@@ -1,0 +1,22 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "example-server"
+path = "src/server.rs"
+
+[[bin]]
+name = "example-client"
+path = "src/client.rs"
+
+[dependencies]
+tonic = "0.8"
+prost = "0.11"
+futures-util = "0.3"
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+tonic-build = "0.8"
+# Also needs protoc, on ubuntu: apt install -y protobuf-compiler

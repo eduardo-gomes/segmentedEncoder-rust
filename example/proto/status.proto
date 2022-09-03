@@ -1,0 +1,32 @@
+syntax = "proto3";
+package status;
+
+message Progress{
+  int32 numerator = 1;
+  int32 denominator = 2;
+}
+
+enum Stage{
+  FAILED = 0;
+  FINISHED = 1;
+  WORKING = 2;
+}
+
+message Duration{
+  uint64 seconds = 1;
+  uint32 nanoseconds = 2;
+}
+
+message StatusReport{
+  Stage phase = 1;
+  Duration elapsed = 2;
+  Progress progress = 3;
+  string report_string = 4;
+}
+
+service StatusReporter{
+  rpc Report(stream StatusReport) returns (ReportResult);
+  rpc GetLatestReport(Empty) returns (StatusReport);
+}
+message Empty{}
+message ReportResult{}
