@@ -1,3 +1,4 @@
+use multiplex_tonic_hyper::MakeMultiplexer;
 use status::status_reporter_server::StatusReporterServer;
 use tower::make::Shared;
 
@@ -35,13 +36,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let status_reporter_service = grpc::StatusKeeper::new();
 
-	// let web_service = web::make_service(&status_reporter_service).into_make_service();
+	let web_service = web::make_service(&status_reporter_service).into_make_service();
 
 	let svc = Shared::new(StatusReporterServer::new(status_reporter_service));
 
+	let multi = MakeMultiplexer::new(svc, web_service);
+
 	println!("Starting server on http://{:?}", addr);
 
-	let server = hyper::Server::bind(&addr).serve(svc);
+	let server = hyper::Server::bind(&addr).serve(multi);
 
 	server.await?;
 
