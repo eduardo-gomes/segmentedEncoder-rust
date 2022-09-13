@@ -1,6 +1,9 @@
+use std::net::SocketAddr;
+
 use multiplex_tonic_hyper::MakeMultiplexer;
-use status::status_reporter_server::StatusReporterServer;
 use tower::make::Shared;
+
+use status::status_reporter_server::StatusReporterServer;
 
 pub mod status {
 	tonic::include_proto!("status");
@@ -9,9 +12,19 @@ pub mod status {
 mod grpc;
 
 pub mod web {
-	use axum::{body::Body, routing::get, Router};
+	use std::net::SocketAddr;
+
+	use axum::{body::Body, extract::ConnectInfo, middleware::{from_fn, Next}, response::Response, Router, routing::get};
+	use hyper::Request;
+	use hyper::server::conn::AddrStream;
 
 	use crate::grpc::StatusKeeper;
+
+	async fn log(req: Request<Body>, next: Next<Body>) -> Response {
+		let addr = req.extensions().get::<ConnectInfo<SocketAddr>>();
+		println!("Got from{addr:?}\nRequest: {} {} {:?}", req.method(), req.uri(), req.version());
+		next.run(req).await
+	}
 
 	pub(super) fn make_service(status_keeper: &StatusKeeper) -> axum::Router<Body> {
 		let fun = |keeper: StatusKeeper| format!("{:#?}", keeper.get_latest_report());
@@ -26,7 +39,7 @@ pub mod web {
 						async move { fun(keeper.clone()) }
 					}
 				}),
-			)
+			).layer(from_fn(log))
 	}
 }
 
@@ -36,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let status_reporter_service = grpc::StatusKeeper::new();
 
-	let web_service = web::make_service(&status_reporter_service).into_make_service();
+	let web_service = web::make_service(&status_reporter_service).into_make_service_with_connect_info::<SocketAddr>();
 
 	let svc = Shared::new(StatusReporterServer::new(status_reporter_service));
 
