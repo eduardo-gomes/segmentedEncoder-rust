@@ -40,7 +40,16 @@ pub mod web {
 	pub(super) fn make_service(status_keeper: &StatusKeeper) -> Router<Body> {
 		let fun = |keeper: StatusKeeper| format!("{:#?}", keeper.get_latest_report());
 		web_packer::include_web_static!()
-			.route("/", get(|| async { "Hello, world!" }))
+			.route(
+				"/",
+				get(|| async {
+					Response::builder()
+						.status(hyper::StatusCode::FOUND)
+						.header(hyper::header::LOCATION, "/index.html")
+						.body(Body::empty())
+						.unwrap()
+				}),
+			)
 			.route(
 				"/latest",
 				get({
