@@ -14,15 +14,26 @@ mod grpc;
 pub mod web {
 	use std::net::SocketAddr;
 
-	use axum::{body::Body, extract::ConnectInfo, middleware::{from_fn, Next}, response::Response, Router, routing::get};
+	use axum::{
+		body::Body,
+		extract::ConnectInfo,
+		middleware::{from_fn, Next},
+		response::Response,
+		Router,
+		routing::get,
+	};
 	use hyper::Request;
-	use hyper::server::conn::AddrStream;
 
 	use crate::grpc::StatusKeeper;
 
 	async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 		let addr = req.extensions().get::<ConnectInfo<SocketAddr>>();
-		println!("Got from{addr:?}\nRequest: {} {} {:?}", req.method(), req.uri(), req.version());
+		println!(
+			"Got from{addr:?}\nRequest: {} {} {:?}",
+			req.method(),
+			req.uri(),
+			req.version()
+		);
 		next.run(req).await
 	}
 
@@ -39,7 +50,8 @@ pub mod web {
 						async move { fun(keeper.clone()) }
 					}
 				}),
-			).layer(from_fn(log))
+			)
+			.layer(from_fn(log))
 	}
 }
 
@@ -49,7 +61,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let status_reporter_service = grpc::StatusKeeper::new();
 
-	let web_service = web::make_service(&status_reporter_service).into_make_service_with_connect_info::<SocketAddr>();
+	let web_service = web::make_service(&status_reporter_service)
+		.into_make_service_with_connect_info::<SocketAddr>();
 
 	let svc = Shared::new(StatusReporterServer::new(status_reporter_service));
 
