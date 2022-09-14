@@ -1,5 +1,6 @@
-use futures_util::StreamExt; //stream.next()
 use std::sync::{Arc, RwLock};
+
+use futures_util::StreamExt;
 use tonic::{Request, Response, Status};
 
 use super::status::status_reporter_server::StatusReporter;
@@ -9,6 +10,7 @@ use super::status::{Empty, ReportResult, StatusReport};
 pub struct StatusKeeper {
 	latest: Arc<RwLock<Option<StatusReport>>>,
 }
+
 impl StatusKeeper {
 	pub fn new() -> Self {
 		StatusKeeper {

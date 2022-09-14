@@ -1,6 +1,6 @@
 const out = document.getElementById("display-latest");
 
-async function refresh(){
+async function refresh() {
     let res = await fetch("/latest");
     let text = await res.text();
     console.log(res, text);
@@ -8,10 +8,11 @@ async function refresh(){
     return "Request got: " + res.status;
 }
 
-function callback(){
+function callback() {
     refresh().then(console.log)
     setTimeout(callback, 500);
 }
+
 callback()
 
 console.log("Js file loaded");

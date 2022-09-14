@@ -2,13 +2,13 @@ use tonic::Request;
 
 use status::status_reporter_client::StatusReporterClient;
 use status::Empty;
+use status_reporter::DelayedStatusReporterStream;
 
 pub mod status {
 	tonic::include_proto!("status"); // The string specified here must match the proto package name
 }
 
 mod status_reporter;
-use status_reporter::DelayedStatusReporterStream;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

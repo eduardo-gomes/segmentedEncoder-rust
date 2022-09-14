@@ -1,6 +1,7 @@
-use futures_util::Stream;
 use std::task::{Poll, Waker};
 use std::time::{Duration, Instant};
+
+use futures_util::Stream;
 
 use super::status::{Duration as StatusDuration, Progress, Stage, StatusReport};
 
@@ -22,6 +23,7 @@ pub(super) struct DelayedStatusReporterStream {
 	ready_at: Instant,
 	started_at: Instant,
 }
+
 impl DelayedStatusReporterStream {
 	/// delay in milliseconds
 	pub(super) fn new(delay: u64, len: i32) -> Self {
@@ -78,6 +80,7 @@ impl DelayedStatusReporterStream {
 		signed.try_into().unwrap_or_default()
 	}
 }
+
 impl Stream for DelayedStatusReporterStream {
 	type Item = StatusReport;
 
