@@ -19,8 +19,10 @@ tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
 tower = "0.4.13"
 hyper = "0.14.20"
 axum = "0.5.15"
+web-packer = { path = "../web-packer" }
 multiplex-tonic-hyper = { git = "https://github.com/eduardo-gomes/multiplex-tonic-hyper.git" }
 
 [build-dependencies]
 tonic-build = "0.8"
+web-packer = { path = "../web-packer" }
 # Also needs protoc, on ubuntu: apt install -y protobuf-compiler

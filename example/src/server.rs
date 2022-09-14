@@ -19,8 +19,8 @@ pub mod web {
 		extract::ConnectInfo,
 		middleware::{from_fn, Next},
 		response::Response,
-		Router,
 		routing::get,
+		Router,
 	};
 	use hyper::Request;
 
@@ -37,9 +37,9 @@ pub mod web {
 		next.run(req).await
 	}
 
-	pub(super) fn make_service(status_keeper: &StatusKeeper) -> axum::Router<Body> {
+	pub(super) fn make_service(status_keeper: &StatusKeeper) -> Router<Body> {
 		let fun = |keeper: StatusKeeper| format!("{:#?}", keeper.get_latest_report());
-		Router::new()
+		web_packer::include_web_static!()
 			.route("/", get(|| async { "Hello, world!" }))
 			.route(
 				"/latest",
