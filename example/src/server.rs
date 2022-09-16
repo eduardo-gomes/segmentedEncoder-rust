@@ -39,7 +39,7 @@ pub mod web {
 
 	pub(super) fn make_service(status_keeper: &StatusKeeper) -> Router<Body> {
 		let fun = |keeper: StatusKeeper| format!("{:#?}", keeper.get_latest_report());
-		web_packer::include_web_static!()
+		web_frontend::get_router()
 			.route(
 				"/",
 				get(|| async {

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Title</title>
+	<style>
+		:root {
+			color-scheme: light dark;
+		}
+	</style>
+</head>
+<body>
+Hello world
+<br/>
+Auto refreshing /latest:
+<div id="job-div">
+	Add job:
+	<div style="display: flex; flex-direction: column">
+		<label>
+			Input file:
+			<input id="file-input" type="file" accept="video/*"/>
+		</label>
+		<label>video encoder:
+			<input id="c:v" type="text"/>
+		</label>
+		<label>video args:
+			<input id="v-args" type="text"/>
+		</label>
+		<label>audio encoder:
+			<input id="c:a" type="text"/>
+		</label>
+		<label>audio args:
+			<input id="a-args" type="text"/>
+		</label>
+		<button id="task-add">Add-task</button>
+	</div>
+</div>
+<div id="status">
+	<pre id="display-latest">Waiting</pre>
+</div>
+<script src="main.js"></script>
+</body>
+</html>
