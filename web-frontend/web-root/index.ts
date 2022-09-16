@@ -1,4 +1,5 @@
 import status_div, {status_updater} from "./status";
+import jobs_div from "./jobs";
 
 const tabs = document.getElementById("tabs");
 const container = document.getElementById("container");
@@ -19,6 +20,7 @@ function add_tab(element: HTMLDivElement, label: string){
     button.addEventListener("click", callback)
 }
 add_tab(status_div, "Status");
+add_tab(jobs_div, "Jobs");
 status_updater(500);
 
 console.log("Js file loaded");
