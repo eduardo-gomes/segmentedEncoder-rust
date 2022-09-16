@@ -71,6 +71,7 @@ mod bundle_web {
 				relative.to_str().ok_or("path is not valid UTF-8")?,
 				absolute.to_str().ok_or("path is not valid UTF-8")?
 			);
+			println!("Mapping {relative:?} to {absolute:?}");
 			list = list.add(&line);
 		}
 
