@@ -54,12 +54,22 @@ mod bundle_web {
 
 	///Generate a rust file that read the files at compile time, and generate a hashmap
 	/// with the relative path as the key
-	pub fn bundle_web_root(web_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+	pub fn bundle_web_root(
+		web_root: &Path,
+		generated: Option<&Path>,
+	) -> Result<(), Box<dyn std::error::Error>> {
 		println!(
 			"cargo:rerun-if-changed={}",
 			web_root.to_str().ok_or("web_root is not valid UTF-8")?
 		);
-		let files = list_all_files(web_root)?;
+		let mut files = list_all_files(web_root)?;
+		let files = {
+			if let Some(path) = generated {
+				let mut generated = list_all_files(path)?;
+				files.append(&mut generated);
+			}
+			files
+		};
 		let out_dir = env::var_os("OUT_DIR")
 			.ok_or("OUT_DIR is not set. Is this running in the build script?")?;
 		let dest = Path::new(&out_dir).join("bundled_web.rs");
