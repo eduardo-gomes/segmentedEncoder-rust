@@ -7,11 +7,16 @@
 		:root {
 			color-scheme: light dark;
 		}
+		.disabled{
+			display: none
+		}
 	</style>
 </head>
 <body>
 Hello world
 <br/>
+<div id="tabs"></div>
+<div id="container"></div>
 Auto refreshing /latest:
 <div id="job-div">
 	Add job:
@@ -34,9 +39,6 @@ Auto refreshing /latest:
 		</label>
 		<button id="task-add">Add-task</button>
 	</div>
-</div>
-<div id="status">
-	<pre id="display-latest">Waiting</pre>
 </div>
 <script src="out.js"></script>
 </body>

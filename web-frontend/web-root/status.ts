@@ -1,4 +1,4 @@
-const status_div = document.getElementById("status");
+const status_div = document.createElement("div");
 const out = document.createElement("pre");
 status_div.appendChild(out);
 
@@ -16,3 +16,4 @@ function callback(timeout: number) {
 }
 
 export {callback as status_updater};
+export default status_div;
