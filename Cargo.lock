@@ -752,6 +752,7 @@ dependencies = [
  "axum",
  "hyper",
  "tokio",
+ "tower",
  "web-frontend",
 ]
 
