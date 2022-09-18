@@ -1,0 +1,12 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread", "signal"] }
+hyper = "0.14.20"
+axum = "0.5.15"
+web-frontend = { path = "../web-frontend" }
