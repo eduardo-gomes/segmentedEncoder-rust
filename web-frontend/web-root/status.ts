@@ -5,8 +5,11 @@ status_div.appendChild(out);
 
 async function refresh() {
 	let res = await fetch("/latest");
-	if (res.status >= 400)
-		throw new Error(`Refresh got status code: ${res.status}`);
+	if (res.status >= 400) {
+		const message = `Refresh got status code: ${res.status}`;
+		out.innerText = message;
+		throw new Error(message);
+	}
 	out.innerText = await res.text();
 	return "Request got: " + res.status;
 }
