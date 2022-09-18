@@ -3,6 +3,8 @@ use std::net::SocketAddr;
 pub mod web {
 	use std::net::SocketAddr;
 
+	use axum::response::Redirect;
+	use axum::routing::get;
 	use axum::{
 		body::Body,
 		extract::ConnectInfo,
@@ -20,7 +22,10 @@ pub mod web {
 	}
 
 	pub(super) fn make_service() -> Router<Body> {
-		web_frontend::get_router().layer(from_fn(log))
+		let redirect = get(|| async { Redirect::permanent("/index.html") });
+		web_frontend::get_router()
+			.route("/", redirect)
+			.layer(from_fn(log))
 	}
 }
 
@@ -29,6 +34,7 @@ async fn shutdown_signal() {
 	tokio::signal::ctrl_c()
 		.await
 		.expect("failed to install CTRL+C signal handler");
+	println!("Received CTRL+C");
 }
 
 #[tokio::main]
