@@ -39,17 +39,8 @@ pub mod web {
 
 	pub(super) fn make_service(status_keeper: &StatusKeeper) -> Router<Body> {
 		let fun = |keeper: StatusKeeper| format!("{:#?}", keeper.get_latest_report());
-		web_frontend::get_router()
-			.route(
-				"/",
-				get(|| async {
-					Response::builder()
-						.status(hyper::StatusCode::FOUND)
-						.header(hyper::header::LOCATION, "/index.html")
-						.body(Body::empty())
-						.unwrap()
-				}),
-			)
+		Router::new()
+			.route("/", get(|| async { "Hello world!\nCheck /latest" }))
 			.route(
 				"/latest",
 				get({

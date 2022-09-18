@@ -136,7 +136,6 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tower",
- "web-frontend",
 ]
 
 [[package]]
