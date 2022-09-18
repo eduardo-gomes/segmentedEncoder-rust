@@ -1,8 +1,8 @@
 import status_div, {status_updater} from "./status";
 import jobs_div from "./jobs";
 
-const tabs = document.getElementById("tabs");
-const container = document.getElementById("container");
+const tabs = document.getElementById("tabs") as HTMLDivElement;
+const container = document.getElementById("container") as HTMLDivElement;
 const div_list = new Map<string, HTMLDivElement>();
 
 function show_div(div: HTMLDivElement) {
@@ -24,6 +24,6 @@ function add_tab(element: HTMLDivElement, label: string) {
 add_tab(status_div, "Status");
 add_tab(jobs_div, "Jobs");
 show_div(status_div);
-status_updater(500);
+status_updater(2000);
 
 console.log("Js file loaded");
