@@ -19,7 +19,7 @@ async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 }
 
 pub(super) fn make_service() -> Router<Body> {
-	let redirect = get(|| async { Redirect::permanent("/index.html") });
+	let redirect = get(|| async { Redirect::permanent("/index.xhtml") });
 	web_frontend::get_router()
 		.route("/", redirect)
 		.nest("/api", api::make_router())
