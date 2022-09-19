@@ -1,3 +1,5 @@
+import Tab from "./tab";
+
 const jobs_div = document.createElement("div");
 const input_div = document.createElement("div");
 jobs_div.appendChild(document.createTextNode("Add job:"));
@@ -69,4 +71,5 @@ type Task = {
 	file: File
 };
 
-export default jobs_div;
+const jobs_tab = new Tab(jobs_div, "Jobs");
+export default jobs_tab;

@@ -1,29 +1,29 @@
-import status_div, {status_updater} from "./status";
+import status_div from "./status";
 import jobs_div from "./jobs";
+import type Tab from "./tab";
 
 const tabs = document.getElementById("tabs") as HTMLDivElement;
 const container = document.getElementById("container") as HTMLDivElement;
-const div_list = new Map<string, HTMLDivElement>();
+const tab_list = new Map<string, Tab>();
 
-function show_div(div: HTMLDivElement) {
-	div_list.forEach((div) => div.classList.add("disabled"));
-	div.classList.remove("disabled");
+function show_tab(tab: Tab) {
+	tab_list.forEach((tab) => tab.hide());
+	tab.show();
 }
 
-function add_tab(element: HTMLDivElement, label: string) {
-	div_list.set(label, element);
+function add_tab(tab: Tab) {
+	tab_list.set(tab.label, tab);
 	const button = document.createElement("button");
-	button.innerText = label;
+	button.innerText = tab.label;
 	tabs.appendChild(button);
-	element.classList.add("disabled");
-	container.appendChild(element);
+	tab.hide();
+	container.appendChild(tab.element);
 
-	button.addEventListener("click", () => show_div(element));
+	button.addEventListener("click", () => show_tab(tab));
 }
 
-add_tab(status_div, "Status");
-add_tab(jobs_div, "Jobs");
-show_div(status_div);
-status_updater(2000);
+add_tab(status_div);
+add_tab(jobs_div);
+show_tab(status_div);
 
 console.log("Js file loaded");
