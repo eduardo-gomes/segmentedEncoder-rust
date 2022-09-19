@@ -45,6 +45,28 @@ input_div.appendChild(audio_args_label);
 const add_button = document.createElement("input");
 add_button.type = "button";
 add_button.value = "Add job";
+add_button.addEventListener("click", create_task);
 input_div.appendChild(add_button);
+
+function create_task() {
+	let files = file_input.files;
+	if (files == null || files.length < 1) throw new Error("No file selected");
+	let task: Task = {
+		video_encoder: video_codec.value,
+		video_args: video_args.value,
+		audio_encoder: audio_codec.value,
+		audio_args: audio_args.value,
+		file: files[0]
+	};
+	console.log("Task to create:", task);
+}
+
+type Task = {
+	video_encoder: string,
+	video_args: string,
+	audio_encoder: string,
+	audio_args: string,
+	file: File
+};
 
 export default jobs_div;
