@@ -61,6 +61,9 @@ function create_task() {
 		file: files[0]
 	};
 	console.log("Task to create:", task);
+	send_task(task)
+		.then((res) => console.log("Created task response:", res))
+		.catch((e) => console.error("Create task error:", e));
 }
 
 type Task = {
@@ -70,6 +73,29 @@ type Task = {
 	audio_args: string,
 	file: File
 };
+
+function visible_ascii_encode(str: string) {
+	//should be able to decode using https://docs.rs/percent-encoding/latest/percent_encoding/fn.percent_decode_str.html
+
+	//the server accepts only visible ascii characters (c >= 32, c < 127, c = \t).
+	//Encode only special characters and '%' for better readability
+	return str.replace(/[^\x20-\x7E\t]|%/g, (c) => encodeURIComponent(c));
+}
+
+async function send_task(task: Task) {
+	const headers = {
+		video_encoder: visible_ascii_encode(task.video_encoder),
+		video_args: visible_ascii_encode(task.video_args),
+		audio_encoder: visible_ascii_encode(task.audio_encoder),
+		audio_args: visible_ascii_encode(task.audio_args),
+	};
+	console.log("Encoded header:", headers);
+	return await fetch("/api/jobs", {
+		method: "POST",
+		headers: headers,
+		body: task.file
+	})
+}
 
 const jobs_tab = new Tab(jobs_div, "Jobs");
 export default jobs_tab;
