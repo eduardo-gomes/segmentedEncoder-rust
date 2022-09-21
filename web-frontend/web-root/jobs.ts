@@ -51,15 +51,20 @@ add_button.addEventListener("click", create_task);
 input_div.appendChild(add_button);
 
 function create_task() {
-	let files = file_input.files;
-	if (files == null || files.length < 1) throw new Error("No file selected");
-	let task: Task = {
-		video_encoder: video_codec.value,
-		video_args: video_args.value,
-		audio_encoder: audio_codec.value,
-		audio_args: audio_args.value,
-		file: files[0]
-	};
+	function get_input() {
+		let files = file_input.files;
+		if (files == null || files.length < 1) throw new Error("No file selected");
+		let task: Task = {
+			video_encoder: video_codec.value,
+			video_args: video_args.value,
+			audio_encoder: audio_codec.value,
+			audio_args: audio_args.value,
+			file: files[0]
+		};
+		return task;
+	}
+
+	let task = get_input();
 	console.log("Task to create:", task);
 	send_task(task)
 		.then((res) => console.log("Created task response:", res))
@@ -74,20 +79,20 @@ type Task = {
 	file: File
 };
 
-function visible_ascii_encode(str: string) {
-	//should be able to decode using https://docs.rs/percent-encoding/latest/percent_encoding/fn.percent_decode_str.html
-
-	//the server accepts only visible ascii characters (c >= 32, c < 127, c = \t).
-	//Encode only special characters and '%' for better readability
-	return str.replace(/[^\x20-\x7E\t]|%/g, (c) => encodeURIComponent(c));
+function visible_ascii(str: string) {
+	//Only ascii will be allowed for now.
+	//For previous encoding: https://github.com/eduardo-gomes/segmentedEncoder-rust/blob/b82d0ea872d5784cedbac3003db6df6e09ccbf37/web-frontend/web-root/jobs.ts#L77
+	const match = str.match(/[^\x20-\x7E\t]|%/g);
+	if (match) throw Error("Found character not in visible ascii: " + match.join());
+	return str;
 }
 
 async function send_task(task: Task) {
 	const headers = {
-		video_encoder: visible_ascii_encode(task.video_encoder),
-		video_args: visible_ascii_encode(task.video_args),
-		audio_encoder: visible_ascii_encode(task.audio_encoder),
-		audio_args: visible_ascii_encode(task.audio_args),
+		video_encoder: visible_ascii(task.video_encoder),
+		video_args: visible_ascii(task.video_args),
+		audio_encoder: visible_ascii(task.audio_encoder),
+		audio_args: visible_ascii(task.audio_args),
 	};
 	console.log("Encoded header:", headers);
 	return await fetch("/api/jobs", {
