@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-mod web;
+use server::make_service;
 
 async fn shutdown_signal() {
 	// Wait for the CTRL+C signal
@@ -14,7 +14,7 @@ async fn shutdown_signal() {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let addr = "[::]:8888".parse().unwrap();
 
-	let web_service = web::make_service().into_make_service_with_connect_info::<SocketAddr>();
+	let web_service = make_service().into_make_service_with_connect_info::<SocketAddr>();
 
 	println!("Starting server on http://{:?}", addr);
 	let server = hyper::Server::bind(&addr).serve(web_service);
