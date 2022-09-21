@@ -97,5 +97,14 @@ async function send_task(task: Task) {
 	})
 }
 
+function fill_default_values() {
+	video_codec.value = "libsvtav1";
+	video_args.value = "-preset 4 -crf 27";
+	audio_codec.value = "opus";
+	audio_args.value = "-b:a 96k";
+}
+
+fill_default_values();
+
 const jobs_tab = new Tab(jobs_div, "Jobs");
 export default jobs_tab;
