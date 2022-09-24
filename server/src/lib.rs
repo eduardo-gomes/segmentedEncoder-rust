@@ -7,3 +7,5 @@ pub mod web;
 pub fn make_service() -> Router {
 	web::make_service()
 }
+
+mod storage;
