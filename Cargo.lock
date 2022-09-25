@@ -751,8 +751,10 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "hyper",
+ "tempfile",
  "tokio",
  "tower",
+ "uuid",
  "web-frontend",
 ]
 
@@ -1040,6 +1042,15 @@ name = "unicode-ident"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4f5b37a154999a8f3f98cc23a628d850e154479cd94decf3414696e12e31aaf"
+
+[[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+dependencies = [
+ "getrandom",
+]
 
 [[package]]
 name = "version_check"
