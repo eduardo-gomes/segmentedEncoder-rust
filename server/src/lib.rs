@@ -9,3 +9,22 @@ pub fn make_service() -> Router {
 }
 
 mod storage;
+
+mod jobs {
+	pub struct JobParams {
+		video_encoder: String,
+	}
+
+	impl JobParams {
+		#[cfg(test)]
+		pub(crate) fn sample_params() -> Self {
+			JobParams {
+				video_encoder: "libsvtav1".to_string(),
+			}
+		}
+	}
+	pub struct Job();
+}
+
+#[allow(dead_code)]
+mod job_manager;
