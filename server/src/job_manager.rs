@@ -6,9 +6,16 @@ use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams};
 
+#[derive(Debug)]
 struct JobManager {
 	count: usize,
 	map: HashMap<Uuid, Arc<RwLock<Job>>>,
+}
+
+impl JobManager {
+	pub(crate) fn status(&self) -> String {
+		format!("{self:?}")
+	}
 }
 
 impl JobManager {
@@ -62,7 +69,7 @@ mod test {
 
 	#[test]
 	fn get_job_nonexistent_uuid_none() {
-		let mut manager = JobManager::new();
+		let manager = JobManager::new();
 		let uuid = Uuid::new_v4();
 		let job = manager.get_job(&uuid);
 		assert!(job.is_none());
@@ -86,5 +93,18 @@ mod test {
 
 		manager.create_job(Body::empty(), JobParams::sample_params());
 		assert_eq!(manager.job_count(), 1);
+	}
+
+	#[test]
+	fn status_turns_into_string_with_job_id() {
+		let mut manager = JobManager::new();
+		let (uuid, _) = manager.create_job(Body::empty(), JobParams::sample_params());
+
+		let status = manager.status().to_string();
+		let uuid_string = uuid.as_hyphenated().to_string();
+		assert!(
+			status.contains(&uuid_string),
+			"'{status}' should contains '{uuid_string}'"
+		)
 	}
 }

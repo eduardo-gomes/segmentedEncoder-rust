@@ -23,6 +23,7 @@ mod jobs {
 			}
 		}
 	}
+	#[derive(Debug)]
 	pub struct Job();
 }
 
