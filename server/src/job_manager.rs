@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, RwLock};
 
 use hyper::Body;
@@ -6,15 +7,29 @@ use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams};
 
-#[derive(Debug)]
 pub(crate) struct JobManager {
 	count: usize,
 	map: HashMap<Uuid, Arc<RwLock<Job>>>,
 }
 
+impl Debug for JobManager {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		//map to use uuid as hyphenated
+		let map: Vec<(String, &Arc<RwLock<Job>>)> = self
+			.map
+			.iter()
+			.map(|(u, j)| (u.as_hyphenated().to_string(), j))
+			.collect();
+		f.debug_struct("JobManager")
+			.field("count", &self.job_count())
+			.field("map", &map)
+			.finish()
+	}
+}
+
 impl JobManager {
 	pub(crate) fn status(&self) -> String {
-		format!("{self:#?}")
+		format!("{:#?}", self)
 	}
 }
 
@@ -53,8 +68,9 @@ impl JobManager {
 
 #[cfg(test)]
 mod test {
-	use hyper::Body;
 	use std::ops::Deref;
+
+	use hyper::Body;
 	use uuid::Uuid;
 
 	use crate::job_manager::JobManager;
