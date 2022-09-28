@@ -7,14 +7,14 @@ use uuid::Uuid;
 use crate::jobs::{Job, JobParams};
 
 #[derive(Debug)]
-struct JobManager {
+pub(crate) struct JobManager {
 	count: usize,
 	map: HashMap<Uuid, Arc<RwLock<Job>>>,
 }
 
 impl JobManager {
 	pub(crate) fn status(&self) -> String {
-		format!("{self:?}")
+		format!("{self:#?}")
 	}
 }
 

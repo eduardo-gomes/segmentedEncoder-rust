@@ -5,14 +5,18 @@ pub mod web;
 /// Temporary function to 'build' the service.
 /// Will be replaced with a proper builder to set service proprieties.
 pub fn make_service() -> Router {
-	web::make_service()
+	use crate::job_manager::JobManager;
+	use std::sync::{Arc, RwLock};
+	let manager = Arc::new(RwLock::new(JobManager::new()));
+	web::make_service(manager)
 }
 
+#[allow(dead_code)]
 mod storage;
 
 mod jobs {
 	pub struct JobParams {
-		video_encoder: String,
+		pub(crate) video_encoder: String,
 	}
 
 	impl JobParams {
