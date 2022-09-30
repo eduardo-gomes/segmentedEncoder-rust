@@ -2,10 +2,9 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::{Arc, RwLock};
 
-use hyper::Body;
 use uuid::Uuid;
 
-use crate::jobs::{Job, JobParams};
+use crate::jobs::Job;
 
 pub(crate) struct JobManager {
 	count: usize,
@@ -40,14 +39,10 @@ impl JobManager {
 }
 
 impl JobManager {
-	pub(crate) fn create_job(
-		&mut self,
-		_input: Body,
-		_params: JobParams,
-	) -> (Uuid, Arc<RwLock<Job>>) {
+	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<RwLock<Job>>) {
 		self.count += 1;
 		let uuid = Uuid::new_v4();
-		let arc = Arc::new(RwLock::new(Job {}));
+		let arc = Arc::new(RwLock::new(job));
 		self.map.insert(uuid.clone(), arc.clone());
 		(uuid, arc)
 	}
@@ -70,11 +65,10 @@ impl JobManager {
 mod test {
 	use std::ops::Deref;
 
-	use hyper::Body;
 	use uuid::Uuid;
 
 	use crate::job_manager::JobManager;
-	use crate::jobs::JobParams;
+	use crate::jobs::{Job, JobParams, Source};
 
 	#[test]
 	fn new_job_manager_has_0_jobs() {
@@ -94,8 +88,9 @@ mod test {
 	#[test]
 	fn get_reference_to_job_from_uuid() {
 		let mut manager = JobManager::new();
+		let job = Job::new(Source::Local(), JobParams::sample_params());
 
-		let (uuid, job) = manager.create_job(Body::empty(), JobParams::sample_params());
+		let (uuid, job) = manager.add_job(job);
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert!(
 			std::ptr::eq(job.read().unwrap().deref(), job2.read().unwrap().deref()),
@@ -107,14 +102,16 @@ mod test {
 	fn new_manager_has_1_job_after_enqueue() {
 		let mut manager = JobManager::new();
 
-		manager.create_job(Body::empty(), JobParams::sample_params());
+		let job = Job::new(Source::Local(), JobParams::sample_params());
+		manager.add_job(job);
 		assert_eq!(manager.job_count(), 1);
 	}
 
 	#[test]
 	fn status_turns_into_string_with_job_id() {
 		let mut manager = JobManager::new();
-		let (uuid, _) = manager.create_job(Body::empty(), JobParams::sample_params());
+		let job = Job::new(Source::Local(), JobParams::sample_params());
+		let (uuid, _) = manager.add_job(job);
 
 		let status = manager.status().to_string();
 		let uuid_string = uuid.as_hyphenated().to_string();

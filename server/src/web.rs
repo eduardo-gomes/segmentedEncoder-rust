@@ -38,7 +38,7 @@ mod api {
 	use hyper::{Body, Response, StatusCode};
 
 	use crate::job_manager::JobManager;
-	use crate::jobs::JobParams;
+	use crate::jobs::{Job, JobParams, Source};
 
 	fn parse_job(headers: &HeaderMap) -> Result<JobParams, &'static str> {
 		let encoder = headers
@@ -65,19 +65,22 @@ mod api {
 				.status(StatusCode::BAD_REQUEST)
 				.body(Body::from(str))
 				.unwrap(),
-			Ok(params) => match state.0.write() {
-				Ok(mut job) => {
-					let (uuid, _) = job.create_job(req.into_body(), params);
-					Response::builder()
-						.status(StatusCode::OK)
-						.body(Body::from(uuid.as_hyphenated().to_string()))
-						.unwrap()
+			Ok(params) => {
+				let job = Job::new(Source::Local(), params);
+				match state.0.write() {
+					Ok(mut manager) => {
+						let (uuid, _) = manager.add_job(job);
+						Response::builder()
+							.status(StatusCode::OK)
+							.body(Body::from(uuid.as_hyphenated().to_string()))
+							.unwrap()
+					}
+					Err(e) => Response::builder()
+						.status(StatusCode::INTERNAL_SERVER_ERROR)
+						.body(Body::from(format!("Job manager became poisoned!\n{e}")))
+						.unwrap(),
 				}
-				Err(e) => Response::builder()
-					.status(StatusCode::INTERNAL_SERVER_ERROR)
-					.body(Body::from(format!("Job manager became poisoned!\n{e}")))
-					.unwrap(),
-			},
+			}
 		}
 	}
 
