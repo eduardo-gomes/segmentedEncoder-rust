@@ -1,3 +1,5 @@
+extern crate core;
+
 use axum::Router;
 
 use crate::storage::Storage;

@@ -18,10 +18,11 @@ pub(crate) struct JobManager {
 impl JobManager {
 	pub(crate) async fn create_job(
 		&mut self,
-		_body: Body,
+		body: Body,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<RwLock<Job>>)> {
-		let (_file, id) = self.storage.create_file().await?;
+		let (mut file, id) = self.storage.create_file().await?;
+		stream::body_to_file(body, &mut file).await?;
 		let job = Job::new(Source::Local(id), params);
 
 		Ok(self.add_job(job))
@@ -83,7 +84,7 @@ mod stream {
 	use hyper::Body;
 	use tokio::fs::File;
 
-	async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
+	pub(crate) async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
 		use futures_util::stream::TryStreamExt;
 		use futures_util::StreamExt;
 		let stream = body
@@ -128,6 +129,7 @@ mod test {
 	use std::ops::Deref;
 
 	use hyper::Body;
+	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
 	use crate::job_manager::JobManager;
@@ -201,5 +203,26 @@ mod test {
 			.unwrap();
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert_eq!(job.read().unwrap().deref(), job2.read().unwrap().deref());
+	}
+
+	#[tokio::test]
+	async fn create_job_check_source() {
+		let body = Body::from(WEBM_SAMPLE.as_slice());
+		//Using rwlock because it will only lock for part of the function
+		let mut manager = make_job_manager();
+
+		let (_uuid, job) = manager
+			.create_job(body, JobParams::sample_params())
+			.await
+			.unwrap();
+		let uuid = match job.read().unwrap().source.clone() {
+			Source::Local(uuid) => uuid,
+		};
+		let mut file = manager.storage.get_file(&uuid).await.unwrap();
+
+		let mut content = Vec::new();
+		file.read_to_end(&mut content).await.unwrap();
+
+		assert_eq!(content, WEBM_SAMPLE);
 	}
 }
