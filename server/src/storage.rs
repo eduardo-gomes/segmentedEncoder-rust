@@ -9,7 +9,7 @@ use tempfile::{tempdir, TempDir};
 use tokio::fs::File;
 use uuid::Uuid;
 
-struct Storage {
+pub struct Storage {
 	dir: TempDir,
 }
 

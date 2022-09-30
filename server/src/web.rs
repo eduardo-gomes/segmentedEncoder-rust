@@ -110,7 +110,7 @@ mod api {
 mod test {
 	use std::error::Error;
 
-	use crate::WEBM_SAMPLE;
+	use crate::{Storage, WEBM_SAMPLE};
 	use axum::Router;
 	use hyper::header::CONTENT_TYPE;
 	use hyper::service::Service;
@@ -121,7 +121,8 @@ mod test {
 	fn make_service() -> Router<Body> {
 		use crate::job_manager::JobManager;
 		use std::sync::{Arc, RwLock};
-		let manager = Arc::new(RwLock::new(JobManager::new()));
+		let storage = Storage::new().unwrap();
+		let manager = Arc::new(RwLock::new(JobManager::new(storage)));
 		super::make_service(manager)
 	}
 

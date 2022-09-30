@@ -1,3 +1,4 @@
+use crate::storage::Storage;
 use axum::Router;
 
 pub mod web;
@@ -7,7 +8,8 @@ pub mod web;
 pub fn make_service() -> Router {
 	use crate::job_manager::JobManager;
 	use std::sync::{Arc, RwLock};
-	let manager = Arc::new(RwLock::new(JobManager::new()));
+	let storage = Storage::new().unwrap();
+	let manager = Arc::new(RwLock::new(JobManager::new(storage)));
 	web::make_service(manager)
 }
 
