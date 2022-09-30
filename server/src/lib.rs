@@ -15,6 +15,8 @@ pub fn make_service() -> Router {
 mod storage;
 
 mod jobs {
+	use uuid::Uuid;
+
 	#[derive(Clone, Debug)]
 	#[cfg_attr(test, derive(PartialEq))]
 	pub struct JobParams {
@@ -23,7 +25,7 @@ mod jobs {
 	#[derive(Clone, Debug)]
 	#[cfg_attr(test, derive(PartialEq))]
 	pub(crate) enum Source {
-		Local(),
+		Local(Uuid),
 	}
 
 	impl JobParams {
@@ -50,10 +52,11 @@ mod jobs {
 	#[cfg(test)]
 	mod test {
 		use crate::jobs::{Job, JobParams, Source};
+		use uuid::Uuid;
 
 		#[test]
 		fn job_takes_source_and_parameters() {
-			let source = Source::Local();
+			let source = Source::Local(Uuid::new_v4());
 			let parameters = JobParams::sample_params();
 			let job = Job::new(source.clone(), parameters.clone());
 

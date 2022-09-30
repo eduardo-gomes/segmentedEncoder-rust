@@ -36,6 +36,7 @@ mod api {
 	use axum::routing::{get, post};
 	use axum::{Extension, Router};
 	use hyper::{Body, Response, StatusCode};
+	use uuid::Uuid;
 
 	use crate::job_manager::JobManager;
 	use crate::jobs::{Job, JobParams, Source};
@@ -66,7 +67,7 @@ mod api {
 				.body(Body::from(str))
 				.unwrap(),
 			Ok(params) => {
-				let job = Job::new(Source::Local(), params);
+				let job = Job::new(Source::Local(Uuid::nil()), params);
 				match state.0.write() {
 					Ok(mut manager) => {
 						let (uuid, _) = manager.add_job(job);
