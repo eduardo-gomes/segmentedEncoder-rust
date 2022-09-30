@@ -79,6 +79,50 @@ impl JobManager {
 	}
 }
 
+mod stream {
+	use hyper::Body;
+	use tokio::fs::File;
+
+	async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
+		use futures_util::stream::TryStreamExt;
+		use futures_util::StreamExt;
+		let stream = body
+			.map(|res| {
+				res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+			})
+			.into_async_read();
+		let mut stream = tokio_util::compat::FuturesAsyncReadCompatExt::compat(stream);
+		tokio::io::copy(&mut stream, file).await
+	}
+
+	#[cfg(test)]
+	mod test {
+		use hyper::Body;
+
+		use crate::job_manager::stream::body_to_file;
+		use crate::{Storage, WEBM_SAMPLE};
+
+		#[tokio::test]
+		async fn body_to_job_source() -> std::io::Result<()> {
+			let body = Body::from(WEBM_SAMPLE.as_slice());
+
+			let storage = Storage::new()?;
+			let uuid = {
+				let (mut file, uuid) = storage.create_file().await?;
+				let _len = body_to_file(body, &mut file).await?;
+				uuid
+			};
+
+			let mut file = storage.get_file(&uuid).await?;
+			let mut read = Vec::new();
+			use tokio::io::AsyncReadExt;
+			file.read_to_end(&mut read).await?;
+			assert_eq!(read, WEBM_SAMPLE, "Content should be the same");
+			Ok(())
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use std::ops::Deref;
