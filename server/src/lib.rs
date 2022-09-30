@@ -1,5 +1,6 @@
-use crate::storage::Storage;
 use axum::Router;
+
+use crate::storage::Storage;
 
 pub mod web;
 
@@ -24,6 +25,7 @@ mod jobs {
 	pub struct JobParams {
 		pub(crate) video_encoder: String,
 	}
+
 	#[derive(Clone, Debug)]
 	#[cfg_attr(test, derive(PartialEq))]
 	pub(crate) enum Source {
@@ -38,6 +40,7 @@ mod jobs {
 			}
 		}
 	}
+
 	#[derive(Debug)]
 	#[cfg_attr(test, derive(PartialEq))]
 	pub(crate) struct Job {
@@ -53,8 +56,9 @@ mod jobs {
 
 	#[cfg(test)]
 	mod test {
-		use crate::jobs::{Job, JobParams, Source};
 		use uuid::Uuid;
+
+		use crate::jobs::{Job, JobParams, Source};
 
 		#[test]
 		fn job_takes_source_and_parameters() {
