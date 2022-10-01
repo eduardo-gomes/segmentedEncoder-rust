@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::io::{Error, ErrorKind};
+use std::sync::{Arc, PoisonError, RwLock};
 
 use hyper::Body;
 use uuid::Uuid;
@@ -17,15 +18,21 @@ pub(crate) struct JobManager {
 
 impl JobManager {
 	pub(crate) async fn create_job(
-		&mut self,
+		lock: &RwLock<Self>,
 		body: Body,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<RwLock<Job>>)> {
-		let (mut file, id) = self.storage.create_file().await?;
+		fn to_io<T>(e: PoisonError<T>) -> Error {
+			Error::new(ErrorKind::Other, e.to_string())
+		}
+		let (mut file, id) = {
+			let read = lock.read().map_err(to_io)?;
+			read.storage.create_file().await?
+		};
 		stream::body_to_file(body, &mut file).await?;
 		let job = Job::new(Source::Local(id), params);
 
-		Ok(self.add_job(job))
+		Ok(lock.write().map_err(to_io)?.add_job(job))
 	}
 }
 
@@ -83,6 +90,7 @@ impl JobManager {
 #[cfg(test)]
 mod test {
 	use std::ops::Deref;
+	use std::sync::RwLock;
 
 	use hyper::Body;
 	use tokio::io::AsyncReadExt;
@@ -151,13 +159,12 @@ mod test {
 	async fn create_job() {
 		let body = Body::from(WEBM_SAMPLE.as_slice());
 		//Using rwlock because it will only lock for part of the function
-		let mut manager = make_job_manager();
+		let manager = RwLock::new(make_job_manager());
 
-		let (uuid, job) = manager
-			.create_job(body, JobParams::sample_params())
+		let (uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let job2 = manager.get_job(&uuid).unwrap();
+		let job2 = manager.read().unwrap().get_job(&uuid).unwrap();
 		assert_eq!(job.read().unwrap().deref(), job2.read().unwrap().deref());
 	}
 
@@ -165,16 +172,21 @@ mod test {
 	async fn create_job_check_source() {
 		let body = Body::from(WEBM_SAMPLE.as_slice());
 		//Using rwlock because it will only lock for part of the function
-		let mut manager = make_job_manager();
+		let manager = RwLock::new(make_job_manager());
 
-		let (_uuid, job) = manager
-			.create_job(body, JobParams::sample_params())
+		let (_uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
 			.await
 			.unwrap();
 		let uuid = match job.read().unwrap().source.clone() {
 			Source::Local(uuid) => uuid,
 		};
-		let mut file = manager.storage.get_file(&uuid).await.unwrap();
+		let mut file = manager
+			.read()
+			.unwrap()
+			.storage
+			.get_file(&uuid)
+			.await
+			.unwrap();
 
 		let mut content = Vec::new();
 		file.read_to_end(&mut content).await.unwrap();
