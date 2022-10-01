@@ -77,7 +77,7 @@ mod bundle_web {
 		let mut list = String::new();
 		for (relative, absolute) in files {
 			let line = format!(
-				"\tmap.insert(\"{}\", include_bytes!(\"{}\").as_slice());\n",
+				"\tmap.insert(\"{}\", include_bytes!(r\"{}\").as_slice());\n",
 				relative.to_str().ok_or("path is not valid UTF-8")?,
 				absolute.to_str().ok_or("path is not valid UTF-8")?
 			);

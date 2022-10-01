@@ -85,8 +85,8 @@ mod stream {
 	use tokio::fs::File;
 
 	pub(crate) async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
-		use futures_util::stream::TryStreamExt;
-		use futures_util::StreamExt;
+		use futures::stream::TryStreamExt;
+		use futures::StreamExt;
 		let stream = body
 			.map(|res| {
 				res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
