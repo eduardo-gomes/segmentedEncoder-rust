@@ -30,7 +30,7 @@ pub(super) fn make_service(manager: Arc<RwLock<JobManager>>) -> Router<Body> {
 }
 
 mod api {
-	use std::sync::{Arc, RwLock};
+	use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 	use axum::{Extension, Router};
 	use axum::extract::Path;
@@ -61,28 +61,38 @@ mod api {
 	) -> Response<Body> {
 		dbg!(req.headers());
 		let headers = req.headers();
-		let params = parse_job(headers);
-		match params {
-			Err(str) => Response::builder()
+		let params = parse_job(headers).map_err(|str| {
+			Response::builder()
 				.status(StatusCode::BAD_REQUEST)
 				.body(Body::from(str))
-				.unwrap(),
-			Ok(params) => {
-				let job = Job::new(Source::Local(Uuid::nil()), params);
-				match state.0.write() {
-					Ok(mut manager) => {
-						let (uuid, _) = manager.add_job(job);
-						Response::builder()
-							.status(StatusCode::OK)
-							.body(Body::from(uuid.as_hyphenated().to_string()))
-							.unwrap()
-					}
-					Err(e) => Response::builder()
+				.unwrap()
+		});
+		let handle_post = |params| {
+			let job = Job::new(Source::Local(Uuid::nil()), params);
+			let add_job = |mut manager: RwLockWriteGuard<JobManager>| {
+				let (uuid, _) = manager.add_job(job);
+				Response::builder()
+					.status(StatusCode::OK)
+					.body(Body::from(uuid.as_hyphenated().to_string()))
+					.unwrap()
+			};
+			let try_lock = state.0.write();
+			let lock = try_lock
+				.map_err(|e| {
+					Response::builder()
 						.status(StatusCode::INTERNAL_SERVER_ERROR)
 						.body(Body::from(format!("Job manager became poisoned!\n{e}")))
-						.unwrap(),
-				}
+						.unwrap()
+				})
+				.map(add_job);
+			match lock {
+				Ok(res) => res,
+				Err(e) => e,
 			}
+		};
+		match params {
+			Err(res) => res,
+			Ok(params) => handle_post(params),
 		}
 	}
 
@@ -90,7 +100,15 @@ mod api {
 		Path(job_id): Path<Uuid>,
 		state: Extension<Arc<RwLock<JobManager>>>,
 	) -> Response<Body> {
-		let job = state.0.read().map(|manager| manager.get_job(&job_id));
+		let try_lock = state.0.read();
+		let job = try_lock
+			.map(|manager| manager.get_job(&job_id))
+			.map_err(|e| {
+				Response::builder()
+					.status(StatusCode::INTERNAL_SERVER_ERROR)
+					.body(Body::from(e.to_string()))
+					.unwrap()
+			});
 		match job {
 			Ok(job) => match job {
 				Some(_) => Response::builder()
@@ -102,10 +120,7 @@ mod api {
 					.body(Body::empty())
 					.unwrap(),
 			},
-			Err(e) => Response::builder()
-				.status(StatusCode::INTERNAL_SERVER_ERROR)
-				.body(Body::from(e.to_string()))
-				.unwrap(),
+			Err(e) => e,
 		}
 	}
 
