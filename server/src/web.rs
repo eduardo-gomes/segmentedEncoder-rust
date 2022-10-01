@@ -1,8 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
-use axum::response::Redirect;
-use axum::routing::get;
 use axum::{
 	body::Body,
 	extract::ConnectInfo,
@@ -10,6 +8,8 @@ use axum::{
 	response::Response,
 	Router,
 };
+use axum::response::Redirect;
+use axum::routing::get;
 use hyper::Request;
 
 use crate::job_manager::JobManager;
@@ -32,9 +32,10 @@ pub(super) fn make_service(manager: Arc<RwLock<JobManager>>) -> Router<Body> {
 mod api {
 	use std::sync::{Arc, RwLock};
 
+	use axum::{Extension, Router};
+	use axum::extract::Path;
 	use axum::http::{HeaderMap, Request};
 	use axum::routing::{get, post};
-	use axum::{Extension, Router};
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
@@ -85,10 +86,34 @@ mod api {
 		}
 	}
 
+	async fn job_source(
+		Path(job_id): Path<Uuid>,
+		state: Extension<Arc<RwLock<JobManager>>>,
+	) -> Response<Body> {
+		let job = state.0.read().map(|manager| manager.get_job(&job_id));
+		match job {
+			Ok(job) => match job {
+				Some(_) => Response::builder()
+					.status(StatusCode::OK)
+					.body(Body::empty())
+					.unwrap(),
+				None => Response::builder()
+					.status(StatusCode::NOT_FOUND)
+					.body(Body::empty())
+					.unwrap(),
+			},
+			Err(e) => Response::builder()
+				.status(StatusCode::INTERNAL_SERVER_ERROR)
+				.body(Body::from(e.to_string()))
+				.unwrap(),
+		}
+	}
+
 	pub(crate) fn make_router(job_manager: Arc<RwLock<JobManager>>) -> Router<Body> {
 		Router::new()
 			.route("/status", get(get_status))
 			.route("/jobs", post(job_post))
+			.route("/jobs/:job_id/source", get(job_source))
 			.layer(Extension(job_manager))
 	}
 
@@ -111,9 +136,9 @@ mod test {
 	use std::error::Error;
 
 	use axum::Router;
+	use hyper::{Body, HeaderMap, http, Method, Request, StatusCode};
 	use hyper::header::CONTENT_TYPE;
 	use hyper::service::Service;
-	use hyper::{http, Body, HeaderMap, Method, Request, StatusCode};
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
@@ -229,6 +254,34 @@ mod test {
 			status.contains(&job_id),
 			"'{status}' should contain the job id '{job_id}'"
 		);
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn get_job_source_200() -> Result<(), Box<dyn Error>> {
+		let mut service = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse()?);
+		let request = build_job_request_with_headers(&headers)?;
+		let response = service.ready().await?.call(request).await?;
+		let job_id = hyper::body::to_bytes(response.into_body()).await?;
+		let job_id = String::from_utf8(job_id.to_vec())?;
+
+		let uri = format!("/api/jobs/{job_id}/source");
+		let request = Request::get(uri).body(Body::empty()).unwrap();
+		let response = service.ready().await?.call(request).await?;
+		assert_eq!(response.status(), StatusCode::OK);
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn get_job_source_unknown_job_404() -> Result<(), Box<dyn Error>> {
+		let service = make_service();
+		let uuid = Uuid::new_v4();
+		let uri = format!("/api/jobs/{uuid}/source");
+		let request = Request::get(uri).body(Body::empty()).unwrap();
+		let response = service.oneshot(request).await?;
+		assert_eq!(response.status(), StatusCode::NOT_FOUND);
 		Ok(())
 	}
 }

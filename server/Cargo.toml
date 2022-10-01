@@ -13,7 +13,7 @@ hyper = "0.14.20"
 axum = "0.5.15"
 web-frontend = { path = "../web-frontend" }
 tempfile = "3"
-uuid = {version = "1.1.2", features = ["v4"]}
+uuid = { version = "1.1.2", features = ["v4", "serde"] }
 
 [dev-dependencies]
 tower = "0.4.13"
