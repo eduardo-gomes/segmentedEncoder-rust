@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams, Source};
-use crate::storage::{Storage, stream};
+use crate::storage::{stream, Storage};
 
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
@@ -107,9 +107,9 @@ mod test {
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
-	use crate::{Storage, WEBM_SAMPLE};
 	use crate::job_manager::{JobManager, JobManagerUtils};
 	use crate::jobs::{Job, JobParams, Source};
+	use crate::{Storage, WEBM_SAMPLE};
 
 	fn make_job_manager() -> JobManager {
 		JobManager::new(Storage::new().unwrap())

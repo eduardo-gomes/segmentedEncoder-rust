@@ -106,8 +106,8 @@ pub mod stream {
 	mod test {
 		use hyper::Body;
 
-		use crate::{Storage, WEBM_SAMPLE};
 		use crate::storage::stream::body_to_file;
+		use crate::{Storage, WEBM_SAMPLE};
 
 		#[tokio::test]
 		async fn body_to_job_source() -> std::io::Result<()> {
