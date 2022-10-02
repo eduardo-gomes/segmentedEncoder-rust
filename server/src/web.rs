@@ -95,21 +95,22 @@ mod api {
 		match job {
 			Some(job) => {
 				let source = job.read().await.source.clone();
-				match source {
-					Source::Local(uuid) => {
-						let file = state.read().await.storage.get_file(&uuid).await;
-						match file {
-							Ok(file) => Response::builder()
-								.status(StatusCode::OK)
-								//Uses Transfer-Encoding: chunked if Content-Length is not specified
-								.body(Body::wrap_stream(read_to_stream(file)))
-								.unwrap(),
-							Err(e) => Response::builder()
-								.status(StatusCode::INTERNAL_SERVER_ERROR)
-								.body(Body::from(format!("Failed to read file: {e}")))
-								.unwrap(),
-						}
+				async fn send_local(state: &JobManagerLock, uuid: &Uuid) -> Response<Body> {
+					let file = state.read().await.storage.get_file(&uuid).await;
+					match file {
+						Ok(file) => Response::builder()
+							.status(StatusCode::OK)
+							//Uses Transfer-Encoding: chunked if Content-Length is not specified
+							.body(Body::wrap_stream(read_to_stream(file)))
+							.unwrap(),
+						Err(e) => Response::builder()
+							.status(StatusCode::INTERNAL_SERVER_ERROR)
+							.body(Body::from(format!("Failed to read file: {e}")))
+							.unwrap(),
 					}
+				}
+				match source {
+					Source::Local(uuid) => send_local(&state, &uuid).await,
 				}
 			}
 			None => Response::builder()
