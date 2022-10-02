@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use axum::{
 	body::Body,
@@ -12,7 +12,7 @@ use axum::response::Redirect;
 use axum::routing::get;
 use hyper::Request;
 
-use crate::job_manager::JobManager;
+use crate::job_manager::JobManagerLock;
 
 async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 	let addr = req.extensions().get::<ConnectInfo<SocketAddr>>();
@@ -21,7 +21,7 @@ async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 	next.run(req).await
 }
 
-pub(super) fn make_service(manager: Arc<RwLock<JobManager>>) -> Router<Body> {
+pub(super) fn make_service(manager: Arc<JobManagerLock>) -> Router<Body> {
 	let redirect = get(|| async { Redirect::permanent("/index.xhtml") });
 	web_frontend::get_router()
 		.route("/", redirect)
@@ -30,7 +30,7 @@ pub(super) fn make_service(manager: Arc<RwLock<JobManager>>) -> Router<Body> {
 }
 
 mod api {
-	use std::sync::{Arc, RwLock, RwLockWriteGuard};
+	use std::sync::Arc;
 
 	use axum::{Extension, Router};
 	use axum::extract::Path;
@@ -39,7 +39,7 @@ mod api {
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
-	use crate::job_manager::JobManager;
+	use crate::job_manager::JobManagerLock;
 	use crate::jobs::{Job, JobParams, Source};
 
 	fn parse_job(headers: &HeaderMap) -> Result<JobParams, &'static str> {
@@ -55,10 +55,7 @@ mod api {
 		}
 	}
 
-	async fn job_post(
-		state: Extension<Arc<RwLock<JobManager>>>,
-		req: Request<Body>,
-	) -> Response<Body> {
+	async fn job_post(state: Extension<Arc<JobManagerLock>>, req: Request<Body>) -> Response<Body> {
 		dbg!(req.headers());
 		let headers = req.headers();
 		let params = parse_job(headers).map_err(|str| {
@@ -69,62 +66,38 @@ mod api {
 		});
 		let handle_post = |params| {
 			let job = Job::new(Source::Local(Uuid::nil()), params);
-			let add_job = |mut manager: RwLockWriteGuard<JobManager>| {
-				let (uuid, _) = manager.add_job(job);
-				Response::builder()
-					.status(StatusCode::OK)
-					.body(Body::from(uuid.as_hyphenated().to_string()))
-					.unwrap()
-			};
-			let try_lock = state.0.write();
-			let lock = try_lock
-				.map_err(|e| {
-					Response::builder()
-						.status(StatusCode::INTERNAL_SERVER_ERROR)
-						.body(Body::from(format!("Job manager became poisoned!\n{e}")))
-						.unwrap()
-				})
-				.map(add_job);
-			match lock {
-				Ok(res) => res,
-				Err(e) => e,
-			}
+			let mut manager = state.0.write().await;
+			let (uuid, _) = manager.add_job(job);
+			Response::builder()
+				.status(StatusCode::OK)
+				.body(Body::from(uuid.as_hyphenated().to_string()))
+				.unwrap()
 		};
 		match params {
 			Err(res) => res,
-			Ok(params) => handle_post(params),
+			Ok(params) => handle_post(params).await,
 		}
 	}
 
 	async fn job_source(
 		Path(job_id): Path<Uuid>,
-		state: Extension<Arc<RwLock<JobManager>>>,
+		state: Extension<Arc<JobManagerLock>>,
 	) -> Response<Body> {
-		let try_lock = state.0.read();
-		let job = try_lock
-			.map(|manager| manager.get_job(&job_id))
-			.map_err(|e| {
-				Response::builder()
-					.status(StatusCode::INTERNAL_SERVER_ERROR)
-					.body(Body::from(e.to_string()))
-					.unwrap()
-			});
+		let lock = state.0.read().await;
+		let job = lock.get_job(&job_id);
 		match job {
-			Ok(job) => match job {
-				Some(_) => Response::builder()
-					.status(StatusCode::OK)
-					.body(Body::empty())
-					.unwrap(),
-				None => Response::builder()
-					.status(StatusCode::NOT_FOUND)
-					.body(Body::empty())
-					.unwrap(),
-			},
-			Err(e) => e,
+			Some(_) => Response::builder()
+				.status(StatusCode::OK)
+				.body(Body::empty())
+				.unwrap(),
+			None => Response::builder()
+				.status(StatusCode::NOT_FOUND)
+				.body(Body::empty())
+				.unwrap(),
 		}
 	}
 
-	pub(crate) fn make_router(job_manager: Arc<RwLock<JobManager>>) -> Router<Body> {
+	pub(crate) fn make_router(job_manager: Arc<JobManagerLock>) -> Router<Body> {
 		Router::new()
 			.route("/status", get(get_status))
 			.route("/jobs", post(job_post))
@@ -132,17 +105,10 @@ mod api {
 			.layer(Extension(job_manager))
 	}
 
-	async fn get_status(state: Extension<Arc<RwLock<JobManager>>>) -> Response<Body> {
-		match state.read() {
-			Ok(job_manager) => {
-				let status = job_manager.status();
-				Response::new(Body::from(status))
-			}
-			Err(e) => Response::builder()
-				.status(StatusCode::INTERNAL_SERVER_ERROR)
-				.body(Body::from(format!("Job manager became poisoned!\n{e}")))
-				.unwrap(),
-		}
+	async fn get_status(state: Extension<Arc<JobManagerLock>>) -> Response<Body> {
+		let manager = state.read().await;
+		let status = manager.status();
+		Response::new(Body::from(status))
 	}
 }
 
@@ -161,7 +127,8 @@ mod test {
 
 	fn make_service() -> Router<Body> {
 		use crate::job_manager::JobManager;
-		use std::sync::{Arc, RwLock};
+		use std::sync::Arc;
+		use tokio::sync::RwLock;
 		let storage = Storage::new().unwrap();
 		let manager = Arc::new(RwLock::new(JobManager::new(storage)));
 		super::make_service(manager)

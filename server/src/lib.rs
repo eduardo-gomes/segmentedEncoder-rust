@@ -10,7 +10,8 @@ pub mod web;
 /// Will be replaced with a proper builder to set service proprieties.
 pub fn make_service() -> Router {
 	use crate::job_manager::JobManager;
-	use std::sync::{Arc, RwLock};
+	use std::sync::Arc;
+	use tokio::sync::RwLock;
 	let storage = Storage::new().unwrap();
 	let manager = Arc::new(RwLock::new(JobManager::new(storage)));
 	web::make_service(manager)
