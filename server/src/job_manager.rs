@@ -15,7 +15,7 @@ pub(crate) type JobManagerLock = RwLock<JobManager>;
 pub(crate) struct JobManager {
 	count: usize,
 	map: HashMap<Uuid, Arc<RwLock<Job>>>,
-	storage: Storage,
+	pub storage: Storage,
 }
 
 impl JobManager {

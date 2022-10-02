@@ -39,8 +39,9 @@ mod api {
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
-	use crate::job_manager::JobManagerLock;
-	use crate::jobs::{Job, JobParams, Source};
+	use crate::job_manager::{JobManager, JobManagerLock};
+	use crate::jobs::{JobParams, Source};
+	use crate::storage::stream::read_to_stream;
 
 	fn parse_job(headers: &HeaderMap) -> Result<JobParams, &'static str> {
 		let encoder = headers
@@ -64,14 +65,18 @@ mod api {
 				.body(Body::from(str))
 				.unwrap()
 		});
-		let handle_post = |params| {
-			let job = Job::new(Source::Local(Uuid::nil()), params);
-			let mut manager = state.0.write().await;
-			let (uuid, _) = manager.add_job(job);
-			Response::builder()
-				.status(StatusCode::OK)
-				.body(Body::from(uuid.as_hyphenated().to_string()))
-				.unwrap()
+		let handle_post = |params| async {
+			let job = JobManager::create_job(&state, req.into_body(), params).await;
+			match job {
+				Ok((uuid, _)) => Response::builder()
+					.status(StatusCode::OK)
+					.body(Body::from(uuid.as_hyphenated().to_string()))
+					.unwrap(),
+				Err(e) => Response::builder()
+					.status(StatusCode::OK)
+					.body(Body::from(format!("Failed to create job: {e}")))
+					.unwrap(),
+			}
 		};
 		match params {
 			Err(res) => res,
@@ -83,13 +88,30 @@ mod api {
 		Path(job_id): Path<Uuid>,
 		state: Extension<Arc<JobManagerLock>>,
 	) -> Response<Body> {
-		let lock = state.0.read().await;
-		let job = lock.get_job(&job_id);
+		let job = {
+			let lock = state.0.read().await;
+			lock.get_job(&job_id)
+		};
 		match job {
-			Some(_) => Response::builder()
-				.status(StatusCode::OK)
-				.body(Body::empty())
-				.unwrap(),
+			Some(job) => {
+				let source = job.read().await.source.clone();
+				match source {
+					Source::Local(uuid) => {
+						let file = state.0.read().await.storage.get_file(&uuid).await;
+						match file {
+							Ok(file) => Response::builder()
+								.status(StatusCode::OK)
+								//Uses Transfer-Encoding: chunked if Content-Length is not specified
+								.body(Body::wrap_stream(read_to_stream(file)))
+								.unwrap(),
+							Err(e) => Response::builder()
+								.status(StatusCode::INTERNAL_SERVER_ERROR)
+								.body(Body::from(format!("Failed to read file: {e}")))
+								.unwrap(),
+						}
+					}
+				}
+			}
 			None => Response::builder()
 				.status(StatusCode::NOT_FOUND)
 				.body(Body::empty())
@@ -253,6 +275,25 @@ mod test {
 		let request = Request::get(uri).body(Body::empty()).unwrap();
 		let response = service.ready().await?.call(request).await?;
 		assert_eq!(response.status(), StatusCode::OK);
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn get_job_source_same_as_input() -> Result<(), Box<dyn Error>> {
+		let mut service = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse()?);
+		let request = build_job_request_with_headers(&headers)?;
+		let response = service.ready().await?.call(request).await?;
+		let job_id = hyper::body::to_bytes(response.into_body()).await?;
+		let job_id = String::from_utf8(job_id.to_vec())?;
+
+		let uri = format!("/api/jobs/{job_id}/source");
+		let request = Request::get(uri).body(Body::empty()).unwrap();
+		let response = service.ready().await?.call(request).await?;
+		assert_eq!(response.status(), StatusCode::OK);
+		let content = hyper::body::to_bytes(response.into_body()).await?;
+		assert_eq!(content, WEBM_SAMPLE.as_slice());
 		Ok(())
 	}
 

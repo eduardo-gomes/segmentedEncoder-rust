@@ -86,6 +86,8 @@ mod test {
 pub mod stream {
 	use hyper::Body;
 	use tokio::fs::File;
+	use tokio::io::AsyncRead;
+	use tokio_util::io::ReaderStream;
 
 	pub(crate) async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
 		use futures::stream::TryStreamExt;
@@ -97,6 +99,10 @@ pub mod stream {
 			.into_async_read();
 		let mut stream = tokio_util::compat::FuturesAsyncReadCompatExt::compat(stream);
 		tokio::io::copy(&mut stream, file).await
+	}
+
+	pub(crate) fn read_to_stream<T: AsyncRead>(read: T) -> ReaderStream<T> {
+		tokio_util::io::ReaderStream::new(read)
 	}
 
 	#[cfg(test)]
