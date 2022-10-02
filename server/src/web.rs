@@ -39,7 +39,7 @@ mod api {
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
-	use crate::job_manager::{JobManager, JobManagerLock};
+	use crate::job_manager::{JobManagerLock, JobManagerUtils};
 	use crate::jobs::{JobParams, Source};
 	use crate::storage::stream::read_to_stream;
 
@@ -66,7 +66,7 @@ mod api {
 				.unwrap()
 		});
 		let handle_post = |params| async {
-			let job = JobManager::create_job(&state, req.into_body(), params).await;
+			let job = state.create_job(req.into_body(), params).await;
 			match job {
 				Ok((uuid, _)) => Response::builder()
 					.status(StatusCode::OK)
@@ -89,7 +89,7 @@ mod api {
 		state: Extension<Arc<JobManagerLock>>,
 	) -> Response<Body> {
 		let job = {
-			let lock = state.0.read().await;
+			let lock = state.read().await;
 			lock.get_job(&job_id)
 		};
 		match job {
@@ -97,7 +97,7 @@ mod api {
 				let source = job.read().await.source.clone();
 				match source {
 					Source::Local(uuid) => {
-						let file = state.0.read().await.storage.get_file(&uuid).await;
+						let file = state.read().await.storage.get_file(&uuid).await;
 						match file {
 							Ok(file) => Response::builder()
 								.status(StatusCode::OK)

@@ -3,6 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::io;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -12,28 +13,38 @@ use crate::storage::{Storage, stream};
 
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
-pub(crate) struct JobManager {
-	count: usize,
-	map: HashMap<Uuid, Arc<RwLock<Job>>>,
-	pub storage: Storage,
+#[async_trait]
+pub(crate) trait JobManagerUtils {
+	async fn create_job(
+		&self,
+		body: Body,
+		params: JobParams,
+	) -> io::Result<(Uuid, Arc<RwLock<Job>>)>;
 }
 
-impl JobManager {
-	pub(crate) async fn create_job(
-		lock: &RwLock<Self>,
+#[async_trait]
+impl JobManagerUtils for JobManagerLock {
+	async fn create_job(
+		&self,
 		body: Body,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<RwLock<Job>>)> {
 		let (mut file, id) = {
-			let read = lock.read().await;
+			let read = self.read().await;
 			let res = read.storage.create_file();
 			res.await?
 		};
 		stream::body_to_file(body, &mut file).await?;
 		let job = Job::new(Source::Local(id), params);
 
-		Ok(lock.write().await.add_job(job))
+		Ok(self.write().await.add_job(job))
 	}
+}
+
+pub(crate) struct JobManager {
+	count: usize,
+	map: HashMap<Uuid, Arc<RwLock<Job>>>,
+	pub storage: Storage,
 }
 
 impl Debug for JobManager {
@@ -97,7 +108,7 @@ mod test {
 	use uuid::Uuid;
 
 	use crate::{Storage, WEBM_SAMPLE};
-	use crate::job_manager::JobManager;
+	use crate::job_manager::{JobManager, JobManagerUtils};
 	use crate::jobs::{Job, JobParams, Source};
 
 	fn make_job_manager() -> JobManager {
@@ -161,7 +172,8 @@ mod test {
 		//Using rwlock because it will only lock for part of the function
 		let manager = RwLock::new(make_job_manager());
 
-		let (uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
+		let (uuid, job) = manager
+			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
 		let job2 = manager.read().await.get_job(&uuid).unwrap();
@@ -174,7 +186,8 @@ mod test {
 		//Using rwlock because it will only lock for part of the function
 		let manager = RwLock::new(make_job_manager());
 
-		let (_uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
+		let (_uuid, job) = manager
+			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
 		let uuid = match job.read().await.source.clone() {
