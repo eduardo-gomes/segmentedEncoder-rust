@@ -114,7 +114,7 @@ mod api {
 			}
 			None => Response::builder()
 				.status(StatusCode::NOT_FOUND)
-				.body(Body::empty())
+				.body(Body::from("Not found"))
 				.unwrap(),
 		}
 	}
