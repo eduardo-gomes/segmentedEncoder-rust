@@ -1,8 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::response::Redirect;
-use axum::routing::get;
 use axum::{
 	body::Body,
 	extract::ConnectInfo,
@@ -10,6 +8,8 @@ use axum::{
 	response::Response,
 	Router,
 };
+use axum::response::Redirect;
+use axum::routing::get;
 use hyper::Request;
 
 use crate::job_manager::JobManagerLock;
@@ -32,10 +32,10 @@ pub(super) fn make_service(manager: Arc<JobManagerLock>) -> Router<Body> {
 mod api {
 	use std::sync::Arc;
 
+	use axum::{Extension, Router};
 	use axum::extract::Path;
 	use axum::http::{HeaderMap, Request};
 	use axum::routing::{get, post};
-	use axum::{Extension, Router};
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
@@ -73,7 +73,7 @@ mod api {
 					.body(Body::from(uuid.as_hyphenated().to_string()))
 					.unwrap(),
 				Err(e) => Response::builder()
-					.status(StatusCode::OK)
+					.status(StatusCode::INTERNAL_SERVER_ERROR)
 					.body(Body::from(format!("Failed to create job: {e}")))
 					.unwrap(),
 			}
@@ -139,9 +139,9 @@ mod test {
 	use std::error::Error;
 
 	use axum::Router;
+	use hyper::{Body, HeaderMap, http, Method, Request, StatusCode};
 	use hyper::header::CONTENT_TYPE;
 	use hyper::service::Service;
-	use hyper::{http, Body, HeaderMap, Method, Request, StatusCode};
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
