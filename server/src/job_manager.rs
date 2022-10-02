@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
-use std::io::{Error, ErrorKind};
-use std::sync::{Arc, PoisonError, RwLock};
+use std::sync::Arc;
 
 use hyper::Body;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams, Source};
 use crate::storage::{Storage, stream};
+
+pub(crate) type JobManagerLock = RwLock<JobManager>;
 
 pub(crate) struct JobManager {
 	count: usize,
@@ -22,17 +24,15 @@ impl JobManager {
 		body: Body,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<RwLock<Job>>)> {
-		fn to_io<T>(e: PoisonError<T>) -> Error {
-			Error::new(ErrorKind::Other, e.to_string())
-		}
 		let (mut file, id) = {
-			let read = lock.read().map_err(to_io)?;
-			read.storage.create_file().await?
+			let read = lock.read().await;
+			let res = read.storage.create_file();
+			res.await?
 		};
 		stream::body_to_file(body, &mut file).await?;
 		let job = Job::new(Source::Local(id), params);
 
-		Ok(lock.write().map_err(to_io)?.add_job(job))
+		Ok(lock.write().await.add_job(job))
 	}
 }
 
@@ -90,10 +90,10 @@ impl JobManager {
 #[cfg(test)]
 mod test {
 	use std::ops::Deref;
-	use std::sync::RwLock;
 
 	use hyper::Body;
 	use tokio::io::AsyncReadExt;
+	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
 	use crate::{Storage, WEBM_SAMPLE};
@@ -119,15 +119,15 @@ mod test {
 		assert!(job.is_none());
 	}
 
-	#[test]
-	fn get_reference_to_job_from_uuid() {
+	#[tokio::test]
+	async fn get_reference_to_job_from_uuid() {
 		let mut manager = make_job_manager();
 		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
 
 		let (uuid, job) = manager.add_job(job);
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert!(
-			std::ptr::eq(job.read().unwrap().deref(), job2.read().unwrap().deref()),
+			std::ptr::eq(job.read().await.deref(), job2.read().await.deref()),
 			"Should be reference to same object"
 		);
 	}
@@ -164,8 +164,8 @@ mod test {
 		let (uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let job2 = manager.read().unwrap().get_job(&uuid).unwrap();
-		assert_eq!(job.read().unwrap().deref(), job2.read().unwrap().deref());
+		let job2 = manager.read().await.get_job(&uuid).unwrap();
+		assert_eq!(job.read().await.deref(), job2.read().await.deref());
 	}
 
 	#[tokio::test]
@@ -177,16 +177,10 @@ mod test {
 		let (_uuid, job) = JobManager::create_job(&manager, body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let uuid = match job.read().unwrap().source.clone() {
+		let uuid = match job.read().await.source.clone() {
 			Source::Local(uuid) => uuid,
 		};
-		let mut file = manager
-			.read()
-			.unwrap()
-			.storage
-			.get_file(&uuid)
-			.await
-			.unwrap();
+		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
 
 		let mut content = Vec::new();
 		file.read_to_end(&mut content).await.unwrap();
