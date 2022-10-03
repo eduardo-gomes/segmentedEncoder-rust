@@ -48,10 +48,25 @@ mod api {
 			.get("video_encoder")
 			.map(|val| val.to_str().map_err(|_| "video_codec has invalid value"))
 			.transpose()?;
+		let video_args = headers
+			.get("video_args")
+			.map(|val| val.to_str().map_err(|_| "video_args has invalid value"))
+			.transpose()?;
+		let audio_encoder = headers
+			.get("audio_encoder")
+			.map(|val| val.to_str().map_err(|_| "audio_encoder has invalid value"))
+			.transpose()?;
+		let audio_args = headers
+			.get("audio_args")
+			.map(|val| val.to_str().map_err(|_| "audio_args has invalid value"))
+			.transpose()?;
 		match encoder {
 			None => return Err("Missing video encoder"),
 			Some(encoder) => Ok(JobParams {
 				video_encoder: encoder.to_string(),
+				video_args: video_args.map(String::from),
+				audio_encoder: audio_encoder.map(String::from),
+				audio_args: audio_args.map(String::from),
 			}),
 		}
 	}
@@ -120,11 +135,39 @@ mod api {
 		}
 	}
 
+	async fn job_info(
+		Path(job_id): Path<Uuid>,
+		state: Extension<Arc<JobManagerLock>>,
+	) -> Response<Body> {
+		match state.read().await.get_job(&job_id) {
+			None => Response::builder().body(Body::empty()).unwrap(),
+			Some(job) => {
+				let params = &job.read().await.parameters;
+				let mut string = format!("{}", params.video_encoder);
+				if let Some(args) = params.video_args.as_ref() {
+					string.push('\n');
+					string.push_str(args);
+				}
+				if let Some(a_encoder) = params.audio_encoder.as_ref() {
+					string.push('\n');
+					string.push_str(a_encoder);
+				}
+				if let Some(a_args) = params.audio_args.as_ref() {
+					string.push('\n');
+					string.push_str(a_args);
+				}
+				println!("Info: {string}");
+				Response::new(Body::from(string))
+			}
+		}
+	}
+
 	pub(crate) fn make_router(job_manager: Arc<JobManagerLock>) -> Router<Body> {
 		Router::new()
 			.route("/status", get(get_status))
 			.route("/jobs", post(job_post))
 			.route("/jobs/:job_id/source", get(job_source))
+			.route("/jobs/:job_id/info", get(job_info))
 			.layer(Extension(job_manager))
 	}
 
@@ -192,6 +235,34 @@ mod test {
 		Ok(())
 	}
 
+	#[tokio::test]
+	async fn api_job_info_contains_params() -> Result<(), Box<dyn Error>> {
+		let mut service = make_service();
+		let mut headers = HeaderMap::new();
+		let video_encoder = "libx265";
+		let video_args = "-crf 24";
+		let audio_encoder = "libopus";
+		let audio_args = "-b:a 96k";
+		headers.insert("video_encoder", video_encoder.parse().unwrap());
+		headers.insert("video_args", video_args.parse().unwrap());
+		headers.insert("audio_encoder", audio_encoder.parse().unwrap());
+		headers.insert("audio_args", audio_args.parse().unwrap());
+		let id = post_job_ang_get_uuid(&mut service, &headers).await?;
+
+		let request = Request::get(format!("/api/jobs/{id}/info"))
+			.body(Body::empty())
+			.unwrap();
+		let response = service.oneshot(request).await?;
+		assert_eq!(response.status(), StatusCode::OK);
+		let content = hyper::body::to_bytes(response.into_body()).await?;
+		let content = String::from_utf8(content.to_vec())?;
+		assert!(content.contains(video_encoder));
+		assert!(content.contains(video_args));
+		assert!(content.contains(audio_encoder));
+		assert!(content.contains(audio_args));
+		Ok(())
+	}
+
 	fn build_job_request_with_headers(headers: &HeaderMap) -> Result<Request<Body>, http::Error> {
 		let mut request = Request::builder().uri("/api/jobs").method(Method::POST);
 		for (name, value) in headers {
@@ -231,7 +302,7 @@ mod test {
 		let request = build_job_request_with_headers(&headers)?;
 		let response = service.ready().await?.call(request).await?;
 		let uuid = hyper::body::to_bytes(response.into_body()).await?;
-		let uuid = String::from_utf8(uuid.to_vec()).expect("Did not return UTF-8");
+		let uuid = String::from_utf8(uuid.to_vec()).map_err(|_| "Did not return UTF-8")?;
 		let uuid = Uuid::parse_str(&uuid)?;
 		Ok(uuid)
 	}

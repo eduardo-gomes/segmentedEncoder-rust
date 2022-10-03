@@ -27,6 +27,9 @@ mod jobs {
 	#[cfg_attr(test, derive(PartialEq))]
 	pub struct JobParams {
 		pub(crate) video_encoder: String,
+		pub(crate) video_args: Option<String>,
+		pub(crate) audio_encoder: Option<String>,
+		pub(crate) audio_args: Option<String>,
 	}
 
 	#[derive(Clone, Debug)]
@@ -40,6 +43,9 @@ mod jobs {
 		pub(crate) fn sample_params() -> Self {
 			JobParams {
 				video_encoder: "libsvtav1".to_string(),
+				video_args: None,
+				audio_encoder: None,
+				audio_args: None,
 			}
 		}
 	}
