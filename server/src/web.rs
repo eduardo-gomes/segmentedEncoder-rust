@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum::response::Redirect;
+use axum::routing::get;
 use axum::{
 	body::Body,
 	extract::ConnectInfo,
@@ -8,8 +10,6 @@ use axum::{
 	response::Response,
 	Router,
 };
-use axum::response::Redirect;
-use axum::routing::get;
 use hyper::Request;
 
 use crate::job_manager::JobManagerLock;
@@ -43,25 +43,22 @@ mod api {
 	use crate::jobs::{JobParams, Source};
 	use crate::storage::stream::read_to_stream;
 
-	fn parse_job(headers: &HeaderMap) -> Result<JobParams, &'static str> {
-		let encoder = headers
-			.get("video_encoder")
-			.map(|val| val.to_str().map_err(|_| "video_codec has invalid value"))
-			.transpose()?;
-		let video_args = headers
-			.get("video_args")
-			.map(|val| val.to_str().map_err(|_| "video_args has invalid value"))
-			.transpose()?;
-		let audio_encoder = headers
-			.get("audio_encoder")
-			.map(|val| val.to_str().map_err(|_| "audio_encoder has invalid value"))
-			.transpose()?;
-		let audio_args = headers
-			.get("audio_args")
-			.map(|val| val.to_str().map_err(|_| "audio_args has invalid value"))
-			.transpose()?;
+	fn parse_job(headers: &HeaderMap) -> Result<JobParams, String> {
+		let get_opt = |header| {
+			headers
+				.get(header)
+				.map(|val| {
+					val.to_str()
+						.map_err(|_| format!("{header} has invalid value"))
+				})
+				.transpose()
+		};
+		let encoder = get_opt("video_encoder")?;
+		let video_args = get_opt("video_args")?;
+		let audio_encoder = get_opt("audio_encoder")?;
+		let audio_args = get_opt("audio_args")?;
 		match encoder {
-			None => return Err("Missing video encoder"),
+			None => return Err("Missing video encoder".to_string()),
 			Some(encoder) => Ok(JobParams {
 				video_encoder: encoder.to_string(),
 				video_args: video_args.map(String::from),
@@ -140,22 +137,13 @@ mod api {
 		state: Extension<Arc<JobManagerLock>>,
 	) -> Response<Body> {
 		match state.read().await.get_job(&job_id) {
-			None => Response::builder().body(Body::empty()).unwrap(),
+			None => Response::builder()
+				.status(StatusCode::NOT_FOUND)
+				.body(Body::from("Not found"))
+				.unwrap(),
 			Some(job) => {
 				let params = &job.read().await.parameters;
-				let mut string = format!("{}", params.video_encoder);
-				if let Some(args) = params.video_args.as_ref() {
-					string.push('\n');
-					string.push_str(args);
-				}
-				if let Some(a_encoder) = params.audio_encoder.as_ref() {
-					string.push('\n');
-					string.push_str(a_encoder);
-				}
-				if let Some(a_args) = params.audio_args.as_ref() {
-					string.push('\n');
-					string.push_str(a_args);
-				}
+				let string = format!("{params:#?}");
 				println!("Info: {string}");
 				Response::new(Body::from(string))
 			}
@@ -183,9 +171,9 @@ mod test {
 	use std::error::Error;
 
 	use axum::Router;
-	use hyper::{Body, HeaderMap, http, Method, Request, StatusCode};
 	use hyper::header::CONTENT_TYPE;
 	use hyper::service::Service;
+	use hyper::{http, Body, HeaderMap, Method, Request, StatusCode};
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
