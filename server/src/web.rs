@@ -224,16 +224,24 @@ mod test {
 		Ok(())
 	}
 
-	#[tokio::test]
-	async fn post_job_response_is_uuid() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
-		let mut headers = HeaderMap::new();
-		headers.insert("video_encoder", "libx264".parse().unwrap());
+	async fn post_job_ang_get_uuid(
+		service: &mut Router,
+		headers: &HeaderMap,
+	) -> Result<Uuid, Box<dyn Error>> {
 		let request = build_job_request_with_headers(&headers)?;
 		let response = service.ready().await?.call(request).await?;
 		let uuid = hyper::body::to_bytes(response.into_body()).await?;
 		let uuid = String::from_utf8(uuid.to_vec()).expect("Did not return UTF-8");
 		let uuid = Uuid::parse_str(&uuid)?;
+		Ok(uuid)
+	}
+
+	#[tokio::test]
+	async fn post_job_response_is_uuid() -> Result<(), Box<dyn Error>> {
+		let mut service = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse().unwrap());
+		let uuid = post_job_ang_get_uuid(&mut service, &mut headers).await?;
 		assert!(!uuid.is_nil());
 		Ok(())
 	}
@@ -243,10 +251,7 @@ mod test {
 		let mut service = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
-		let request = build_job_request_with_headers(&headers)?;
-		let response = service.ready().await?.call(request).await?;
-		let job_id = hyper::body::to_bytes(response.into_body()).await?;
-		let job_id = String::from_utf8(job_id.to_vec())?;
+		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
 
 		let status_request = Request::builder()
 			.uri("/api/status")
@@ -256,7 +261,7 @@ mod test {
 		let status = hyper::body::to_bytes(response.into_body()).await?;
 		let status = String::from_utf8(status.to_vec())?;
 		assert!(
-			status.contains(&job_id),
+			status.contains(&job_id.as_hyphenated().to_string()),
 			"'{status}' should contain the job id '{job_id}'"
 		);
 		Ok(())
@@ -267,10 +272,7 @@ mod test {
 		let mut service = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse()?);
-		let request = build_job_request_with_headers(&headers)?;
-		let response = service.ready().await?.call(request).await?;
-		let job_id = hyper::body::to_bytes(response.into_body()).await?;
-		let job_id = String::from_utf8(job_id.to_vec())?;
+		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
 
 		let uri = format!("/api/jobs/{job_id}/source");
 		let request = Request::get(uri).body(Body::empty()).unwrap();
@@ -284,10 +286,7 @@ mod test {
 		let mut service = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse()?);
-		let request = build_job_request_with_headers(&headers)?;
-		let response = service.ready().await?.call(request).await?;
-		let job_id = hyper::body::to_bytes(response.into_body()).await?;
-		let job_id = String::from_utf8(job_id.to_vec())?;
+		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
 
 		let uri = format!("/api/jobs/{job_id}/source");
 		let request = Request::get(uri).body(Body::empty()).unwrap();
