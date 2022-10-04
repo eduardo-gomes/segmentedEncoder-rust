@@ -13,11 +13,11 @@ async function refresh() {
 		throw new Error(message);
 	}
 	out.innerText = await res.text();
-	return "Request got: " + res.status;
+	console.debug("Request got:", res.status);
 }
 
 function status_updater() {
-	refresh().then(console.debug).catch(console.error)
+	refresh().then().catch((e) => console.error("Failed to update status:", e));
 }
 
 let interval: undefined | number;

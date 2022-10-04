@@ -8,37 +8,40 @@ jobs_div.appendChild(input_div);
 input_div.style.display = "flex";
 input_div.style.flexDirection = "column";
 
-const file_input_label = document.createElement("label");
-file_input_label.innerText = "Input file:"
+function createLabel(text: string): HTMLLabelElement {
+	const label = document.createElement("label");
+	const span = document.createElement("span");
+	span.innerText = text;
+	label.appendChild(span);
+	return label;
+}
+
+const file_input_label = createLabel("Input file:");
 const file_input = document.createElement("input");
 file_input.type = "file";
 file_input.accept = "video/*";
 file_input_label.appendChild(file_input)
 input_div.appendChild(file_input_label);
 
-const video_codec_label = document.createElement("label");
-video_codec_label.innerText = "video encoder:";
+const video_codec_label = createLabel("video encoder:");
 const video_codec = document.createElement("input");
 video_codec.type = "text";
 video_codec_label.appendChild(video_codec);
 input_div.appendChild(video_codec_label);
 
-const video_args_label = document.createElement("label");
-video_args_label.innerText = "video args:";
+const video_args_label = createLabel("video args:");
 const video_args = document.createElement("input");
 video_args.type = "text";
 video_args_label.appendChild(video_args);
 input_div.appendChild(video_args_label);
 
-const audio_codec_label = document.createElement("label");
-audio_codec_label.innerText = "audio encoder:";
+const audio_codec_label = createLabel("audio encoder:");
 const audio_codec = document.createElement("input");
 audio_codec.type = "text";
 audio_codec_label.appendChild(audio_codec);
 input_div.appendChild(audio_codec_label);
 
-const audio_args_label = document.createElement("label");
-audio_args_label.innerText = "audio args:";
+const audio_args_label = createLabel("audio args:");
 const audio_args = document.createElement("input");
 audio_args.type = "text";
 audio_args_label.appendChild(audio_args);
@@ -65,9 +68,15 @@ function create_task() {
 	}
 
 	let task = get_input();
-	console.log("Task to create:", task);
+	console.debug("Task to create:", task);
 	send_task(task)
-		.then((res) => console.log("Created task response:", res))
+		.then((res) => {
+			console.debug("Created task response:", res);
+			res.text().then(function (text) {
+				let url = new URL(`/api/jobs/${text}/source`, window.location.origin);
+				console.info("Source available at:", url.href)
+			});
+		})
 		.catch((e) => console.error("Create task error:", e));
 }
 
@@ -94,7 +103,7 @@ async function send_task(task: Task) {
 		audio_encoder: visible_ascii(task.audio_encoder),
 		audio_args: visible_ascii(task.audio_args),
 	};
-	console.log("Encoded header:", headers);
+	console.debug("Encoded header:", headers);
 	return await fetch("/api/jobs", {
 		method: "POST",
 		headers: headers,

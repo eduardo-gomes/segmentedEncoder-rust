@@ -15,7 +15,7 @@ class Tab {
 		this.div.classList.remove("disabled");
 		if (this.foreground)
 			this.foreground();
-		console.log("Show", this._label);
+		console.debug("Show", this._label);
 	}
 
 	hide() {

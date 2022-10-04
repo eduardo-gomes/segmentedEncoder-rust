@@ -25,5 +25,3 @@ function add_tab(tab: Tab) {
 add_tab(status_div);
 add_tab(jobs_div);
 show_tab(status_div);
-
-console.log("Js file loaded");
