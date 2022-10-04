@@ -2,11 +2,9 @@ import Tab from "./tab";
 
 const jobs_div = document.createElement("div");
 const input_div = document.createElement("div");
+input_div.id = "job-div";
 jobs_div.appendChild(document.createTextNode("Add job:"));
 jobs_div.appendChild(input_div);
-
-input_div.style.display = "flex";
-input_div.style.flexDirection = "column";
 
 function createLabel(text: string): HTMLLabelElement {
 	const label = document.createElement("label");

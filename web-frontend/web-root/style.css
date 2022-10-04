@@ -5,3 +5,28 @@
 .disabled {
 	display: none
 }
+
+#tabs {
+	display: flex;
+	gap: 0.5em;
+}
+
+#tabs button {
+	padding-left: 1em;
+	padding-right: 1em;
+}
+
+#job-div {
+	display: grid;
+	grid-template-columns: max-content auto;
+	grid-column-gap: .5em;
+	grid-row-gap: .2em;
+}
+
+#job-div label {
+	display: contents;
+}
+
+#job-div > input {
+	grid-column: 1 / 3;
+}
