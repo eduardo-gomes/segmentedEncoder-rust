@@ -3,8 +3,8 @@ use std::sync::{Arc, RwLock};
 use futures_util::StreamExt;
 use tonic::{Request, Response, Status};
 
-use super::status::status_reporter_server::StatusReporter;
-use super::status::{Empty, ReportResult, StatusReport};
+use grpc_proto::status::status_reporter_server::StatusReporter;
+use grpc_proto::status::{Empty, ReportResult, StatusReport};
 
 #[derive(Clone)]
 pub struct StatusKeeper {

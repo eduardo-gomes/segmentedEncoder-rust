@@ -1,12 +1,9 @@
 use tonic::Request;
 
-use status::status_reporter_client::StatusReporterClient;
-use status::Empty;
-use status_reporter::DelayedStatusReporterStream;
+use grpc_proto::status::status_reporter_client::StatusReporterClient;
+use grpc_proto::status::Empty;
 
-pub mod status {
-	tonic::include_proto!("status"); // The string specified here must match the proto package name
-}
+use self::status_reporter::DelayedStatusReporterStream;
 
 mod status_reporter;
 

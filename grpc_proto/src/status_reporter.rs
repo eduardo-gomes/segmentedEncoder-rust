@@ -3,16 +3,7 @@ use std::time::{Duration, Instant};
 
 use futures_util::Stream;
 
-use super::status::{Duration as StatusDuration, Progress, Stage, StatusReport};
-
-impl From<Duration> for StatusDuration {
-	fn from(duration: Duration) -> Self {
-		StatusDuration {
-			seconds: duration.as_secs(),
-			nanoseconds: duration.subsec_nanos(),
-		}
-	}
-}
+use grpc_proto::status::{Progress, Stage, StatusReport};
 
 /// Essa classe gera uma série de StatusReport com um intervalo entre eles,
 /// simulando o que uma tarefa faria.

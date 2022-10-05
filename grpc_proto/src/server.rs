@@ -3,11 +3,7 @@ use std::net::SocketAddr;
 use multiplex_tonic_hyper::MakeMultiplexer;
 use tower::make::Shared;
 
-use status::status_reporter_server::StatusReporterServer;
-
-pub mod status {
-	tonic::include_proto!("status");
-}
+use grpc_proto::status::status_reporter_server::StatusReporterServer;
 
 mod grpc;
 
