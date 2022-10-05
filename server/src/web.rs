@@ -32,10 +32,10 @@ pub(super) fn make_service(manager: Arc<JobManagerLock>) -> Router<Body> {
 mod api {
 	use std::sync::Arc;
 
-	use axum::{Extension, Router};
 	use axum::extract::Path;
 	use axum::http::{HeaderMap, Request};
 	use axum::routing::{get, post};
+	use axum::{Extension, Router};
 	use hyper::{Body, Response, StatusCode};
 	use uuid::Uuid;
 
@@ -49,7 +49,7 @@ mod api {
 				.get(header)
 				.map(|val| {
 					val.to_str()
-						.map_err(|_| format!("{header} has invalid value"))
+						.map_err(|e| format!("{header} has invalid value: {e}"))
 				})
 				.transpose()
 		};
