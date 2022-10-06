@@ -79,7 +79,7 @@ impl Stream for DelayedStatusReporterStream {
 		self: std::pin::Pin<&mut Self>,
 		cx: &mut std::task::Context<'_>,
 	) -> Poll<Option<Self::Item>> {
-		if self.remaining() <= 0 {
+		if self.remaining() == 0 {
 			Poll::Ready(None)
 		} else {
 			match self.is_ready() {

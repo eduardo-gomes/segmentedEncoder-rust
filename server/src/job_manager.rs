@@ -69,7 +69,7 @@ impl JobManager {
 
 impl JobManager {
 	pub(crate) fn get_job(&self, uuid: &Uuid) -> Option<Arc<RwLock<Job>>> {
-		self.map.get(uuid).map(|r| r.clone())
+		self.map.get(uuid).cloned()
 	}
 }
 
@@ -77,7 +77,7 @@ impl JobManager {
 	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<RwLock<Job>>) {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(RwLock::new(job));
-		self.map.insert(uuid.clone(), arc.clone());
+		self.map.insert(uuid, arc.clone());
 		(uuid, arc)
 	}
 }

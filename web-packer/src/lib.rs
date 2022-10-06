@@ -126,7 +126,7 @@ mod bundle_web {
 				let entry = entry?;
 				let path = entry.path();
 				let rel = path.strip_prefix(dir).expect("Failed to get relative path");
-				let rel = relative.clone().join(rel);
+				let rel = relative.join(rel);
 				if path.is_dir() {
 					recursive_list_all_files(&path, &rel, files)?;
 				} else {

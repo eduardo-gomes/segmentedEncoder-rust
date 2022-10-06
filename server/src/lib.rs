@@ -24,7 +24,7 @@ mod jobs {
 	use uuid::Uuid;
 
 	#[derive(Clone, Debug)]
-	#[cfg_attr(test, derive(PartialEq))]
+	#[cfg_attr(test, derive(PartialEq, Eq))]
 	pub struct JobParams {
 		pub(crate) video_encoder: String,
 		pub(crate) video_args: Option<String>,

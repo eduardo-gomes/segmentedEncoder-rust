@@ -58,7 +58,7 @@ mod api {
 		let audio_encoder = get_opt("audio_encoder")?;
 		let audio_args = get_opt("audio_args")?;
 		match encoder {
-			None => return Err("Missing video encoder".to_string()),
+			None => Err("Missing video encoder".to_string()),
 			Some(encoder) => Ok(JobParams {
 				video_encoder: encoder.to_string(),
 				video_args: video_args.map(String::from),
@@ -108,7 +108,7 @@ mod api {
 			Some(job) => {
 				let source = job.read().await.source.clone();
 				async fn send_local(state: &JobManagerLock, uuid: &Uuid) -> Response<Body> {
-					let file = state.read().await.storage.get_file(&uuid).await;
+					let file = state.read().await.storage.get_file(uuid).await;
 					match file {
 						Ok(file) => Response::builder()
 							.status(StatusCode::OK)
@@ -287,7 +287,7 @@ mod test {
 		service: &mut Router,
 		headers: &HeaderMap,
 	) -> Result<Uuid, Box<dyn Error>> {
-		let request = build_job_request_with_headers(&headers)?;
+		let request = build_job_request_with_headers(headers)?;
 		let response = service.ready().await?.call(request).await?;
 		let uuid = hyper::body::to_bytes(response.into_body()).await?;
 		let uuid = String::from_utf8(uuid.to_vec()).map_err(|_| "Did not return UTF-8")?;
@@ -300,7 +300,7 @@ mod test {
 		let mut service = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
-		let uuid = post_job_ang_get_uuid(&mut service, &mut headers).await?;
+		let uuid = post_job_ang_get_uuid(&mut service, &headers).await?;
 		assert!(!uuid.is_nil());
 		Ok(())
 	}

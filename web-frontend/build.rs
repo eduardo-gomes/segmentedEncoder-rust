@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let result = Command::new(NPX)
 		.args([
 			"esbuild".to_string(),
-			format!("{}", entry.to_str().expect("Not UTF-8")),
+			entry.to_str().expect("Not UTF-8").to_string(),
 			"--sourcemap".to_string(),
 			"--bundle".to_string(),
 			format!("--outfile={}", out.to_str().expect("Not UTF-8")),
