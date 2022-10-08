@@ -1,2 +1,2 @@
 [workspace]
-members = ["grpc_proto", "web-packer", "web-frontend", "server"]
+members = ["grpc_proto", "web-packer", "web-frontend", "server", "client"]

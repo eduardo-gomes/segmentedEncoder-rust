@@ -118,6 +118,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "client"
+version = "0.1.0"
+dependencies = [
+ "grpc_proto",
+ "tokio",
+]
+
+[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -486,7 +494,8 @@ checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
 [[package]]
 name = "multiplex-tonic-hyper"
 version = "0.1.0"
-source = "git+https://github.com/eduardo-gomes/multiplex-tonic-hyper.git#542067dca370f33af50f58a1288e258423c735b7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "002f157801c0a446aac0949ca2ff38508e9b5ed9e10c98260eb031677b3c82fc"
 dependencies = [
  "futures",
  "hyper",
@@ -750,7 +759,9 @@ dependencies = [
  "async-trait",
  "axum",
  "futures",
+ "grpc_proto",
  "hyper",
+ "multiplex-tonic-hyper",
  "tempfile",
  "tokio",
  "tokio-util",

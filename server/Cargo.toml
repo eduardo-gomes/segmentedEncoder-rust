@@ -15,6 +15,8 @@ axum = "0.5.15"
 web-frontend = { path = "../web-frontend" }
 tempfile = "3"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
+grpc_proto = { path = "../grpc_proto" }
+multiplex-tonic-hyper = "0.1.0"
 
 [dev-dependencies]
 tower = "0.4.13"
