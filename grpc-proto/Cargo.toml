@@ -1,5 +1,5 @@
 [package]
-name = "grpc_proto"
+name = "grpc-proto"
 version = "0.1.0"
 edition = "2021"
 
