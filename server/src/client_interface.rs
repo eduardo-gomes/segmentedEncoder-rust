@@ -1,13 +1,15 @@
 //!This module implements the client interface, and will implement the grpc interface
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use uuid::Uuid;
 
+type ClientEntry = Arc<()>;
+
 struct Service {
-	increment: usize,
-	///The Uuid is the client token, and this number is the id
-	clients: HashMap<Uuid, usize>,
+	///The Uuid is the client id, the access token will be stored on the map
+	clients: HashMap<Uuid, Arc<()>>,
 }
 
 impl Service {
@@ -15,7 +17,7 @@ impl Service {
 		self.clients.remove(id);
 	}
 
-	pub(crate) fn get_client(&self, id: &Uuid) -> Option<usize> {
+	pub(crate) fn get_client(&self, id: &Uuid) -> Option<ClientEntry> {
 		self.clients.get(id).cloned()
 	}
 
@@ -23,17 +25,15 @@ impl Service {
 		self.clients.len()
 	}
 
-	pub(crate) fn register_client(&mut self) -> (Uuid, usize) {
+	pub(crate) fn register_client(&mut self) -> (Uuid, ClientEntry) {
 		let id = Uuid::new_v4();
-		self.clients.insert(id.clone(), self.increment);
-		let i = self.increment;
-		self.increment += 1;
-		(id, i)
+		let arc = Arc::new(());
+		self.clients.insert(id.clone(), arc.clone());
+		(id, arc)
 	}
 
 	pub(crate) fn new() -> Self {
 		Self {
-			increment: 0,
 			clients: HashMap::new(),
 		}
 	}
@@ -41,6 +41,8 @@ impl Service {
 
 #[cfg(test)]
 mod test {
+	use std::sync::Arc;
+
 	use crate::client_interface::Service;
 
 	#[test]
@@ -64,7 +66,7 @@ mod test {
 		let (id, client) = service.register_client();
 
 		let got = service.get_client(&id).unwrap();
-		assert_eq!(got, client);
+		assert!(Arc::ptr_eq(&got, &client));
 	}
 
 	#[test]
@@ -72,7 +74,7 @@ mod test {
 		let mut service = Service::new();
 		let (_id, client_1) = service.register_client();
 		let (_id, client_2) = service.register_client();
-		assert_ne!(client_1, client_2);
+		assert!(!Arc::ptr_eq(&client_1, &client_2));
 	}
 
 	#[test]
