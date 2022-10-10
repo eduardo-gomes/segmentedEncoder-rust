@@ -4,6 +4,8 @@ use axum::Router;
 
 use crate::storage::Storage;
 
+#[allow(dead_code)] //until we use
+mod client_interface;
 pub mod web;
 
 /// Temporary function to 'build' the service.
