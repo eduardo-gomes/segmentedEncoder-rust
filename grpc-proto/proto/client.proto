@@ -1,0 +1,14 @@
+syntax = "proto3";
+package segmented_encoder;
+
+message RegistrationRequest{
+  string display_name = 1;
+}
+
+message RegistrationResponse{
+  bytes worker_id = 1;
+}
+
+service SegmentedEncoder{
+  rpc registerClient(RegistrationRequest) returns (RegistrationResponse);
+}

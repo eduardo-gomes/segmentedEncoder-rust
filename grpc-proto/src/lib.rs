@@ -1,3 +1,7 @@
+pub mod proto {
+	tonic::include_proto!("segmented_encoder");
+}
+
 pub mod echo {
 	pub mod pb {
 		tonic::include_proto!("echo");
