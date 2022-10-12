@@ -1,13 +1,14 @@
-use std::str::FromStr;
-
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
-use uuid::Uuid;
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
 use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
 
+use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
+
 use super::Service;
+
+mod auth_interceptor;
 
 struct ServiceLock(RwLock<Service>);
 
@@ -27,20 +28,12 @@ impl SegmentedEncoder for ServiceLock {
 		&self,
 		request: Request<Empty>,
 	) -> Result<Response<RegistrationResponse>, Status> {
-		let worker_id = request
-			.metadata()
-			.get("worker-id")
-			.map(|str| str.to_str().map(Uuid::from_str));
-		let worker_id = match worker_id {
-			Some(Ok(Ok(uuid))) => self.0.read().await.get_client(&uuid).map(|_| uuid),
-			_ => None,
-		};
-		match worker_id {
-			None => Err(Status::unauthenticated("Not authenticated")),
-			Some(worker_id) => Ok(Response::new(RegistrationResponse {
-				worker_id: worker_id.into_bytes().to_vec(),
-			})),
-		}
+		let worker_id = AuthenticationExtension::verify_request(&request, self)
+			.await
+			.successful()?;
+		Ok(Response::new(RegistrationResponse {
+			worker_id: worker_id.into_bytes().to_vec(),
+		}))
 	}
 }
 
@@ -57,7 +50,6 @@ mod test {
 	use uuid::Uuid;
 
 	use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
-	use grpc_proto::proto::segmented_encoder_server::SegmentedEncoderServer;
 	use grpc_proto::proto::{Empty, RegistrationRequest};
 
 	use crate::client_interface::grpc_service::ServiceLock;
@@ -162,7 +154,7 @@ mod test {
 		Box<dyn Error>,
 	> {
 		let instance = ServiceLock(RwLock::new(Service::new()));
-		let service = Shared::new(SegmentedEncoderServer::new(instance));
+		let service = Shared::new(instance.with_auth());
 		let addr = "[::1]:0".parse().unwrap();
 		let server = hyper::Server::bind(&addr).serve(service);
 		let addr = server.local_addr();
