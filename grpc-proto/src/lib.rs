@@ -28,7 +28,7 @@ pub mod echo {
 				})
 		}
 
-		pub async fn counting_client(url: &String) -> Result<(), Box<dyn std::error::Error>> {
+		pub async fn counting_client(url: &str) -> Result<(), Box<dyn std::error::Error>> {
 			let endpoint = Channel::builder(url.parse()?);
 			let mut client = EchoClient::connect(endpoint).await?;
 			let req_stream = make_stream();

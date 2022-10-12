@@ -31,7 +31,7 @@ impl Service {
 	pub(crate) fn register_client(&mut self) -> (Uuid, ClientEntry) {
 		let id = Uuid::new_v4();
 		let arc = Arc::new(());
-		self.clients.insert(id.clone(), arc.clone());
+		self.clients.insert(id, arc.clone());
 		(id, arc)
 	}
 

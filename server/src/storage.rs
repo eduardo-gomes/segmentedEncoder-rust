@@ -71,14 +71,15 @@ mod test {
 		let (file, uuid) = storage.create_file().await.unwrap();
 
 		//Write random data to file
-		let mut file = file.try_into_std().unwrap(); //So we dont need async in the test
-		file.write(data.as_bytes()).unwrap();
+		let mut file = file.try_into_std().unwrap(); //So we don't need async in the test
+		let wrote = file.write(data.as_bytes()).unwrap();
 		drop(file);
 
 		let mut file = storage.get_file(&uuid).await.unwrap();
 		let mut content = String::new();
 		file.read_to_string(&mut content).await.unwrap();
 
+		assert_eq!(wrote, data.len());
 		assert_eq!(content, data, "Should have the data we wrote before!");
 	}
 }
