@@ -7,8 +7,11 @@ use uuid::Uuid;
 
 type ClientEntry = Arc<()>;
 
+mod grpc_service;
+
 struct Service {
-	///The Uuid is the client id, the access token will be stored on the map
+	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
+	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,
 }
 

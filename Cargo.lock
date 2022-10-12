@@ -765,6 +765,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-util",
+ "tonic",
  "tower",
  "uuid",
  "web-frontend",

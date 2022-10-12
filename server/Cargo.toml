@@ -16,7 +16,9 @@ web-frontend = { path = "../web-frontend" }
 tempfile = "3"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 grpc-proto = { path = "../grpc-proto" }
+tonic = { version = "0.8.2", default-features = false }
 multiplex-tonic-hyper = "0.1.0"
 
 [dev-dependencies]
 tower = "0.4.13"
+tonic = "0.8.2"
