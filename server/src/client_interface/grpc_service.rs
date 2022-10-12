@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -8,14 +9,17 @@ use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
 
 use super::Service;
 
+struct ServiceLock(RwLock<Service>);
+
 #[tonic::async_trait]
-impl SegmentedEncoder for Service {
+impl SegmentedEncoder for ServiceLock {
 	async fn register_client(
 		&self,
 		_request: Request<RegistrationRequest>,
 	) -> Result<Response<RegistrationResponse>, Status> {
+		let (uuid, _) = self.0.write().await.register_client();
 		Ok(Response::new(RegistrationResponse {
-			worker_id: Uuid::new_v4().into_bytes().to_vec(),
+			worker_id: uuid.into_bytes().to_vec(),
 		}))
 	}
 
@@ -26,9 +30,9 @@ impl SegmentedEncoder for Service {
 		let worker_id = request
 			.metadata()
 			.get("worker-id")
-			.map(|str| str.to_str().map(|str| Uuid::from_str(str)));
+			.map(|str| str.to_str().map(Uuid::from_str));
 		let worker_id = match worker_id {
-			Some(Ok(Ok(a))) => Some(a),
+			Some(Ok(Ok(uuid))) => self.0.read().await.get_client(&uuid).map(|_| uuid),
 			_ => None,
 		};
 		match worker_id {
@@ -46,6 +50,7 @@ mod test {
 	use std::future::Future;
 	use std::str::FromStr;
 
+	use tokio::sync::RwLock;
 	use tonic::transport::{Channel, Endpoint};
 	use tonic::{Code, Request};
 	use tower::make::Shared;
@@ -55,6 +60,7 @@ mod test {
 	use grpc_proto::proto::segmented_encoder_server::SegmentedEncoderServer;
 	use grpc_proto::proto::{Empty, RegistrationRequest};
 
+	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;
 
 	#[tokio::test]
@@ -82,8 +88,7 @@ mod test {
 		let response = client
 			.get_worker_registration(Empty {})
 			.await
-			.err()
-			.expect("Should not accept unauthenticated requests");
+			.expect_err("Should not accept unauthenticated requests");
 		assert_eq!(response.code(), Code::Unauthenticated);
 
 		close.await?;
@@ -113,6 +118,27 @@ mod test {
 		Ok(())
 	}
 
+	#[tokio::test]
+	async fn random_uuid_is_not_authenticated() -> Result<(), Box<dyn Error>> {
+		let (close, _, url) = start_server().await?;
+		let channel = Endpoint::from_str(&url)?.connect().await?;
+		let mut client =
+			SegmentedEncoderClient::with_interceptor(channel, move |mut req: Request<()>| {
+				req.metadata_mut()
+					.insert("worker-id", Uuid::new_v4().to_string().parse().unwrap());
+				Ok(req)
+			});
+
+		let response = client
+			.get_worker_registration(Empty {})
+			.await
+			.expect_err("Should not authenticate");
+		assert_eq!(response.code(), Code::Unauthenticated);
+
+		close.await?;
+		Ok(())
+	}
+
 	//Request registration and return the worker_id
 	async fn register(
 		client: &mut SegmentedEncoderClient<Channel>,
@@ -135,7 +161,7 @@ mod test {
 		),
 		Box<dyn Error>,
 	> {
-		let instance = Service::new();
+		let instance = ServiceLock(RwLock::new(Service::new()));
 		let service = Shared::new(SegmentedEncoderServer::new(instance));
 		let addr = "[::1]:0".parse().unwrap();
 		let server = hyper::Server::bind(&addr).serve(service);
@@ -147,7 +173,6 @@ mod test {
 		let server_handle = tokio::spawn(graceful);
 		let port = addr.port();
 		let url = format!("http://[::1]:{port}");
-		// println!("Connecting to {url}");
 
 		let close = async move {
 			tx.send(()).map_err(|_| "the receiver dropped")?;
