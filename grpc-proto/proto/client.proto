@@ -9,6 +9,9 @@ message RegistrationResponse{
   bytes worker_id = 1;
 }
 
+message Empty{}
+
 service SegmentedEncoder{
   rpc registerClient(RegistrationRequest) returns (RegistrationResponse);
+  rpc getWorkerRegistration(Empty) returns (RegistrationResponse);
 }
