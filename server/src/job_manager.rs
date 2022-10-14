@@ -187,9 +187,7 @@ mod test {
 			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let uuid = match job.read().await.source.clone() {
-			Source::Local(uuid) => uuid,
-		};
+		let Source::Local(uuid) = job.read().await.source.clone();
 		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
 
 		let mut content = Vec::new();
