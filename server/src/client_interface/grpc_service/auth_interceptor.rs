@@ -1,3 +1,5 @@
+//! Module to validate authentication to the grpc_interface
+
 use std::str::FromStr;
 
 use tonic::codegen::InterceptedService;
@@ -9,6 +11,7 @@ use grpc_proto::proto::segmented_encoder_server::SegmentedEncoderServer;
 use crate::client_interface::grpc_service::auth_interceptor::AuthResult::{NoAuth, Successful};
 use crate::client_interface::grpc_service::ServiceLock;
 
+///Struct used to validate client credentials
 pub(super) struct AuthenticationExtension(Option<Uuid>);
 
 pub enum AuthResult {
@@ -19,6 +22,8 @@ pub enum AuthResult {
 }
 
 impl AuthResult {
+	/// Returns the client if authentication was validated, or Err with [tonic::Status] describing
+	/// the issue. Useful with `?` where authentication is required
 	pub(crate) fn successful(self) -> Result<Uuid, Status> {
 		match self {
 			AuthResult::Err(status) => Err(status),
@@ -29,6 +34,7 @@ impl AuthResult {
 }
 
 impl AuthenticationExtension {
+	/// Validate client credentials
 	async fn verify(&self, service: &ServiceLock) -> AuthResult {
 		match self.0 {
 			None => NoAuth,
@@ -38,7 +44,7 @@ impl AuthenticationExtension {
 			},
 		}
 	}
-	/// Extract extension and calls verify
+	/// Calls verify on request's extension
 	pub(crate) async fn verify_request<T>(req: &Request<T>, service: &ServiceLock) -> AuthResult {
 		let extension = req.extensions().get::<AuthenticationExtension>();
 		match extension {
@@ -56,11 +62,12 @@ type ServiceWithAuth = InterceptedService<
 impl ServiceLock {
 	///Add authentication interceptor to service
 	pub(crate) fn with_auth(self) -> ServiceWithAuth {
-		SegmentedEncoderServer::with_interceptor(self, intercept)
+		SegmentedEncoderServer::with_interceptor(self, intercept_credentials)
 	}
 }
 
-fn intercept(mut request: Request<()>) -> Result<Request<()>, Status> {
+/// Inject [AuthenticationExtension] with parsed credentials on requests
+fn intercept_credentials(mut request: Request<()>) -> Result<Request<()>, Status> {
 	let worker_id = request
 		.metadata()
 		.get("worker-id")
