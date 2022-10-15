@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams, Source};
-use crate::storage::{stream, Storage};
+use crate::storage::{Storage, stream};
 
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
@@ -65,24 +65,18 @@ impl JobManager {
 	pub(crate) fn status(&self) -> String {
 		format!("{:#?}", self)
 	}
-}
 
-impl JobManager {
 	pub(crate) fn get_job(&self, uuid: &Uuid) -> Option<Arc<RwLock<Job>>> {
 		self.map.get(uuid).cloned()
 	}
-}
 
-impl JobManager {
 	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<RwLock<Job>>) {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(RwLock::new(job));
 		self.map.insert(uuid, arc.clone());
 		(uuid, arc)
 	}
-}
 
-impl JobManager {
 	pub fn job_count(&self) -> usize {
 		self.map.len()
 	}
@@ -104,9 +98,9 @@ mod test {
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
+	use crate::{Storage, WEBM_SAMPLE};
 	use crate::job_manager::{JobManager, JobManagerUtils};
 	use crate::jobs::{Job, JobParams, Source};
-	use crate::{Storage, WEBM_SAMPLE};
 
 	fn make_job_manager() -> JobManager {
 		JobManager::new(Storage::new().unwrap())
