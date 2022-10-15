@@ -51,6 +51,12 @@ add_button.value = "Add job";
 add_button.addEventListener("click", create_task);
 input_div.appendChild(add_button);
 
+const status_label = createLabel("Status:");
+const status_text = document.createElement("span");
+status_label.classList.add("disabled");
+status_label.appendChild(status_text)
+input_div.appendChild(status_label);
+
 function create_task() {
 	function get_input() {
 		let files = file_input.files;
@@ -65,17 +71,34 @@ function create_task() {
 		return task;
 	}
 
-	let task = get_input();
-	console.debug("Task to create:", task);
-	send_task(task)
-		.then((res) => {
-			console.debug("Created task response:", res);
+	function send_fulfilled(res: Response) {
+		console.debug("Created task response:", res);
+		if (res.ok)
 			res.text().then(function (text) {
 				let url = new URL(`/api/jobs/${text}/source`, window.location.origin);
 				console.info("Source available at:", url.href)
+				status_text.innerText = "Created job " + text;
 			});
-		})
-		.catch((e) => console.error("Create task error:", e));
+		else {
+			console.warn("Request was not successful:", res);
+			status_text.innerText = "Created job bad response";
+		}
+	}
+
+	function send_rejected(e: any) {
+		console.error("Create task error:", e);
+		status_text.innerText = "Upload job request failed";
+	}
+
+	let task = get_input();
+	console.debug("Task to create:", task);
+
+	status_label.classList.remove("disabled");
+	status_text.innerText = "Uploading job!";
+
+	send_task(task)
+		.then(send_fulfilled)
+		.catch(send_rejected);
 }
 
 type Task = {
