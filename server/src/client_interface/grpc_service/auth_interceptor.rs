@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use tonic::codegen::InterceptedService;
 use tonic::{Request, Status};
+use tonic::codegen::InterceptedService;
 use uuid::Uuid;
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoderServer;
@@ -54,7 +54,7 @@ impl AuthenticationExtension {
 	}
 }
 
-type ServiceWithAuth = InterceptedService<
+pub(crate) type ServiceWithAuth = InterceptedService<
 	SegmentedEncoderServer<ServiceLock>,
 	fn(Request<()>) -> Result<Request<()>, Status>,
 >;

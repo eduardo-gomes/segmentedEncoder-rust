@@ -1,16 +1,22 @@
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 
-use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
 use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
+use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
 
 use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
 
 use super::Service;
 
-mod auth_interceptor;
+pub(super) mod auth_interceptor;
 
-struct ServiceLock(RwLock<Service>);
+pub struct ServiceLock(RwLock<Service>);
+
+impl Service {
+	pub(crate) fn into_lock(self) -> ServiceLock {
+		ServiceLock(RwLock::new(self))
+	}
+}
 
 #[tonic::async_trait]
 impl SegmentedEncoder for ServiceLock {
@@ -44,13 +50,13 @@ mod test {
 	use std::str::FromStr;
 
 	use tokio::sync::RwLock;
-	use tonic::transport::{Channel, Endpoint};
 	use tonic::{Code, Request};
+	use tonic::transport::{Channel, Endpoint};
 	use tower::make::Shared;
 	use uuid::Uuid;
 
-	use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
 	use grpc_proto::proto::{Empty, RegistrationRequest};
+	use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;

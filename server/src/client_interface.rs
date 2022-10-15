@@ -5,11 +5,13 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
+
 type ClientEntry = Arc<()>;
 
 mod grpc_service;
 
-struct Service {
+pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,

@@ -1,5 +1,11 @@
-use axum::Router;
+use std::net::SocketAddr;
 
+use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
+use axum::Router;
+use multiplex_tonic_hyper::MakeMultiplexer;
+use tower::make::Shared;
+
+use crate::client_interface::ServiceWithAuth;
 use crate::storage::Storage;
 
 #[allow(dead_code)] //until we use
@@ -8,13 +14,16 @@ pub mod web;
 
 /// Temporary function to 'build' the service.
 /// Will be replaced with a proper builder to set service proprieties.
-pub fn make_service() -> Router {
+pub fn make_multiplexed_service() -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
 	use crate::job_manager::JobManager;
 	use std::sync::Arc;
 	use tokio::sync::RwLock;
 	let storage = Storage::new().unwrap();
 	let manager = Arc::new(RwLock::new(JobManager::new(storage)));
-	web::make_service(manager)
+	let web = web::make_service(manager).into_make_service_with_connect_info::<SocketAddr>();
+	use crate::client_interface::Service;
+	let grpc_service = Service::new().into_lock().with_auth();
+	MakeMultiplexer::new(Shared::new(grpc_service), web)
 }
 
 #[allow(dead_code)]
