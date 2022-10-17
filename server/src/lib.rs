@@ -14,7 +14,8 @@ pub mod web;
 
 /// Temporary function to 'build' the service.
 /// Will be replaced with a proper builder to set service proprieties.
-pub fn make_multiplexed_service() -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
+pub fn make_multiplexed_service(
+) -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
 	use crate::job_manager::JobManager;
 	use std::sync::Arc;
 	use tokio::sync::RwLock;

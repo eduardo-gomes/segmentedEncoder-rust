@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use tonic::{Request, Status};
 use tonic::codegen::InterceptedService;
+use tonic::{Request, Status};
 use uuid::Uuid;
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoderServer;

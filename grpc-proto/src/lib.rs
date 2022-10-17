@@ -3,16 +3,16 @@ pub mod proto {
 
 	tonic::include_proto!("segmented_encoder");
 	mod helper {
-		use tonic::{Request, Status};
 		use tonic::codegen::InterceptedService;
 		use tonic::transport::Channel;
+		use tonic::{Request, Status};
 		use uuid::Uuid;
 
-		use crate::proto::RegistrationResponse;
 		use crate::proto::segmented_encoder_client::SegmentedEncoderClient;
+		use crate::proto::RegistrationResponse;
 
 		type SegmentedEncoderClientWithAuth<F> =
-		SegmentedEncoderClient<InterceptedService<Channel, F>>;
+			SegmentedEncoderClient<InterceptedService<Channel, F>>;
 
 		pub fn client_with_auth(
 			channel: Channel,
@@ -48,8 +48,8 @@ pub mod echo {
 		use std::time::Duration;
 
 		use futures_util::StreamExt;
-		use tokio_stream::Stream;
 		use tokio_stream::wrappers::IntervalStream;
+		use tokio_stream::Stream;
 		use tonic::transport::Channel;
 
 		use crate::echo::pb::echo_client::EchoClient;
@@ -84,7 +84,7 @@ pub mod echo {
 
 		use futures_util::Stream;
 		use tokio::sync::mpsc;
-		use tokio_stream::{StreamExt, wrappers::ReceiverStream};
+		use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 		use tonic::{Request, Response, Status, Streaming};
 		use tower::make::Shared;
 

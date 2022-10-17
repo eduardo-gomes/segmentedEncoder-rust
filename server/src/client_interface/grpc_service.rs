@@ -1,8 +1,8 @@
 use tokio::sync::RwLock;
 use tonic::{Request, Response, Status};
 
-use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
+use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
 
 use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
 
@@ -50,13 +50,13 @@ mod test {
 	use std::str::FromStr;
 
 	use tokio::sync::RwLock;
-	use tonic::{Code, Request};
 	use tonic::transport::{Channel, Endpoint};
+	use tonic::{Code, Request};
 	use tower::make::Shared;
 	use uuid::Uuid;
 
-	use grpc_proto::proto::{client_with_auth, Empty, RegistrationRequest};
 	use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
+	use grpc_proto::proto::{client_with_auth, Empty, RegistrationRequest};
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;

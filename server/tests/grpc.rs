@@ -1,8 +1,8 @@
-use tonic::Code;
 use tonic::transport::Endpoint;
+use tonic::Code;
 
-use grpc_proto::proto::Empty;
 use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
+use grpc_proto::proto::Empty;
 use server::make_multiplexed_service;
 
 #[tokio::test]
