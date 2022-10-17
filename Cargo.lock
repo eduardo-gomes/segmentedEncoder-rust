@@ -123,6 +123,8 @@ version = "0.1.0"
 dependencies = [
  "grpc-proto",
  "tokio",
+ "tonic",
+ "uuid",
 ]
 
 [[package]]
