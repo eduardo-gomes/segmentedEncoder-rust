@@ -1,5 +1,42 @@
 pub mod proto {
+	pub use helper::*;
+
 	tonic::include_proto!("segmented_encoder");
+	mod helper {
+		use tonic::{Request, Status};
+		use tonic::codegen::InterceptedService;
+		use tonic::transport::Channel;
+		use uuid::Uuid;
+
+		use crate::proto::RegistrationResponse;
+		use crate::proto::segmented_encoder_client::SegmentedEncoderClient;
+
+		type SegmentedEncoderClientWithAuth<F> =
+		SegmentedEncoderClient<InterceptedService<Channel, F>>;
+
+		pub fn client_with_auth(
+			channel: Channel,
+			worker_id: Uuid,
+		) -> SegmentedEncoderClientWithAuth<impl Fn(Request<()>) -> Result<Request<()>, Status>> {
+			SegmentedEncoderClient::with_interceptor(channel, move |mut req: Request<()>| {
+				req.metadata_mut()
+					.insert("worker-id", worker_id.to_string().parse().unwrap());
+				Ok(req)
+			})
+		}
+
+		#[derive(Debug)]
+		pub struct RegistrationResponseParsed {
+			pub worker_id: Uuid,
+		}
+
+		impl RegistrationResponse {
+			pub fn parse(self) -> Result<RegistrationResponseParsed, uuid::Error> {
+				let worker_id = Uuid::from_slice(self.worker_id.as_slice())?;
+				Ok(RegistrationResponseParsed { worker_id })
+			}
+		}
+	}
 }
 
 pub mod echo {
@@ -11,8 +48,8 @@ pub mod echo {
 		use std::time::Duration;
 
 		use futures_util::StreamExt;
-		use tokio_stream::wrappers::IntervalStream;
 		use tokio_stream::Stream;
+		use tokio_stream::wrappers::IntervalStream;
 		use tonic::transport::Channel;
 
 		use crate::echo::pb::echo_client::EchoClient;
@@ -47,7 +84,7 @@ pub mod echo {
 
 		use futures_util::Stream;
 		use tokio::sync::mpsc;
-		use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+		use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 		use tonic::{Request, Response, Status, Streaming};
 		use tower::make::Shared;
 

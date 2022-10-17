@@ -55,7 +55,7 @@ mod test {
 	use tower::make::Shared;
 	use uuid::Uuid;
 
-	use grpc_proto::proto::{Empty, RegistrationRequest};
+	use grpc_proto::proto::{client_with_auth, Empty, RegistrationRequest};
 	use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
 
 	use crate::client_interface::grpc_service::ServiceLock;
@@ -98,12 +98,7 @@ mod test {
 		let (close, mut client, url) = start_server().await?;
 		let worker_id = register(&mut client).await?;
 		let channel = Endpoint::from_str(&url)?.connect().await?;
-		let mut client =
-			SegmentedEncoderClient::with_interceptor(channel, move |mut req: Request<()>| {
-				req.metadata_mut()
-					.insert("worker-id", worker_id.to_string().parse().unwrap());
-				Ok(req)
-			});
+		let mut client = client_with_auth(channel, worker_id);
 
 		let response = client
 			.get_worker_registration(Empty {})
