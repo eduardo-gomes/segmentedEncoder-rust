@@ -29,15 +29,40 @@ impl JobParams {
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
+pub(crate) enum Segmenter {
+	DoNotSegment,
+}
+
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct Job {
 	pub source: Source,
 	pub parameters: JobParams,
+	pub segmenter: Segmenter,
 }
 
 impl Job {
-	pub(crate) fn new(source: Source, parameters: JobParams) -> Self {
-		Job { source, parameters }
+	pub(crate) fn new(source: Source, parameters: JobParams, segmenter: Segmenter) -> Self {
+		Job {
+			source,
+			parameters,
+			segmenter,
+		}
 	}
+	//will be removed once API/frontend is able to choose segmenter
+	pub(crate) fn new_not_segment(source: Source, parameters: JobParams) -> Self {
+		Job {
+			source,
+			parameters,
+			segmenter: Segmenter::DoNotSegment,
+		}
+	}
+}
+
+///Should be visible to client
+pub struct Task {
+	pub input: String,
+	pub parameters: JobParams,
 }
 
 #[cfg(test)]
@@ -50,7 +75,7 @@ mod test {
 	fn job_takes_source_and_parameters() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
-		let job = Job::new(source.clone(), parameters.clone());
+		let job = Job::new_not_segment(source.clone(), parameters.clone());
 
 		assert_eq!(job.source, source);
 		assert_eq!(job.parameters, parameters);
