@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum::handler::Handler;
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{
@@ -10,7 +11,7 @@ use axum::{
 	response::Response,
 	Router,
 };
-use hyper::Request;
+use hyper::{Request, StatusCode};
 
 use crate::job_manager::JobManagerLock;
 
@@ -23,10 +24,14 @@ async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 
 pub(super) fn make_service(manager: Arc<JobManagerLock>) -> Router<Body> {
 	let redirect = get(|| async { Redirect::permanent("/index.xhtml") });
+	async fn fallback() -> (StatusCode, &'static str) {
+		(StatusCode::NOT_FOUND, "Not found")
+	}
 	web_frontend::get_router()
 		.route("/", redirect)
 		.nest("/api", api::make_router(manager))
 		.layer(from_fn(log))
+		.fallback(fallback.into_service())
 }
 
 mod api {
@@ -365,5 +370,18 @@ mod test {
 		let response = service.oneshot(request).await?;
 		assert_eq!(response.status(), StatusCode::NOT_FOUND);
 		Ok(())
+	}
+
+	#[tokio::test]
+	async fn non_existent_page_returns_404_with_text() {
+		let service = make_service();
+		let request = Request::get("/non_existent_page")
+			.body(Body::empty())
+			.unwrap();
+		let response = service.oneshot(request).await.unwrap();
+		assert_eq!(response.status(), StatusCode::NOT_FOUND);
+		let content = hyper::body::to_bytes(response.into_body()).await.unwrap();
+		let string = String::from_utf8(content.to_vec()).unwrap();
+		assert!(!string.is_empty());
 	}
 }
