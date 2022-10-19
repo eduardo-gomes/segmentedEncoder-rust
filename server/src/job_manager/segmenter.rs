@@ -1,5 +1,6 @@
 //! Module that manages tasks from jobs, should handle if task fails, and when job is complete.
 //! Also handle status tracking
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use uuid::Uuid;
@@ -9,6 +10,7 @@ use crate::jobs::{Job, Task};
 struct JobSegmenter {
 	job: Weak<Job>,
 	job_id: Uuid,
+	generated: AtomicBool,
 }
 
 impl Job {
@@ -16,6 +18,7 @@ impl Job {
 		JobSegmenter {
 			job: Arc::downgrade(self),
 			job_id: uuid,
+			generated: AtomicBool::from(false),
 		}
 	}
 }
@@ -23,6 +26,13 @@ impl Job {
 impl JobSegmenter {
 	fn next_task(&self) -> Option<Task> {
 		let uuid = self.job_id;
+		if self
+			.generated
+			.compare_exchange(false, true, Ordering::SeqCst, Ordering::Acquire)
+			.is_err()
+		{
+			return None;
+		}
 		if let Some(upgraded) = self.job.upgrade() {
 			Some(Task {
 				input: format!("/api/jobs/{uuid}/source"),
@@ -40,7 +50,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::jobs::{Job, JobParams, Segmenter, Source};
+	use crate::jobs::{Job, JobParams, Source};
 
 	#[test]
 	fn job_next_task_on_dont_segment_returns_single_task() {
@@ -52,6 +62,19 @@ mod test {
 
 		let task = job.next_task();
 		assert!(task.is_some());
+	}
+
+	#[test]
+	fn next_task_dont_segment_returns_none_second_time() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let job = job.make_segmenter(job_uuid);
+
+		job.next_task();
+		let task = job.next_task();
+		assert!(task.is_none());
 	}
 
 	#[test]
