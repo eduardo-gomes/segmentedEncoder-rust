@@ -11,10 +11,17 @@ type ClientEntry = Arc<()>;
 
 mod grpc_service;
 
+#[derive(Debug)]
 pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,
+}
+
+impl Service {
+	pub(crate) fn status(&self) -> String {
+		format!("{self:?}")
+	}
 }
 
 impl Service {
@@ -108,5 +115,16 @@ mod test {
 		service.erase_client(&id);
 		let res = service.get_client(&id);
 		assert!(res.is_none());
+	}
+
+	#[test]
+	fn status_has_registered_workers_id() {
+		let mut service = Service::new();
+		let (id, _) = service.register_client();
+		let status = service.status();
+		assert!(
+			status.contains(&id.to_string()),
+			"Status '{status}' should contain worker_id '{id}'"
+		);
 	}
 }
