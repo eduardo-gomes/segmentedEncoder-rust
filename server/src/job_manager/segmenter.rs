@@ -33,14 +33,10 @@ impl JobSegmenter {
 		{
 			return None;
 		}
-		if let Some(upgraded) = self.job.upgrade() {
-			Some(Task {
-				input: format!("/api/jobs/{uuid}/source"),
-				parameters: upgraded.parameters.clone(),
-			})
-		} else {
-			None //Job was dropped
-		}
+		self.job.upgrade().map(|upgraded| Task {
+			input: format!("/api/jobs/{uuid}/source"),
+			parameters: upgraded.parameters.clone(),
+		})
 	}
 }
 
