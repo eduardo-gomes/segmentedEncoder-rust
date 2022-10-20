@@ -61,8 +61,9 @@ pub(crate) type ServiceWithAuth = InterceptedService<
 
 impl ServiceLock {
 	///Add authentication interceptor to service
-	pub(crate) fn with_auth(self) -> ServiceWithAuth {
-		SegmentedEncoderServer::with_interceptor(self, intercept_credentials)
+	pub(crate) fn with_auth(self: std::sync::Arc<Self>) -> ServiceWithAuth {
+		let service = SegmentedEncoderServer::from_arc(self);
+		InterceptedService::new(service, intercept_credentials)
 	}
 }
 

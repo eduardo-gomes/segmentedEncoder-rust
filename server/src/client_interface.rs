@@ -6,6 +6,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
+pub(crate) use grpc_service::ServiceLock;
 
 type ClientEntry = Arc<()>;
 
@@ -20,7 +21,7 @@ pub(crate) struct Service {
 
 impl Service {
 	pub(crate) fn status(&self) -> String {
-		format!("{self:?}")
+		format!("{self:#?}")
 	}
 }
 

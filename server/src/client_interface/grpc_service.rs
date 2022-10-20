@@ -1,4 +1,4 @@
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, RwLockReadGuard};
 use tonic::{Request, Response, Status};
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
@@ -11,6 +11,12 @@ use super::Service;
 pub(super) mod auth_interceptor;
 
 pub struct ServiceLock(RwLock<Service>);
+
+impl ServiceLock {
+	pub(crate) async fn read(&self) -> RwLockReadGuard<'_, Service> {
+		self.0.read().await
+	}
+}
 
 impl Service {
 	pub(crate) fn into_lock(self) -> ServiceLock {
@@ -48,6 +54,7 @@ mod test {
 	use std::error::Error;
 	use std::future::Future;
 	use std::str::FromStr;
+	use std::sync::Arc;
 
 	use tokio::sync::RwLock;
 	use tonic::transport::{Channel, Endpoint};
@@ -154,7 +161,7 @@ mod test {
 		),
 		Box<dyn Error>,
 	> {
-		let instance = ServiceLock(RwLock::new(Service::new()));
+		let instance = Arc::new(ServiceLock(RwLock::new(Service::new())));
 		let service = Shared::new(instance.with_auth());
 		let addr = "[::1]:0".parse().unwrap();
 		let server = hyper::Server::bind(&addr).serve(service);

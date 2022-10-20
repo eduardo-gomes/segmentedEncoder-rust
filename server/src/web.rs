@@ -13,7 +13,7 @@ use axum::{
 };
 use hyper::{Request, StatusCode};
 
-use crate::job_manager::JobManagerLock;
+use crate::State;
 
 async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 	let addr = req.extensions().get::<ConnectInfo<SocketAddr>>();
@@ -22,14 +22,14 @@ async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 	next.run(req).await
 }
 
-pub(super) fn make_service(manager: Arc<JobManagerLock>) -> Router<Body> {
+pub(super) fn make_service(state: Arc<State>) -> Router<Body> {
 	let redirect = get(|| async { Redirect::permanent("/index.xhtml") });
 	async fn fallback() -> (StatusCode, &'static str) {
 		(StatusCode::NOT_FOUND, "Not found")
 	}
 	web_frontend::get_router()
 		.route("/", redirect)
-		.nest("/api", api::make_router(manager))
+		.nest("/api", api::make_router(state))
 		.layer(from_fn(log))
 		.fallback(fallback.into_service())
 }
@@ -47,6 +47,7 @@ mod api {
 	use crate::job_manager::{JobManagerLock, JobManagerUtils};
 	use crate::jobs::{JobParams, Source};
 	use crate::storage::stream::read_to_stream;
+	use crate::State;
 
 	fn parse_job(headers: &HeaderMap) -> Result<JobParams, String> {
 		let get_opt = |header| {
@@ -73,7 +74,7 @@ mod api {
 		}
 	}
 
-	async fn job_post(state: Extension<Arc<JobManagerLock>>, req: Request<Body>) -> Response<Body> {
+	async fn job_post(state: Extension<Arc<State>>, req: Request<Body>) -> Response<Body> {
 		dbg!(req.headers());
 		let headers = req.headers();
 		let params = parse_job(headers).map_err(|str| {
@@ -83,7 +84,7 @@ mod api {
 				.unwrap()
 		});
 		let handle_post = |params| async {
-			let job = state.create_job(req.into_body(), params).await;
+			let job = state.manager.create_job(req.into_body(), params).await;
 			match job {
 				Ok((uuid, _)) => Response::builder()
 					.status(StatusCode::OK)
@@ -101,12 +102,9 @@ mod api {
 		}
 	}
 
-	async fn job_source(
-		Path(job_id): Path<Uuid>,
-		state: Extension<Arc<JobManagerLock>>,
-	) -> Response<Body> {
+	async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Response<Body> {
 		let job = {
-			let lock = state.read().await;
+			let lock = state.manager.read().await;
 			lock.get_job(&job_id)
 		};
 		match job {
@@ -127,7 +125,7 @@ mod api {
 					}
 				}
 				match source {
-					Source::Local(uuid) => send_local(&state, &uuid).await,
+					Source::Local(uuid) => send_local(&state.manager, &uuid).await,
 				}
 			}
 			None => Response::builder()
@@ -137,11 +135,8 @@ mod api {
 		}
 	}
 
-	async fn job_info(
-		Path(job_id): Path<Uuid>,
-		state: Extension<Arc<JobManagerLock>>,
-	) -> Response<Body> {
-		match state.read().await.get_job(&job_id) {
+	async fn job_info(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Response<Body> {
+		match state.manager.read().await.get_job(&job_id) {
 			None => Response::builder()
 				.status(StatusCode::NOT_FOUND)
 				.body(Body::from("Not found"))
@@ -155,18 +150,26 @@ mod api {
 		}
 	}
 
-	pub(crate) fn make_router(job_manager: Arc<JobManagerLock>) -> Router<Body> {
+	pub(crate) fn make_router(state: Arc<State>) -> Router<Body> {
 		Router::new()
 			.route("/status", get(get_status))
 			.route("/jobs", post(job_post))
 			.route("/jobs/:job_id/source", get(job_source))
 			.route("/jobs/:job_id/info", get(job_info))
-			.layer(Extension(job_manager))
+			.layer(Extension(state))
 	}
 
-	async fn get_status(state: Extension<Arc<JobManagerLock>>) -> Response<Body> {
-		let manager = state.read().await;
-		let status = manager.status();
+	async fn get_status(state: Extension<Arc<State>>) -> Response<Body> {
+		let manager = state.manager.read().await;
+		let mut status = manager.status();
+		let client_status = {
+			match state.grpc.upgrade() {
+				None => "GRPC_SERVICE WAS DROPPED".to_string(),
+				Some(service) => service.read().await.status(),
+			}
+		};
+		status.push('\n');
+		status.push_str(&client_status);
 		Response::new(Body::from(status))
 	}
 }
@@ -182,15 +185,25 @@ mod test {
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
-	use crate::{Storage, WEBM_SAMPLE};
+	use crate::{State, Storage, WEBM_SAMPLE};
 
 	fn make_service() -> Router<Body> {
-		use crate::job_manager::JobManager;
 		use std::sync::Arc;
-		use tokio::sync::RwLock;
-		let storage = Storage::new().unwrap();
-		let manager = Arc::new(RwLock::new(JobManager::new(storage)));
-		super::make_service(manager)
+		let state = {
+			use crate::job_manager::JobManager;
+			use tokio::sync::RwLock;
+			let storage = Storage::new().unwrap();
+			let manager_lock = RwLock::new(JobManager::new(storage));
+			let service_lock = Arc::new(crate::client_interface::Service::new().into_lock());
+			let weak_service = Arc::downgrade(&service_lock);
+
+			//to use weak_service, we should keep the arc
+			Arc::new(State {
+				manager: manager_lock,
+				grpc: weak_service,
+			})
+		};
+		super::make_service(state)
 	}
 
 	#[tokio::test]

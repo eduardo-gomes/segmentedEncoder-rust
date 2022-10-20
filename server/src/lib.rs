@@ -1,29 +1,42 @@
 use std::net::SocketAddr;
+use std::sync::Weak;
 
 use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
 use axum::Router;
 use multiplex_tonic_hyper::MakeMultiplexer;
+use tokio::sync::RwLock;
 use tower::make::Shared;
 
-use crate::client_interface::ServiceWithAuth;
+use crate::client_interface::{ServiceLock, ServiceWithAuth};
+use crate::job_manager::JobManager;
 use crate::storage::Storage;
 
 #[allow(dead_code)] //until we use
 mod client_interface;
 pub mod web;
 
+struct State {
+	manager: RwLock<JobManager>,
+	grpc: Weak<ServiceLock>,
+}
+
 /// Temporary function to 'build' the service.
 /// Will be replaced with a proper builder to set service proprieties.
 pub fn make_multiplexed_service(
 ) -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
-	use crate::job_manager::JobManager;
 	use std::sync::Arc;
-	use tokio::sync::RwLock;
 	let storage = Storage::new().unwrap();
-	let manager = Arc::new(RwLock::new(JobManager::new(storage)));
-	let web = web::make_service(manager).into_make_service_with_connect_info::<SocketAddr>();
+	let manager_lock = RwLock::new(JobManager::new(storage));
 	use crate::client_interface::Service;
-	let grpc_service = Service::new().into_lock().with_auth();
+	let service_lock = Arc::new(Service::new().into_lock());
+	let weak_service = Arc::downgrade(&service_lock);
+	let grpc_service = service_lock.with_auth();
+
+	let state = Arc::new(State {
+		manager: manager_lock,
+		grpc: weak_service,
+	});
+	let web = web::make_service(state).into_make_service_with_connect_info::<SocketAddr>();
 	MakeMultiplexer::new(Shared::new(grpc_service), web)
 }
 
