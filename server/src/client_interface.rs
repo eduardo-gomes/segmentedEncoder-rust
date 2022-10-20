@@ -1,6 +1,7 @@
 //!This module implements the client interface, and will implement the grpc interface
 
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use uuid::Uuid;
@@ -12,20 +13,28 @@ type ClientEntry = Arc<()>;
 
 mod grpc_service;
 
-#[derive(Debug)]
 pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,
 }
 
-impl Service {
-	pub(crate) fn status(&self) -> String {
-		format!("{self:#?}")
+impl Debug for Service {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let map: Vec<(String, &ClientEntry)> = self
+			.clients
+			.iter()
+			.map(|(key, el)| (key.as_hyphenated().to_string(), el))
+			.collect();
+		f.debug_struct("Service").field("clients", &map).finish()
 	}
 }
 
 impl Service {
+	pub(crate) fn status(&self) -> String {
+		format!("{self:#?}")
+	}
+
 	pub(crate) fn erase_client(&mut self, id: &Uuid) {
 		self.clients.remove(id);
 	}
@@ -124,7 +133,7 @@ mod test {
 		let (id, _) = service.register_client();
 		let status = service.status();
 		assert!(
-			status.contains(&id.to_string()),
+			status.contains(&id.as_hyphenated().to_string()),
 			"Status '{status}' should contain worker_id '{id}'"
 		);
 	}
