@@ -13,6 +13,15 @@ struct JobSegmenter {
 	generated: AtomicBool,
 }
 
+impl JobSegmenter {
+	///Interface to allocate tasks.
+	///
+	///The returned task will be marked as running.
+	pub(super) fn allocate(&self) -> Option<Task> {
+		self.next_task()
+	}
+}
+
 impl Job {
 	fn make_segmenter(self: &Arc<Self>, uuid: Uuid) -> JobSegmenter {
 		JobSegmenter {
@@ -24,6 +33,9 @@ impl Job {
 }
 
 impl JobSegmenter {
+	///Internal function to segment tasks.
+	///
+	///This may differ for different kinds of segmentation.
 	fn next_task(&self) -> Option<Task> {
 		let uuid = self.job_id;
 		if self
@@ -49,51 +61,51 @@ mod test {
 	use crate::jobs::{Job, JobParams, Source};
 
 	#[test]
-	fn job_next_task_on_dont_segment_returns_single_task() {
+	fn segmenter_allocate_task_for_do_not_segment() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
 		let job = job.make_segmenter(job_uuid);
 
-		let task = job.next_task();
-		assert!(task.is_some());
+		let allocated = job.allocate();
+		assert!(allocated.is_some());
 	}
 
 	#[test]
-	fn next_task_dont_segment_returns_none_second_time() {
+	fn segmenter_allocate_task_dont_segment_returns_none_second_time() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
 		let job = job.make_segmenter(job_uuid);
 
-		job.next_task();
-		let task = job.next_task();
+		job.allocate();
+		let task = job.allocate();
 		assert!(task.is_none());
 	}
 
 	#[test]
-	fn job_next_task_has_same_parameters() {
+	fn segmenter_allocate_task_has_same_parameters() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
 		let job_with_id = job.make_segmenter(job_uuid);
 
-		let task = job_with_id.next_task().unwrap();
+		let task = job_with_id.allocate().unwrap();
 		assert_eq!(task.parameters, job.parameters);
 	}
 
 	#[test]
-	fn job_task_not_segmented_has_source_as_input() {
+	fn segmenter_allocate_task_not_segmented_has_source_as_input() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
 		let job_with_id = job.make_segmenter(job_uuid);
 
-		let task = job_with_id.next_task().unwrap();
+		let task = job_with_id.allocate().unwrap();
 		let expected_path = format!("/api/jobs/{job_uuid}/source");
 		let path = task.input;
 		assert_eq!(
