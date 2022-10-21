@@ -6,7 +6,14 @@ status_div.insertAdjacentHTML("afterbegin", "Auto refreshing /latest:");
 status_div.appendChild(out);
 
 async function refresh() {
-	let res = await fetch("/api/status");
+	let res;
+	try {
+		res = await fetch("/api/status");
+	} catch (e) {
+		const message = "Fetch failed";
+		out.innerText = message;
+		throw new Error(message, {cause: e as Error});
+	}
 	if (res.status >= 400) {
 		const message = `Refresh got status code: ${res.status}`;
 		out.innerText = message;
