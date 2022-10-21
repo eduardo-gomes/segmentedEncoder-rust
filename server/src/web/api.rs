@@ -72,7 +72,7 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 	};
 	match job {
 		Some(job) => {
-			let source = job.read().await.source.clone();
+			let source = job.source.clone();
 			async fn send_local(state: &JobManagerLock, uuid: &Uuid) -> Response<Body> {
 				let file = state.read().await.storage.get_file(uuid).await;
 				match file {
@@ -105,7 +105,7 @@ async fn job_info(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Res
 			.body(Body::from("Not found"))
 			.unwrap(),
 		Some(job) => {
-			let params = &job.read().await.parameters;
+			let params = &job.parameters;
 			let string = format!("{params:#?}");
 			println!("Info: {string}");
 			Response::new(Body::from(string))

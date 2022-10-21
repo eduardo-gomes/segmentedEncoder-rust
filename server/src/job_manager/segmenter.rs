@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::jobs::{Job, Task};
 
-struct JobSegmenter {
+pub(super) struct JobSegmenter {
 	job: Weak<Job>,
 	job_id: Uuid,
 	generated: AtomicBool,
@@ -23,7 +23,7 @@ impl JobSegmenter {
 }
 
 impl Job {
-	fn make_segmenter(self: &Arc<Self>, uuid: Uuid) -> JobSegmenter {
+	pub(super) fn make_segmenter(self: &Arc<Self>, uuid: Uuid) -> JobSegmenter {
 		JobSegmenter {
 			job: Arc::downgrade(self),
 			job_id: uuid,

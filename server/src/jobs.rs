@@ -51,7 +51,10 @@ impl Job {
 	}
 }
 
-///Should be visible to client
+///Struct containing all data used by client to execute a task.
+///
+///It is able to tell the input and output files
+#[derive(Debug)]
 pub struct Task {
 	pub input: String,
 	pub parameters: JobParams,

@@ -8,27 +8,20 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::jobs::{Job, JobParams, Source};
+use crate::job_manager::segmenter::JobSegmenter;
+use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
 #[async_trait]
 pub(crate) trait JobManagerUtils {
-	async fn create_job(
-		&self,
-		body: Body,
-		params: JobParams,
-	) -> io::Result<(Uuid, Arc<RwLock<Job>>)>;
+	async fn create_job(&self, body: Body, params: JobParams) -> io::Result<(Uuid, Arc<Job>)>;
 }
 
 #[async_trait]
 impl JobManagerUtils for JobManagerLock {
-	async fn create_job(
-		&self,
-		body: Body,
-		params: JobParams,
-	) -> io::Result<(Uuid, Arc<RwLock<Job>>)> {
+	async fn create_job(&self, body: Body, params: JobParams) -> io::Result<(Uuid, Arc<Job>)> {
 		let (mut file, id) = {
 			let read = self.read().await;
 			let res = read.storage.create_file();
@@ -42,17 +35,17 @@ impl JobManagerUtils for JobManagerLock {
 }
 
 pub(crate) struct JobManager {
-	map: HashMap<Uuid, Arc<RwLock<Job>>>,
+	map: HashMap<Uuid, (Arc<Job>, JobSegmenter)>,
 	pub storage: Storage,
 }
 
 impl Debug for JobManager {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		//map to use uuid as hyphenated
-		let map: Vec<(String, &Arc<RwLock<Job>>)> = self
+		let map: Vec<(String, &Arc<Job>)> = self
 			.map
 			.iter()
-			.map(|(u, j)| (u.as_hyphenated().to_string(), j))
+			.map(|(u, (job, _))| (u.as_hyphenated().to_string(), job))
 			.collect();
 		f.debug_struct("JobManager")
 			.field("count", &self.job_count())
@@ -66,19 +59,29 @@ impl JobManager {
 		format!("{:#?}", self)
 	}
 
-	pub(crate) fn get_job(&self, uuid: &Uuid) -> Option<Arc<RwLock<Job>>> {
-		self.map.get(uuid).cloned()
+	pub(crate) fn get_job(&self, uuid: &Uuid) -> Option<Arc<Job>> {
+		self.map.get(uuid).map(|(job, _)| job).cloned()
 	}
 
-	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<RwLock<Job>>) {
+	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<Job>) {
 		let uuid = Uuid::new_v4();
-		let arc = Arc::new(RwLock::new(job));
-		self.map.insert(uuid, arc.clone());
+		let arc = Arc::new(job);
+		let segmenter = arc.make_segmenter(uuid);
+		self.map.insert(uuid, (arc.clone(), segmenter));
 		(uuid, arc)
 	}
 
 	pub fn job_count(&self) -> usize {
 		self.map.len()
+	}
+
+	pub(crate) fn allocate(&self) -> Option<Task> {
+		let got = self
+			.map
+			.iter()
+			.map(|(_, (_, segmenter))| segmenter.allocate())
+			.find(|option| option.is_some());
+		got.unwrap_or_default()
 	}
 
 	pub fn new(storage: Storage) -> Self {
@@ -99,7 +102,7 @@ mod test {
 	use uuid::Uuid;
 
 	use crate::job_manager::{JobManager, JobManagerUtils};
-	use crate::jobs::{Job, JobParams, Source};
+	use crate::jobs::{Job, JobParams, Source, Task};
 	use crate::{Storage, WEBM_SAMPLE};
 
 	fn make_job_manager() -> JobManager {
@@ -129,7 +132,7 @@ mod test {
 		let (uuid, job) = manager.add_job(job);
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert!(
-			std::ptr::eq(job.read().await.deref(), job2.read().await.deref()),
+			std::ptr::eq(job.deref(), job2.deref()),
 			"Should be reference to same object"
 		);
 	}
@@ -149,7 +152,7 @@ mod test {
 		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
 		let (uuid, _) = manager.add_job(job);
 
-		let status = manager.status().to_string();
+		let status = manager.status();
 		let uuid_string = uuid.as_hyphenated().to_string();
 		assert!(
 			status.contains(&uuid_string),
@@ -168,7 +171,7 @@ mod test {
 			.await
 			.unwrap();
 		let job2 = manager.read().await.get_job(&uuid).unwrap();
-		assert_eq!(job.read().await.deref(), job2.read().await.deref());
+		assert_eq!(job.deref(), job2.deref());
 	}
 
 	#[tokio::test]
@@ -181,13 +184,68 @@ mod test {
 			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let Source::Local(uuid) = job.read().await.source.clone();
+		let Source::Local(uuid) = job.source.clone();
 		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
 
 		let mut content = Vec::new();
 		file.read_to_end(&mut content).await.unwrap();
 
 		assert_eq!(content, WEBM_SAMPLE);
+	}
+
+	#[tokio::test]
+	async fn allocate_task_without_job_returns_none() {
+		let manager = make_job_manager();
+		let task = manager.allocate();
+		assert!(task.is_none());
+	}
+
+	#[tokio::test]
+	async fn allocate_task_with_do_not_segment_job_returns_task() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
+		manager.add_job(job);
+
+		let task = manager.allocate();
+		assert!(task.is_some());
+	}
+
+	#[tokio::test]
+	async fn allocated_task_has_type_task() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
+		manager.add_job(job);
+
+		let task: Task = manager.allocate().unwrap();
+		dbg!(task);
+	}
+
+	#[tokio::test]
+	async fn allocate_task_twice_with_one_do_not_segment_job_returns_one_time() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
+		manager.add_job(job);
+
+		let _task = manager.allocate();
+		let task = manager.allocate();
+		assert!(task.is_none());
+	}
+
+	#[tokio::test]
+	async fn allocate_task_twice_with_two_do_not_segment_job_returns_twice() {
+		let mut manager = make_job_manager();
+		manager.add_job(Job::new(
+			Source::Local(Uuid::nil()),
+			JobParams::sample_params(),
+		));
+		manager.add_job(Job::new(
+			Source::Local(Uuid::nil()),
+			JobParams::sample_params(),
+		));
+
+		let _task = manager.allocate();
+		let task = manager.allocate();
+		assert!(task.is_some());
 	}
 }
 
