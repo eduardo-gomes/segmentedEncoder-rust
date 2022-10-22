@@ -1,0 +1,22 @@
+name: Cargo
+description: Setup cargo used by workflows
+runs:
+  using: "composite"
+  steps:
+    - name: cache cargo
+      id: cache-cargo-protoc
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key:  ${{ runner.os }}-cargo-${{ hashFiles(**/Cargo.lock) }}
+        restore-keys: ${{ runner.os }}-cargo-
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+    - name: check protoc
+      run: protoc --version
+      shell: bash
