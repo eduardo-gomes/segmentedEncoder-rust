@@ -26,7 +26,6 @@ runs:
     - name: set windows path
       run: |
         echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
-        ls -Recurse
         echo Path: ((Get-Location).ToString() + "\protoc\bin")
       if: (runner.os == 'Windows')
       working-directory: ${{ steps.protoc-path.outputs.path }}
