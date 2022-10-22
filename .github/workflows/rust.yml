@@ -23,7 +23,7 @@ jobs:
         cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
+        echo ((Get-Location).ToString() + "\protoc\bin") >> $env:GITHUB_PATH
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
@@ -54,8 +54,7 @@ jobs:
         cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
-        echo ((Get-Location).ToString() + "\protoc\bin\protoc.exe")
+        echo ((Get-Location).ToString() + "\protoc\bin") >> $env:GITHUB_PATH
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
