@@ -17,6 +17,3 @@ runs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-    - name: check protoc
-      run: protoc --version
-      shell: bash
