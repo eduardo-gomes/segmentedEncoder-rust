@@ -23,7 +23,10 @@ runs:
       shell: pwsh
     - name: set windows path
       if: (runner.os == 'Windows')
-      run: echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
+      run: |
+        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
+        ls -Recurse
+        echo Path: ((Get-Location).ToString() + "\protoc\bin")
       shell: pwsh
     - id: Linux
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
