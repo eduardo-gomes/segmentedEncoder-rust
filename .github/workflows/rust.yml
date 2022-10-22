@@ -25,6 +25,7 @@ jobs:
         Expand-Archive protoc.zip -DestinationPath protoc
         echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
         Get-Content $env:GITHUB_ENV
+        ls -R protoc\bin
     - name: check PROTOC
       run: echo $env:PROTOC
     - name: download protoc linux
@@ -59,6 +60,7 @@ jobs:
         Expand-Archive protoc.zip -DestinationPath protoc
         echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
         Get-Content $env:GITHUB_ENV
+        ls -R protoc\bin
     - name: check PROTOC
       run: echo $env:PROTOC
     - name: download protoc linux
