@@ -3,6 +3,13 @@ description: Install protoc and update PATH
 runs:
   using: "composite"
   steps:
+    - name: cache windows protoc
+      id: cache-windows-protoc
+      if: runner.os == 'Windows'
+      uses: actions/cache@v3
+        with:
+          path: [~/protobuf-compiler/protoc]
+          key:  ${{ runner.os }}-protoc
     - id: Windows
       run: |
         mkdir ~/protobuf-compiler
@@ -10,9 +17,12 @@ runs:
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
         echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' && steps.cache-windows-protoc.outputs.cache-hit != true
       shell: pwsh
     - id: Linux
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
       if: runner.os == 'Linux'
+      shell: bash
+    - id: check protoc
+      run: protoc --version
       shell: bash
