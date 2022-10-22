@@ -53,6 +53,8 @@ jobs:
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
         echo ((Get-Location).ToString() + "\protoc\bin\") >> $env:GITHUB_PATH
+        echo (${{ env.RUNNER_TEMP }} + "\protoc\bin\")
+        echo ((Get-Location).ToString() + "\protoc\bin\")
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
