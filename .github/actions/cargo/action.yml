@@ -1,5 +1,5 @@
 name: Cargo
-description: Setup cargo used by workflows
+description: Setup cargo and junitify used by workflows
 runs:
   using: "composite"
   steps:
@@ -14,6 +14,8 @@ runs:
           ~/.cargo/git/db/
         key:  ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
+    - run: cargo install junitify
+      shell: bash
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly

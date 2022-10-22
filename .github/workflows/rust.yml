@@ -28,7 +28,14 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test -- --format=json -Z unstable-options --report-time | junitify -r --out ./tests/
+    - name: JUnit Report Action
+      uses: mikepenz/action-junit-report@v3
+      if: always()
+      with:
+        report_paths: ./tests/*.xml
+
+
 
   build-release:
     strategy:
