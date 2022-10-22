@@ -34,6 +34,7 @@ jobs:
       if: always()
       with:
         report_paths: ./tests/*.xml
+        check_name: ${{ runner.os }} Test Report
 
 
 
