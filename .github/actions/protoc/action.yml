@@ -16,8 +16,11 @@ runs:
         cd ~/protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
       if: (runner.os == 'Windows') && (steps.cache-windows-protoc.outputs.cache-hit != 'true')
+      shell: pwsh
+    - name: set windows path
+      if: (runner.os == 'Windows')
+      run: echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
       shell: pwsh
     - id: Linux
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
