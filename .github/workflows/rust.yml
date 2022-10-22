@@ -23,10 +23,10 @@ jobs:
         cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo ("PROTOC=" + ((Get-Location).ToString() + "\protoc\bin\protoc.exe") -replace "\\", "/") >> $env:GITHUB_ENV
-        Get-Content $env:GITHUB_ENV
-    - name: check PROTOC
-      run: ls ${{ env.PROTOC }}
+        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
+        Get-Content $env:GITHUB_PATH
+    - name: check Path
+      run: ls ${{ env.Path }}
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
@@ -57,10 +57,10 @@ jobs:
         cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo ("PROTOC=" + ((Get-Location).ToString() + "\protoc\bin\protoc.exe") -replace "\\", "/") >> $env:GITHUB_ENV
-        Get-Content $env:GITHUB_ENV
-    - name: check PROTOC
-      run: ls ${{ env.PROTOC }}
+        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
+        Get-Content $env:GITHUB_PATH
+    - name: check Path
+      run: ls ${{ env.Path }}
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
