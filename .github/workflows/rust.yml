@@ -25,11 +25,11 @@ jobs:
         Expand-Archive protoc.zip -DestinationPath protoc
         echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
         Get-Content $env:GITHUB_PATH
-    - name: check protoc
-      run: protoc --version
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
+    - name: check protoc
+      run: protoc --version
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
@@ -59,11 +59,11 @@ jobs:
         Expand-Archive protoc.zip -DestinationPath protoc
         echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
         Get-Content $env:GITHUB_PATH
-    - name: check protoc
-      run: protoc --version
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
+    - name: check protoc
+      run: protoc --version
     - uses: actions/checkout@v3
     - uses: actions-rs/toolchain@v1
       with:
