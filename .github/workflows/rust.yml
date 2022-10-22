@@ -1,4 +1,5 @@
 name: Rust
+run-name: Build and test @${{ github.sha }}
 
 on:
   push:

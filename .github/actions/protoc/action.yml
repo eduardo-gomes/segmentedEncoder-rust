@@ -23,6 +23,6 @@ runs:
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
       if: runner.os == 'Linux'
       shell: bash
-    - id: check protoc
+    - name: check protoc
       run: protoc --version
       shell: bash
