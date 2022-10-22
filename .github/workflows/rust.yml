@@ -53,6 +53,6 @@ jobs:
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: build optimized
+        name: build_optimized-${{ runner.os }}
         path: binaries
         retention-days: 30
