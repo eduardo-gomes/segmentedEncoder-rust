@@ -10,10 +10,13 @@ runs:
       with:
         path: ~/protobuf-compiler/protoc
         key: ${{ runner.os }}-protoc
+    - run: |
+        New-Item -ItemType Directory -Path ~/protobuf-compiler -Force
+        cd ~/protobuf-compiler
+      if: (runner.os == 'Windows')
+      shell: pwsh
     - id: Windows
       run: |
-        mkdir ~/protobuf-compiler
-        cd ~/protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
       if: (runner.os == 'Windows') && (steps.cache-windows-protoc.outputs.cache-hit != 'true')
