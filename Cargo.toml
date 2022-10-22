@@ -1,2 +1,7 @@
 [workspace]
 members = ["grpc-proto", "web-packer", "web-frontend", "server", "client"]
+
+[profile.release-lto]
+inherits = "release"
+lto = true
+codegen-units = 1
