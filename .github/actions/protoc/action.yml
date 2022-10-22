@@ -8,7 +8,7 @@ runs:
       if: runner.os == 'Windows'
       uses: actions/cache@v3
       with:
-        path: [~/protobuf-compiler/protoc]
+        path: ~/protobuf-compiler/protoc
         key:  ${{ runner.os }}-protoc
     - id: Windows
       run: |
