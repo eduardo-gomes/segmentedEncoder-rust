@@ -17,9 +17,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: download protoc windows
-      working-directory: ${{ env.RUNNER_TEMP }}
       if: runner.os == 'Windows'
       run: |
+        mkdir protobuf-compiler
+        cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
         echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
@@ -47,14 +48,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: download protoc windows
-      working-directory: ${{ env.RUNNER_TEMP }}
       if: runner.os == 'Windows'
       run: |
+        mkdir protobuf-compiler
+        cd protobuf-compiler
         Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
         Expand-Archive protoc.zip -DestinationPath protoc
-        echo ((Get-Location).ToString() + "\protoc\bin\") >> $env:GITHUB_PATH
-        echo (${{ env.RUNNER_TEMP }} + "\protoc\bin\")
-        echo ((Get-Location).ToString() + "\protoc\bin\")
+        echo ("PROTOC=" + (Get-Location).ToString() + "\protoc\bin\protoc.exe") >> $env:GITHUB_ENV
+        echo ((Get-Location).ToString() + "\protoc\bin\protoc.exe")
     - name: download protoc linux
       if: runner.os == 'Linux'
       run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
