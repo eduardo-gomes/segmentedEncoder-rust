@@ -20,18 +20,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-    - name: download protoc windows
-      if: runner.os == 'Windows'
-      run: |
-        mkdir protobuf-compiler
-        cd protobuf-compiler
-        Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
-        Expand-Archive protoc.zip -DestinationPath protoc
-        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
-        Get-Content $env:GITHUB_PATH
-    - name: download protoc linux
-      if: runner.os == 'Linux'
-      run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
+    - uses: ./.github/actions/protoc
     - name: check protoc
       run: protoc --version
     - name: Cache build
@@ -54,18 +43,7 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
-    - name: download protoc windows
-      if: runner.os == 'Windows'
-      run: |
-        mkdir protobuf-compiler
-        cd protobuf-compiler
-        Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
-        Expand-Archive protoc.zip -DestinationPath protoc
-        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
-        Get-Content $env:GITHUB_PATH
-    - name: download protoc linux
-      if: runner.os == 'Linux'
-      run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
+    - uses: ./.github/actions/protoc
     - name: check protoc
       run: protoc --version
     - name: Cache build

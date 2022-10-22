@@ -1,0 +1,18 @@
+name: Protoc
+description: Install protoc and update PATH
+runs:
+  using: "composite"
+  steps:
+    - id: Windows
+      run: |
+        mkdir ~/protobuf-compiler
+        cd ~/protobuf-compiler
+        Invoke-WebRequest https://github.com/protocolbuffers/protobuf/releases/download/v21.8/protoc-21.8-win64.zip -OutFile protoc.zip
+        Expand-Archive protoc.zip -DestinationPath protoc
+        echo (((Get-Location).ToString() + "\protoc\bin") -replace "\\", "/") >> $env:GITHUB_PATH
+      if: runner.os == 'Windows'
+      shell: pwsh
+    - id: Linux
+      run: sudo apt-get update -yqq && sudo apt-get install -yqq protobuf-compiler
+      if: runner.os == 'Linux'
+      shell: bash
