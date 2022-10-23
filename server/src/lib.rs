@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
 use axum::Router;
@@ -17,12 +17,15 @@ pub mod web;
 
 struct State {
 	manager: RwLock<JobManager>,
-	grpc: Weak<ServiceLock>,
+	grpc: Arc<ServiceLock>,
 }
 
 impl State {
-	fn new(manager: JobManagerLock, grpc: Weak<ServiceLock>) -> Arc<Self> {
-		Arc::new(Self { manager, grpc })
+	fn new(manager: JobManagerLock, grpc: ServiceLock) -> Arc<Self> {
+		Arc::new_cyclic(|weak| {
+			let grpc = Arc::new(grpc.with_state(weak.clone()));
+			Self { manager, grpc }
+		})
 	}
 }
 
@@ -33,11 +36,10 @@ pub fn make_multiplexed_service(
 	let storage = Storage::new().unwrap();
 	let manager_lock = RwLock::new(JobManager::new(storage));
 	use crate::client_interface::Service;
-	let service_lock = Arc::new(Service::new().into_lock());
-	let weak_service = Arc::downgrade(&service_lock);
-	let grpc_service = service_lock.with_auth();
+	let service_lock = Service::new().into_lock();
+	let state = State::new(manager_lock, service_lock);
+	let grpc_service = state.grpc.clone().with_auth();
 
-	let state = State::new(manager_lock, weak_service);
 	let web = web::make_service(state).into_make_service_with_connect_info::<SocketAddr>();
 	MakeMultiplexer::new(Shared::new(grpc_service), web)
 }

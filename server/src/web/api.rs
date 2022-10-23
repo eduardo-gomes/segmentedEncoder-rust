@@ -125,12 +125,7 @@ pub(crate) fn make_router(state: Arc<State>) -> Router<Body> {
 async fn get_status(state: Extension<Arc<State>>) -> Response<Body> {
 	let manager = state.manager.read().await;
 	let mut status = manager.status();
-	let client_status = {
-		match state.grpc.upgrade() {
-			None => "GRPC_SERVICE WAS DROPPED".to_string(),
-			Some(service) => service.read().await.status(),
-		}
-	};
+	let client_status = state.grpc.read().await.status();
 	status.push('\n');
 	status.push_str(&client_status);
 	Response::new(Body::from(status))
@@ -151,20 +146,14 @@ mod test {
 
 	fn make_service() -> Router<Body> {
 		use crate::web;
-		use std::sync::Arc;
 		let state = {
 			use crate::job_manager::JobManager;
 			use tokio::sync::RwLock;
 			let storage = Storage::new().unwrap();
 			let manager_lock = RwLock::new(JobManager::new(storage));
-			let service_lock = Arc::new(crate::client_interface::Service::new().into_lock());
-			let weak_service = Arc::downgrade(&service_lock);
+			let service_lock = crate::client_interface::Service::new().into_lock();
 
-			//to use weak_service, we should keep the arc
-			Arc::new(State {
-				manager: manager_lock,
-				grpc: weak_service,
-			})
+			State::new(manager_lock, service_lock)
 		};
 		web::make_service(state)
 	}

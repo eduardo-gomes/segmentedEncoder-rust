@@ -1,3 +1,5 @@
+use std::sync::Weak;
+
 use tokio::sync::{RwLock, RwLockReadGuard};
 use tonic::{Request, Response, Status};
 
@@ -5,6 +7,7 @@ use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
 use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
 
 use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
+use crate::State;
 
 use super::Service;
 
@@ -14,6 +17,9 @@ pub(super) mod auth_interceptor;
 pub struct ServiceLock(RwLock<Service>);
 
 impl ServiceLock {
+	pub(crate) fn with_state(self, state: Weak<State>) -> Self {
+		self.0.into_inner().with_state(state).into_lock()
+	}
 	pub(crate) async fn read(&self) -> RwLockReadGuard<'_, Service> {
 		self.0.read().await
 	}

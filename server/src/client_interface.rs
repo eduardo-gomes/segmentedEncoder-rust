@@ -5,14 +5,13 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::{Arc, Weak};
 
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
 pub(crate) use grpc_service::ServiceLock;
 
 use crate::jobs::Task;
-use crate::JobManager;
+use crate::State;
 
 type ClientEntry = Arc<()>;
 
@@ -22,14 +21,13 @@ pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,
-	service: Weak<RwLock<JobManager>>,
+	state: Weak<State>,
 }
 
 impl Service {
-	pub(crate) fn with_manager(manager: &Arc<RwLock<JobManager>>) -> Self {
-		let mut val = Self::new();
-		val.service = Arc::downgrade(manager);
-		val
+	pub(crate) fn with_state(mut self, state: Weak<State>) -> Self {
+		self.state = state;
+		self
 	}
 }
 
@@ -70,16 +68,16 @@ impl Service {
 
 	pub(crate) fn request_task(&self) -> Result<impl Future<Output = Option<Task>>, &'static str> {
 		//The future owns the upgraded arc, write may be locked outside the ServiceLock
-		self.service
+		self.state
 			.upgrade()
 			.ok_or("Service was dropped!")
-			.map(|service| async move { service.write().await.allocate() })
+			.map(|service| async move { service.manager.write().await.allocate() })
 	}
 
 	pub(crate) fn new() -> Self {
 		Self {
 			clients: HashMap::new(),
-			service: Weak::default(),
+			state: Weak::default(),
 		}
 	}
 }
@@ -93,7 +91,7 @@ mod test {
 
 	use crate::client_interface::Service;
 	use crate::jobs::{Job, JobParams, Source};
-	use crate::{JobManager, Storage};
+	use crate::{JobManager, State, Storage};
 
 	#[test]
 	fn new_service_has_no_clients() {
@@ -170,10 +168,12 @@ mod test {
 	async fn request_task_returns_none() {
 		let manager_lock = {
 			let manager = JobManager::new(Storage::new().unwrap());
-			Arc::new(RwLock::new(manager))
+			RwLock::new(manager)
 		};
-		let service = Service::with_manager(&manager_lock);
-		let task = service.request_task().unwrap().await;
+		let service = Service::new().into_lock();
+		let state = State::new(manager_lock, service);
+		let service = state.grpc.clone();
+		let task = service.read().await.request_task().unwrap().await;
 		assert!(task.is_none());
 	}
 
@@ -185,11 +185,13 @@ mod test {
 				Source::Local(Uuid::new_v4()),
 				JobParams::sample_params(),
 			));
-			Arc::new(RwLock::new(manager))
+			RwLock::new(manager)
 		};
 
-		let service = Service::with_manager(&manager_lock);
-		let task = service.request_task().unwrap().await;
+		let service = Service::new().into_lock();
+		let state = State::new(manager_lock, service);
+		let service = state.grpc.clone();
+		let task = service.read().await.request_task().unwrap().await;
 		assert!(task.is_some());
 	}
 }
