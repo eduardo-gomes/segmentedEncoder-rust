@@ -2,12 +2,17 @@
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::future::Future;
+use std::sync::{Arc, Weak};
 
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
 pub(crate) use grpc_service::ServiceLock;
+
+use crate::jobs::Task;
+use crate::JobManager;
 
 type ClientEntry = Arc<()>;
 
@@ -17,6 +22,15 @@ pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
 	clients: HashMap<Uuid, Arc<()>>,
+	service: Weak<RwLock<JobManager>>,
+}
+
+impl Service {
+	pub(crate) fn with_manager(manager: &Arc<RwLock<JobManager>>) -> Self {
+		let mut val = Self::new();
+		val.service = Arc::downgrade(manager);
+		val
+	}
 }
 
 impl Debug for Service {
@@ -54,9 +68,18 @@ impl Service {
 		(id, arc)
 	}
 
+	pub(crate) fn request_task(&self) -> Result<impl Future<Output = Option<Task>>, &'static str> {
+		//The future owns the upgraded arc, write may be locked outside the ServiceLock
+		self.service
+			.upgrade()
+			.ok_or("Service was dropped!")
+			.map(|service| async move { service.write().await.allocate() })
+	}
+
 	pub(crate) fn new() -> Self {
 		Self {
 			clients: HashMap::new(),
+			service: Weak::default(),
 		}
 	}
 }
@@ -65,7 +88,12 @@ impl Service {
 mod test {
 	use std::sync::Arc;
 
+	use tokio::sync::RwLock;
+	use uuid::Uuid;
+
 	use crate::client_interface::Service;
+	use crate::jobs::{Job, JobParams, Source};
+	use crate::{JobManager, Storage};
 
 	#[test]
 	fn new_service_has_no_clients() {
@@ -136,5 +164,32 @@ mod test {
 			status.contains(&id.as_hyphenated().to_string()),
 			"Status '{status}' should contain worker_id '{id}'"
 		);
+	}
+
+	#[tokio::test]
+	async fn request_task_returns_none() {
+		let manager_lock = {
+			let manager = JobManager::new(Storage::new().unwrap());
+			Arc::new(RwLock::new(manager))
+		};
+		let service = Service::with_manager(&manager_lock);
+		let task = service.request_task().unwrap().await;
+		assert!(task.is_none());
+	}
+
+	#[tokio::test]
+	async fn request_task_returns_some_after_create_job() {
+		let manager_lock = {
+			let mut manager = JobManager::new(Storage::new().unwrap());
+			manager.add_job(Job::new(
+				Source::Local(Uuid::new_v4()),
+				JobParams::sample_params(),
+			));
+			Arc::new(RwLock::new(manager))
+		};
+
+		let service = Service::with_manager(&manager_lock);
+		let task = service.request_task().unwrap().await;
+		assert!(task.is_some());
 	}
 }
