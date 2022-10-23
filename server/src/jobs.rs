@@ -20,8 +20,8 @@ impl JobParams {
 	pub(crate) fn sample_params() -> Self {
 		JobParams {
 			video_encoder: "libsvtav1".to_string(),
-			video_args: None,
-			audio_encoder: None,
+			video_args: Some("-crf 30".to_string()),
+			audio_encoder: Some("libopus".to_string()),
 			audio_args: None,
 		}
 	}
