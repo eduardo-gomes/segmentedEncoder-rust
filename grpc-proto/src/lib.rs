@@ -5,13 +5,13 @@ pub mod proto {
 	mod helper {
 		use tonic::codegen::InterceptedService;
 		use tonic::transport::Channel;
-		use tonic::{Request, Status};
+		use tonic::{IntoRequest, Request, Status};
 		use uuid::Uuid;
 
 		use crate::proto::segmented_encoder_client::SegmentedEncoderClient;
-		use crate::proto::RegistrationResponse;
+		use crate::proto::{Empty, RegistrationResponse};
 
-		type SegmentedEncoderClientWithAuth<F> =
+		pub type SegmentedEncoderClientWithAuth<F> =
 			SegmentedEncoderClient<InterceptedService<Channel, F>>;
 
 		pub fn client_with_auth(
@@ -23,6 +23,12 @@ pub mod proto {
 					.insert("worker-id", worker_id.to_string().parse().unwrap());
 				Ok(req)
 			})
+		}
+
+		impl IntoRequest<Empty> for () {
+			fn into_request(self) -> Request<Empty> {
+				Request::new(Empty {})
+			}
 		}
 
 		#[derive(Debug)]
