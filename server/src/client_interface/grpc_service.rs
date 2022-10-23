@@ -10,6 +10,7 @@ use super::Service;
 
 pub(super) mod auth_interceptor;
 
+/// A RwLock newType for [Service]. Used to implement [SegmentedEncoder]
 pub struct ServiceLock(RwLock<Service>);
 
 impl ServiceLock {
@@ -19,6 +20,7 @@ impl ServiceLock {
 }
 
 impl Service {
+	///[ServiceLock] is a workaround to implement a trait from another crate
 	pub(crate) fn into_lock(self) -> ServiceLock {
 		ServiceLock(RwLock::new(self))
 	}
