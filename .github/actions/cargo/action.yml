@@ -4,7 +4,7 @@ runs:
   using: "composite"
   steps:
     - name: cache cargo
-      id: cache-cargo-protoc
+      id: cache-cargo
       uses: actions/cache@v3
       with:
         path: |
@@ -14,8 +14,10 @@ runs:
           ~/.cargo/git/db/
         key:  ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: ${{ runner.os }}-cargo-
-    - run: cargo install junitify
-      shell: bash
     - uses: actions-rs/toolchain@v1
       with:
+        profile: minimal
         toolchain: nightly
+    - run: cargo install --force junitify
+      if: steps.cache-cargo.outputs.cache-hit != 'true'
+      shell: bash
