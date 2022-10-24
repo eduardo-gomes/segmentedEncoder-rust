@@ -1,7 +1,8 @@
 use std::process::exit;
+use std::str::FromStr;
 
 use tonic::codegen::InterceptedService;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::{Channel, Endpoint, Uri};
 use tonic::{Request, Status};
 
 use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
@@ -14,9 +15,11 @@ async fn main() {
 		println!("Missing arguments!\nUsage: {} SERVER_URL", args[0]);
 		exit(1);
 	} else {
-		let url = &args[1];
-		println!("Target is {url}");
-		let mut authenticated = connection_register(url.parse().unwrap()).await;
+		let url = Uri::from_str(&args[1]).expect("Failed to parse url");
+		println!("Target url: {url}");
+		url.scheme()
+			.expect("URL should have a scheme. Ex: https://localhost");
+		let mut authenticated = connection_register(Endpoint::from(url)).await;
 		let response = authenticated
 			.get_worker_registration(Empty {})
 			.await
