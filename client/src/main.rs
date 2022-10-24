@@ -22,6 +22,8 @@ async fn main() {
 			.await
 			.unwrap();
 		dbg!(response.into_inner().parse().unwrap());
+		let task = authenticated.request_task(Empty {}).await;
+		dbg!(task).expect("Did not get a task!");
 	}
 }
 
