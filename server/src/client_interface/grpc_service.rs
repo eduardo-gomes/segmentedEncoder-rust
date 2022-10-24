@@ -72,7 +72,8 @@ impl SegmentedEncoder for ServiceLock {
 		.map(|task| {
 			let params = task.parameters;
 			Response::new(Task {
-				v_codec: params.video_encoder.to_string(),
+				input_path: task.input,
+				v_codec: params.video_encoder,
 				v_params: params.video_args.unwrap_or_default(),
 				a_codec: params.audio_encoder.unwrap_or_default(),
 				a_params: params.audio_args.unwrap_or_default(),
@@ -232,6 +233,38 @@ mod test {
 			has_same_parameters,
 			"Task: {:?}\nParams: {:?}\nBoth should have same parameters\n",
 			task, params
+		);
+		close.await
+	}
+
+	#[tokio::test]
+	async fn request_task_has_valid_input_path() -> Result<(), Box<dyn Error>> {
+		use crate::jobs::{Job, JobParams, Source};
+		let state = new_state();
+		let params = JobParams::sample_params();
+		let job = Job::new(Source::Local(Uuid::new_v4()), params.clone());
+		state.manager.write().await.add_job(job);
+
+		let (close, client, url) = start_server(Some(state)).await?;
+		let (mut client, _) = register_connect(client, &url).await?;
+
+		let task = client
+			.request_task(())
+			.await
+			.expect("Should return after a job is created")
+			.into_inner();
+		let path = task.input_path;
+		//Append path to server url
+		let input = reqwest::Url::parse(&url)?.join(&path)?;
+		println!("Input: {}", input);
+		let response = reqwest::get(input.clone())
+			.await
+			.expect("Task should have a valid input");
+		assert!(
+			response.status().is_success(),
+			"Request to {} was not successful {}.",
+			input,
+			response.status()
 		);
 		close.await
 	}

@@ -18,7 +18,7 @@ message Empty{}
 
 message Task{
   //  TaskId id = 1;
-  //  string input = 2;
+  string input_path = 2;
   string v_codec = 3;
   string v_params = 4;
   string a_codec = 5;
