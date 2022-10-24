@@ -46,7 +46,7 @@ impl JobSegmenter {
 			return None;
 		}
 		self.job.upgrade().map(|upgraded| Task {
-			input: format!("/api/jobs/{uuid}/source"),
+			input_path: format!("/api/jobs/{uuid}/source"),
 			parameters: upgraded.parameters.clone(),
 		})
 	}
@@ -107,7 +107,7 @@ mod test {
 
 		let task = job_with_id.allocate().unwrap();
 		let expected_path = format!("/api/jobs/{job_uuid}/source");
-		let path = task.input;
+		let path = task.input_path;
 		assert_eq!(
 			path, expected_path,
 			"Path should match /api/jobs/{{job_id}}/source"

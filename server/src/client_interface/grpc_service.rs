@@ -72,7 +72,7 @@ impl SegmentedEncoder for ServiceLock {
 		.map(|task| {
 			let params = task.parameters;
 			Response::new(Task {
-				input_path: task.input,
+				input_path: task.input_path,
 				v_codec: params.video_encoder,
 				v_params: params.video_args.unwrap_or_default(),
 				a_codec: params.audio_encoder.unwrap_or_default(),
