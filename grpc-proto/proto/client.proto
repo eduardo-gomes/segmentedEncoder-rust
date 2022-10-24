@@ -11,7 +11,22 @@ message RegistrationResponse{
 
 message Empty{}
 
+//message TaskId{
+//  bytes job_id = 1;
+//  bytes run_id = 2;
+//}
+
+message Task{
+  //  TaskId id = 1;
+  //  string input = 2;
+  string v_codec = 3;
+  string v_params = 4;
+  string a_codec = 5;
+  string a_params = 6;
+}
+
 service SegmentedEncoder{
   rpc registerClient(RegistrationRequest) returns (RegistrationResponse);
   rpc getWorkerRegistration(Empty) returns (RegistrationResponse);
+  rpc requestTask(Empty) returns (Task);
 }

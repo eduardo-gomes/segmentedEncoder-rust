@@ -4,7 +4,7 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 use tonic::{Request, Response, Status};
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
-use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse};
+use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse, Task};
 
 use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
 use crate::State;
@@ -55,6 +55,30 @@ impl SegmentedEncoder for ServiceLock {
 			worker_id: worker_id.into_bytes().to_vec(),
 		}))
 	}
+
+	async fn request_task(&self, _request: Request<Empty>) -> Result<Response<Task>, Status> {
+		let got = self
+			.0
+			.read()
+			.await
+			.request_task()
+			.map_err(Status::unknown)?
+			.await;
+		got.ok_or_else(|| {
+			Status::deadline_exceeded(
+				"Deadline exceeded immediately because timeout was not implemented",
+			)
+		})
+		.map(|task| {
+			let params = task.parameters;
+			Response::new(Task {
+				v_codec: params.video_encoder.to_string(),
+				v_params: params.video_args.unwrap_or_default(),
+				a_codec: params.audio_encoder.unwrap_or_default(),
+				a_params: params.audio_args.unwrap_or_default(),
+			})
+		})
+	}
 }
 
 #[cfg(test)]
@@ -66,7 +90,7 @@ mod test {
 
 	use tokio::sync::RwLock;
 	use tonic::transport::{Channel, Endpoint};
-	use tonic::{Code, Request};
+	use tonic::{Code, Request, Status};
 	use tower::make::Shared;
 	use uuid::Uuid;
 
@@ -75,10 +99,11 @@ mod test {
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;
+	use crate::State;
 
 	#[tokio::test]
 	async fn register_client_returns_uuid() -> Result<(), Box<dyn Error>> {
-		let (close, mut client, _) = start_server().await?;
+		let (close, mut client, _) = start_server(None).await?;
 
 		let request = Request::new(RegistrationRequest {
 			display_name: "Test worker".to_string(),
@@ -96,7 +121,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_worker_registration_needs_authentication() -> Result<(), Box<dyn Error>> {
-		let (close, mut client, _) = start_server().await?;
+		let (close, mut client, _) = start_server(None).await?;
 
 		let response = client
 			.get_worker_registration(Empty {})
@@ -110,7 +135,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_worker_registration_authenticated() -> Result<(), Box<dyn Error>> {
-		let (close, mut client, url) = start_server().await?;
+		let (close, mut client, url) = start_server(None).await?;
 		let worker_id = register(&mut client).await?;
 		let channel = Endpoint::from_str(&url)?.connect().await?;
 		let mut client = client_with_auth(channel, worker_id);
@@ -128,7 +153,7 @@ mod test {
 
 	#[tokio::test]
 	async fn random_uuid_is_not_authenticated() -> Result<(), Box<dyn Error>> {
-		let (close, _, url) = start_server().await?;
+		let (close, _, url) = start_server(None).await?;
 		let channel = Endpoint::from_str(&url)?.connect().await?;
 		let mut client =
 			SegmentedEncoderClient::with_interceptor(channel, move |mut req: Request<()>| {
@@ -147,6 +172,96 @@ mod test {
 		Ok(())
 	}
 
+	#[tokio::test]
+	async fn request_task_before_create_task_should_timeout() -> Result<(), Box<dyn Error>> {
+		let state = new_state();
+
+		let (close, client, url) = start_server(Some(state)).await?;
+		let (mut client, _) = register_connect(client, &url).await?;
+
+		let err = client
+			.request_task(())
+			.await
+			.expect_err("Should return fail");
+		assert_eq!(err.code(), Code::DeadlineExceeded, "Status: {:?}", err);
+		close.await
+	}
+
+	#[tokio::test]
+	async fn request_task_after_create_task_return_task() -> Result<(), Box<dyn Error>> {
+		use crate::jobs::{Job, JobParams, Source};
+		let state = new_state();
+		let job = Job::new(Source::Local(Uuid::new_v4()), JobParams::sample_params());
+		state.manager.write().await.add_job(job);
+
+		let (close, client, url) = start_server(Some(state)).await?;
+		let (mut client, _) = register_connect(client, &url).await?;
+
+		let _task = client
+			.request_task(())
+			.await
+			.expect("Should return after a job is created");
+
+		close.await
+	}
+
+	#[tokio::test]
+	async fn request_task_check_task_params() -> Result<(), Box<dyn Error>> {
+		use crate::jobs::{Job, JobParams, Source};
+		let state = new_state();
+		let params = JobParams::sample_params();
+		let job = Job::new(Source::Local(Uuid::new_v4()), params.clone());
+		state.manager.write().await.add_job(job);
+
+		let (close, client, url) = start_server(Some(state)).await?;
+		let (mut client, _) = register_connect(client, &url).await?;
+
+		let task = client
+			.request_task(())
+			.await
+			.expect("Should return after a job is created")
+			.into_inner();
+		let has_same_parameters = {
+			let params = params.clone();
+			task.a_codec == params.audio_encoder.unwrap_or_default()
+				&& task.a_params == params.audio_args.unwrap_or_default()
+				&& task.v_codec == params.video_encoder
+				&& task.v_params == params.video_args.unwrap_or_default()
+		};
+		assert!(
+			has_same_parameters,
+			"Task: {:?}\nParams: {:?}\nBoth should have same parameters\n",
+			task, params
+		);
+		close.await
+	}
+
+	fn new_state() -> Arc<State> {
+		use crate::job_manager::JobManager;
+		use crate::storage::Storage;
+		let manager = JobManager::new(Storage::new().unwrap()).into();
+		State::new(manager, Service::new().into_lock())
+	}
+
+	async fn register_connect(
+		mut client: SegmentedEncoderClient<Channel>,
+		url: &str,
+	) -> Result<
+		(
+			grpc_proto::proto::SegmentedEncoderClientWithAuth<
+				impl Fn(Request<()>) -> Result<Request<()>, Status>,
+			>,
+			Uuid,
+		),
+		Box<dyn Error>,
+	> {
+		let worker_id = register(&mut client).await?;
+		let channel = Endpoint::from_str(url)?.connect().await?;
+		let client = client_with_auth(channel, worker_id);
+
+		Ok((client, worker_id))
+	}
+
 	//Request registration and return the worker_id
 	async fn register(
 		client: &mut SegmentedEncoderClient<Channel>,
@@ -161,7 +276,9 @@ mod test {
 	}
 
 	//Start the server and return future to close, a client and the url
-	async fn start_server() -> Result<
+	async fn start_server(
+		state: Option<Arc<State>>,
+	) -> Result<
 		(
 			impl Future<Output = Result<(), Box<dyn Error>>>,
 			SegmentedEncoderClient<Channel>,
@@ -169,7 +286,10 @@ mod test {
 		),
 		Box<dyn Error>,
 	> {
-		let instance = Arc::new(ServiceLock(RwLock::new(Service::new())));
+		let instance = state.clone().map_or_else(
+			|| Arc::new(ServiceLock(RwLock::new(Service::new()))),
+			|state| state.grpc.clone(),
+		);
 		let service = Shared::new(instance.with_auth());
 		let addr = "[::1]:0".parse().unwrap();
 		let server = hyper::Server::bind(&addr).serve(service);
@@ -185,6 +305,7 @@ mod test {
 		let close = async move {
 			tx.send(()).map_err(|_| "the receiver dropped")?;
 			server_handle.await??;
+			drop(state); //Make close own State while server is open
 			Ok(())
 		};
 		let client = grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient::connect(
