@@ -73,7 +73,7 @@ impl SegmentedEncoder for ServiceLock {
 			let params = task.parameters;
 			Response::new(Task {
 				input_path: task.input_path,
-				v_codec: params.video_encoder,
+				v_codec: params.video_encoder.unwrap_or_default(),
 				v_params: params.video_args.unwrap_or_default(),
 				a_codec: params.audio_encoder.unwrap_or_default(),
 				a_params: params.audio_args.unwrap_or_default(),
@@ -226,7 +226,7 @@ mod test {
 			let params = params.clone();
 			task.a_codec == params.audio_encoder.unwrap_or_default()
 				&& task.a_params == params.audio_args.unwrap_or_default()
-				&& task.v_codec == params.video_encoder
+				&& task.v_codec == params.video_encoder.unwrap_or_default()
 				&& task.v_params == params.video_args.unwrap_or_default()
 		};
 		assert!(

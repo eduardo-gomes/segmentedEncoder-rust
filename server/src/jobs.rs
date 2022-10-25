@@ -3,7 +3,7 @@ use uuid::Uuid;
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct JobParams {
-	pub(crate) video_encoder: String,
+	pub(crate) video_encoder: Option<String>,
 	pub(crate) video_args: Option<String>,
 	pub(crate) audio_encoder: Option<String>,
 	pub(crate) audio_args: Option<String>,
@@ -19,7 +19,7 @@ impl JobParams {
 	#[cfg(test)]
 	pub(crate) fn sample_params() -> Self {
 		JobParams {
-			video_encoder: "libsvtav1".to_string(),
+			video_encoder: Some("libsvtav1".to_string()),
 			video_args: Some("-crf 30".to_string()),
 			audio_encoder: Some("libopus".to_string()),
 			audio_args: None,

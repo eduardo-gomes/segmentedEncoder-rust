@@ -29,7 +29,7 @@ fn parse_job(headers: &HeaderMap) -> Result<JobParams, String> {
 	match encoder {
 		None => Err("Missing video encoder".to_string()),
 		Some(encoder) => Ok(JobParams {
-			video_encoder: encoder.to_string(),
+			video_encoder: Some(encoder.to_string()),
 			video_args: video_args.map(String::from),
 			audio_encoder: audio_encoder.map(String::from),
 			audio_args: audio_args.map(String::from),
