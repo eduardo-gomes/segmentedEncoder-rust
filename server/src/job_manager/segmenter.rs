@@ -10,7 +10,20 @@ use crate::jobs::{Job, Task};
 pub(super) struct JobSegmenter {
 	job: Weak<Job>,
 	job_id: Uuid,
+	task_id: Uuid,
 	generated: AtomicBool,
+}
+
+impl JobSegmenter {
+	pub(crate) fn get_task(&self, id: &Uuid) -> Option<()> {
+		match self.generated.load(Ordering::Relaxed) {
+			true => match id == &self.task_id {
+				true => Some(()),
+				false => None,
+			},
+			false => None,
+		}
+	}
 }
 
 impl JobSegmenter {
@@ -27,6 +40,7 @@ impl Job {
 		JobSegmenter {
 			job: Arc::downgrade(self),
 			job_id: uuid,
+			task_id: Uuid::new_v4(), //While we only have one task, and don't restart
 			generated: AtomicBool::from(false),
 		}
 	}
@@ -46,6 +60,7 @@ impl JobSegmenter {
 			return None;
 		}
 		self.job.upgrade().map(|upgraded| Task {
+			id: self.task_id,
 			input_path: format!("/api/jobs/{uuid}/source"),
 			parameters: upgraded.parameters.clone(),
 		})
@@ -112,5 +127,46 @@ mod test {
 			path, expected_path,
 			"Path should match /api/jobs/{{job_id}}/source"
 		);
+	}
+
+	#[test]
+	fn generated_task_has_non_null_id() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let task = segmenter.allocate().unwrap();
+		let task_id = task.id;
+		assert!(!task_id.is_nil())
+	}
+
+	#[test]
+	fn get_task_returns_none_invalid_id() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let _task = segmenter.allocate().unwrap();
+		let uuid = Uuid::new_v4();
+		let got_task = segmenter.get_task(&uuid);
+		assert!(got_task.is_none())
+	}
+
+	#[test]
+	fn get_task_returns_some_with_valid_id() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let task = segmenter.allocate().unwrap();
+		let task_id = task.id;
+		let got_task = segmenter.get_task(&task_id);
+		assert!(got_task.is_some())
 	}
 }
