@@ -5,7 +5,23 @@ use std::sync::{Arc, Weak};
 
 use uuid::Uuid;
 
-use crate::jobs::{Job, Task};
+use crate::jobs::{Job, JobParams, Task};
+
+///Stores all the data needed to create a [Task], except the id.
+struct Segment {
+	input_path: String,
+	parameters: JobParams,
+}
+
+impl Segment {
+	pub(crate) fn into_task(self, task_id: &Uuid) -> Task {
+		Task {
+			id: *task_id,
+			input_path: self.input_path,
+			parameters: self.parameters,
+		}
+	}
+}
 
 pub(super) struct JobSegmenter {
 	job: Weak<Job>,
@@ -15,6 +31,14 @@ pub(super) struct JobSegmenter {
 }
 
 impl JobSegmenter {
+	///Interface to allocate tasks.
+	///
+	///The returned task will be marked as running.
+	pub(super) fn allocate(&self) -> Option<Task> {
+		self.next_segment()
+			.map(|segment| segment.into_task(&self.task_id))
+	}
+
 	pub(crate) fn get_task(&self, id: &Uuid) -> Option<()> {
 		match self.generated.load(Ordering::Relaxed) {
 			true => match id == &self.task_id {
@@ -23,15 +47,6 @@ impl JobSegmenter {
 			},
 			false => None,
 		}
-	}
-}
-
-impl JobSegmenter {
-	///Interface to allocate tasks.
-	///
-	///The returned task will be marked as running.
-	pub(super) fn allocate(&self) -> Option<Task> {
-		self.next_task()
 	}
 }
 
@@ -47,10 +62,10 @@ impl Job {
 }
 
 impl JobSegmenter {
-	///Internal function to segment tasks.
+	///Internal function to segment jobs.
 	///
 	///This may differ for different kinds of segmentation.
-	fn next_task(&self) -> Option<Task> {
+	fn next_segment(&self) -> Option<Segment> {
 		let uuid = self.job_id;
 		if self
 			.generated
@@ -59,8 +74,7 @@ impl JobSegmenter {
 		{
 			return None;
 		}
-		self.job.upgrade().map(|upgraded| Task {
-			id: self.task_id,
+		self.job.upgrade().map(|upgraded| Segment {
 			input_path: format!("/api/jobs/{uuid}/source"),
 			parameters: upgraded.parameters.clone(),
 		})
