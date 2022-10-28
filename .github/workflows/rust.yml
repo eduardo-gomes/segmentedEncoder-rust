@@ -24,9 +24,10 @@ jobs:
       uses: actions/cache@v3
       with:
         path: target
-        key: ${{ runner.os }}-build-debug
+        key: ${{ runner.os }}-build-debug-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-build-debug
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --tests --verbose
     - name: Run tests
       run: cargo test -- --format=json -Z unstable-options --report-time | junitify -r --out ./tests/
     - name: JUnit Report Action
@@ -51,7 +52,8 @@ jobs:
       uses: actions/cache@v3
       with:
         path: target
-        key: ${{ runner.os }}-build-optimized
+        key: ${{ runner.os }}-build-optimized-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: ${{ runner.os }}-build-optimized
     - name: Build
       run: cargo +nightly build --profile=release-lto --bins -Z unstable-options --out-dir binaries --verbose
     - name: Upload Artifact
