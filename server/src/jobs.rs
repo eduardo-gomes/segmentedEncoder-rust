@@ -55,6 +55,7 @@ impl Job {
 ///
 ///It is able to tell the input and output files
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct Task {
 	pub id: Uuid,
 	pub input_path: String,

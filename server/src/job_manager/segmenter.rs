@@ -1,13 +1,14 @@
 //! Module that manages tasks from jobs, should handle if task fails, and when job is complete.
 //! Also handle status tracking
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
+use tokio::sync::OnceCell;
 use uuid::Uuid;
 
 use crate::jobs::{Job, JobParams, Task};
 
 ///Stores all the data needed to create a [Task], except the id.
+#[derive(Clone)]
 struct Segment {
 	input_path: String,
 	parameters: JobParams,
@@ -27,7 +28,7 @@ pub(super) struct JobSegmenter {
 	job: Weak<Job>,
 	job_id: Uuid,
 	task_id: Uuid,
-	generated: AtomicBool,
+	segment: OnceCell<Segment>,
 }
 
 impl JobSegmenter {
@@ -39,14 +40,12 @@ impl JobSegmenter {
 			.map(|segment| segment.into_task(&self.task_id))
 	}
 
-	pub(crate) fn get_task(&self, id: &Uuid) -> Option<()> {
-		match self.generated.load(Ordering::Relaxed) {
-			true => match id == &self.task_id {
-				true => Some(()),
-				false => None,
-			},
-			false => None,
-		}
+	pub(crate) fn get_task(&self, id: &Uuid) -> Option<Task> {
+		self.segment
+			.get()
+			.filter(|_| id == &self.task_id)
+			.cloned()
+			.map(|segment| segment.into_task(id))
 	}
 
 	pub(crate) fn cancel_task(&self, id: &Uuid) -> bool {
@@ -60,7 +59,7 @@ impl Job {
 			job: Arc::downgrade(self),
 			job_id: uuid,
 			task_id: Uuid::new_v4(), //While we only have one task, and don't restart
-			generated: AtomicBool::from(false),
+			segment: OnceCell::new(),
 		}
 	}
 }
@@ -70,18 +69,16 @@ impl JobSegmenter {
 	///
 	///This may differ for different kinds of segmentation.
 	fn next_segment(&self) -> Option<Segment> {
-		let uuid = self.job_id;
-		if self
-			.generated
-			.compare_exchange(false, true, Ordering::SeqCst, Ordering::Acquire)
-			.is_err()
-		{
-			return None;
-		}
-		self.job.upgrade().map(|upgraded| Segment {
-			input_path: format!("/api/jobs/{uuid}/source"),
-			parameters: upgraded.parameters.clone(),
-		})
+		self.job
+			.upgrade()
+			.map(|upgraded| Segment {
+				input_path: format!("/api/jobs/{}/source", self.job_id),
+				parameters: upgraded.parameters.clone(),
+			})
+			.and_then(|segment| {
+				let res = self.segment.set(segment.clone());
+				res.ok().and(Some(segment))
+			})
 	}
 }
 
@@ -175,7 +172,7 @@ mod test {
 	}
 
 	#[test]
-	fn get_task_returns_some_with_valid_id() {
+	fn get_task_returns_equals_allocate() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
@@ -184,8 +181,8 @@ mod test {
 
 		let task = segmenter.allocate().unwrap();
 		let task_id = task.id;
-		let got_task = segmenter.get_task(&task_id);
-		assert!(got_task.is_some())
+		let got_task = segmenter.get_task(&task_id).unwrap();
+		assert_eq!(got_task, task)
 	}
 
 	#[test]
