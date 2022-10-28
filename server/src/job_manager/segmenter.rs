@@ -38,10 +38,14 @@ impl JobSegmenter {
 	///
 	///The returned task will be marked as running.
 	pub(super) async fn allocate(&self) -> Option<Task> {
+		let mut allocated = self.allocated.write().await;
+		if allocated.is_some() {
+			return None;
+		}
 		let task = self
 			.next_segment()
 			.map(|segment| segment.into_task(&Uuid::new_v4()));
-		*self.allocated.write().await = task.clone();
+		*allocated = task.clone();
 		task
 	}
 
@@ -127,6 +131,20 @@ mod test {
 		job.allocate().await;
 		let task = job.allocate().await;
 		assert!(task.is_none());
+	}
+
+	#[tokio::test]
+	async fn after_failed_allocate_can_get_previous_task() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let job = job.make_segmenter(job_uuid);
+
+		let task_id = job.allocate().await.unwrap().id;
+		job.allocate().await;
+		let got_task = job.get_task(&task_id).await;
+		assert!(got_task.is_some());
 	}
 
 	#[tokio::test]
