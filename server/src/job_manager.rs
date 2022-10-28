@@ -75,13 +75,16 @@ impl JobManager {
 		self.map.len()
 	}
 
-	pub(crate) fn allocate(&self) -> Option<Task> {
-		let got = self
-			.map
-			.iter()
-			.map(|(_, (_, segmenter))| segmenter.allocate())
-			.find(|option| option.is_some());
-		got.unwrap_or_default()
+	pub(crate) async fn allocate(&self) -> Option<Task> {
+		{
+			for (_, segmenter) in self.map.values() {
+				let allocated = segmenter.allocate().await;
+				if allocated.is_some() {
+					return allocated;
+				}
+			}
+		};
+		None
 	}
 
 	pub fn new(storage: Storage) -> Self {
@@ -196,7 +199,7 @@ mod test {
 	#[tokio::test]
 	async fn allocate_task_without_job_returns_none() {
 		let manager = make_job_manager();
-		let task = manager.allocate();
+		let task = manager.allocate().await;
 		assert!(task.is_none());
 	}
 
@@ -206,7 +209,7 @@ mod test {
 		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let task = manager.allocate();
+		let task = manager.allocate().await;
 		assert!(task.is_some());
 	}
 
@@ -216,7 +219,7 @@ mod test {
 		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let task: Task = manager.allocate().unwrap();
+		let task: Task = manager.allocate().await.unwrap();
 		dbg!(task);
 	}
 
@@ -226,8 +229,8 @@ mod test {
 		let job = Job::new(Source::Local(Uuid::nil()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let _task = manager.allocate();
-		let task = manager.allocate();
+		let _task = manager.allocate().await;
+		let task = manager.allocate().await;
 		assert!(task.is_none());
 	}
 
@@ -243,8 +246,8 @@ mod test {
 			JobParams::sample_params(),
 		));
 
-		let _task = manager.allocate();
-		let task = manager.allocate();
+		let _task = manager.allocate().await;
+		let task = manager.allocate().await;
 		assert!(task.is_some());
 	}
 }

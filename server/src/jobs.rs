@@ -54,7 +54,7 @@ impl Job {
 ///Struct containing all data used by client to execute a task.
 ///
 ///It is able to tell the input and output files
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Task {
 	pub id: Uuid,

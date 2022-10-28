@@ -71,7 +71,7 @@ impl Service {
 		self.state
 			.upgrade()
 			.ok_or("Service was dropped!")
-			.map(|service| async move { service.manager.write().await.allocate() })
+			.map(|service| async move { service.manager.write().await.allocate().await })
 	}
 
 	pub(crate) fn new() -> Self {
