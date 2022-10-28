@@ -48,6 +48,10 @@ impl JobSegmenter {
 			false => None,
 		}
 	}
+
+	pub(crate) fn cancel_task(&self, id: &Uuid) -> bool {
+		self.get_task(id).is_some()
+	}
 }
 
 impl Job {
@@ -182,5 +186,32 @@ mod test {
 		let task_id = task.id;
 		let got_task = segmenter.get_task(&task_id);
 		assert!(got_task.is_some())
+	}
+
+	#[test]
+	fn cancel_task_with_valid_id_returns_true() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let task_id = segmenter.allocate().unwrap().id;
+		let result = segmenter.cancel_task(&task_id);
+		assert!(result)
+	}
+
+	#[test]
+	fn cancel_task_with_invalid_id_returns_false() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let _task_id = segmenter.allocate().unwrap().id;
+		let other_id = Uuid::new_v4();
+		let result = segmenter.cancel_task(&other_id);
+		assert!(!result)
 	}
 }
