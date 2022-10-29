@@ -58,16 +58,15 @@ impl JobSegmenter {
 			.cloned()
 	}
 
-	pub(crate) async fn cancel_task(&self, id: &Uuid) -> bool {
+	pub(crate) async fn cancel_task(&self, id: &Uuid) -> Result<(), ()> {
 		let mut allocated = self.allocated.write().await;
 		let should_remove = allocated
 			.as_ref()
-			.map(|task| &task.id == id)
-			.unwrap_or_default();
-		if should_remove {
+			.and_then(|task| (&task.id == id).then_some(()));
+		if should_remove.is_some() {
 			*allocated = None;
 		}
-		should_remove
+		should_remove.ok_or(())
 	}
 }
 
@@ -218,7 +217,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn cancel_task_with_valid_id_returns_true() {
+	async fn cancel_task_with_valid_id_returns_ok() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
@@ -227,7 +226,7 @@ mod test {
 
 		let task_id = segmenter.allocate().await.unwrap().id;
 		let result = segmenter.cancel_task(&task_id).await;
-		assert!(result)
+		assert!(result.is_ok())
 	}
 
 	#[tokio::test]
@@ -239,13 +238,16 @@ mod test {
 		let segmenter = job.make_segmenter(job_uuid);
 
 		let task_id = segmenter.allocate().await.unwrap().id;
-		segmenter.cancel_task(&task_id).await;
+		segmenter
+			.cancel_task(&task_id)
+			.await
+			.expect("Should cancel");
 		let task = segmenter.get_task(&task_id).await;
 		assert!(task.is_none())
 	}
 
 	#[tokio::test]
-	async fn cancel_task_with_invalid_id_returns_false() {
+	async fn cancel_task_with_invalid_id_returns_err() {
 		let source = Source::Local(Uuid::new_v4());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
@@ -255,6 +257,6 @@ mod test {
 		let _task_id = segmenter.allocate().await.unwrap().id;
 		let other_id = Uuid::new_v4();
 		let result = segmenter.cancel_task(&other_id).await;
-		assert!(!result)
+		assert!(result.is_err())
 	}
 }
