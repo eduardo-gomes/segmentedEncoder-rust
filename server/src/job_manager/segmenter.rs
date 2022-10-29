@@ -43,7 +43,10 @@ impl JobSegmenter {
 			return None;
 		}
 		let task = self
-			.next_segment()
+			.segment
+			.get()
+			.or_else(|| self.next_segment())
+			.cloned()
 			.map(|segment| segment.into_task(&Uuid::new_v4()));
 		*allocated = task.clone();
 		task
@@ -85,7 +88,7 @@ impl JobSegmenter {
 	///Internal function to segment jobs.
 	///
 	///This may differ for different kinds of segmentation.
-	fn next_segment(&self) -> Option<Segment> {
+	fn next_segment(&self) -> Option<&Segment> {
 		self.job
 			.upgrade()
 			.map(|upgraded| Segment {
@@ -93,8 +96,8 @@ impl JobSegmenter {
 				parameters: upgraded.parameters.clone(),
 			})
 			.and_then(|segment| {
-				let res = self.segment.set(segment.clone());
-				res.ok().and(Some(segment))
+				let res = self.segment.set(segment);
+				res.ok().and(self.segment.get())
 			})
 	}
 }
@@ -258,5 +261,19 @@ mod test {
 		let other_id = Uuid::new_v4();
 		let result = segmenter.cancel_task(&other_id).await;
 		assert!(result.is_err())
+	}
+
+	#[tokio::test]
+	async fn after_cancel_can_allocate_again() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let task_id = segmenter.allocate().await.unwrap().id;
+		segmenter.cancel_task(&task_id).await.unwrap();
+		let task = segmenter.allocate().await;
+		assert!(task.is_some())
 	}
 }
