@@ -119,7 +119,12 @@ pub(crate) fn make_router(state: Arc<State>) -> Router<Body> {
 		.route("/jobs", post(job_post))
 		.route("/jobs/:job_id/source", get(job_source))
 		.route("/jobs/:job_id/info", get(job_info))
+		.route("/jobs/:job_id/tasks/:task_id/output", post(task_output))
 		.layer(Extension(state))
+}
+
+async fn task_output() -> Response<Body> {
+	Response::new(Body::from("Not implemented"))
 }
 
 async fn get_status(state: Extension<Arc<State>>) -> Response<Body> {
@@ -134,6 +139,7 @@ async fn get_status(state: Extension<Arc<State>>) -> Response<Body> {
 #[cfg(test)]
 mod test {
 	use std::error::Error;
+	use std::sync::Arc;
 
 	use axum::Router;
 	use hyper::header::CONTENT_TYPE;
@@ -142,9 +148,9 @@ mod test {
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
-	use crate::{State, Storage, WEBM_SAMPLE};
+	use crate::{State, Storage, MKV_SAMPLE, WEBM_SAMPLE};
 
-	fn make_service() -> Router<Body> {
+	fn make_service() -> (Router<Body>, Arc<State>) {
 		use crate::web;
 		let state = {
 			use crate::job_manager::JobManager;
@@ -155,12 +161,12 @@ mod test {
 
 			State::new(manager_lock, service_lock)
 		};
-		web::make_service(state)
+		(web::make_service(state.clone()), state)
 	}
 
 	#[tokio::test]
 	async fn api_status_returns_200() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let request = Request::builder().uri("/api/status").body(Body::empty())?;
 		let response = service.ready().await?.call(request).await?;
 
@@ -170,7 +176,7 @@ mod test {
 
 	#[tokio::test]
 	async fn api_post_job_empty() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let request = Request::builder()
 			.uri("/api/jobs")
 			.method(Method::POST)
@@ -183,7 +189,7 @@ mod test {
 
 	#[tokio::test]
 	async fn api_post_job_video_encoder_only() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 		let request = build_job_request_with_headers(&headers)?;
@@ -195,7 +201,7 @@ mod test {
 
 	#[tokio::test]
 	async fn api_job_info_contains_params() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		let video_encoder = "libx265";
 		let video_args = "-crf 24";
@@ -233,7 +239,7 @@ mod test {
 
 	#[tokio::test]
 	async fn api_post_job_video_encoder_invalid() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "non ascii character: ç".parse().unwrap());
 		let request = build_job_request_with_headers(&headers)?;
@@ -245,7 +251,7 @@ mod test {
 
 	#[tokio::test]
 	async fn api_post_job_video_no_parameters() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let request = build_job_request_with_headers(&Default::default())?;
 		let response = service.ready().await?.call(request).await?;
 
@@ -267,7 +273,7 @@ mod test {
 
 	#[tokio::test]
 	async fn post_job_response_is_uuid() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 		let uuid = post_job_ang_get_uuid(&mut service, &headers).await?;
@@ -277,7 +283,7 @@ mod test {
 
 	#[tokio::test]
 	async fn after_posting_job_status_contains_job_id() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
@@ -298,7 +304,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_job_source_200() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse()?);
 		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
@@ -312,7 +318,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_job_source_same_as_input() -> Result<(), Box<dyn Error>> {
-		let mut service = make_service();
+		let (mut service, _) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse()?);
 		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
@@ -328,7 +334,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_job_source_unknown_job_404() -> Result<(), Box<dyn Error>> {
-		let service = make_service();
+		let (service, _) = make_service();
 		let uuid = Uuid::new_v4();
 		let uri = format!("/api/jobs/{uuid}/source");
 		let request = Request::get(uri).body(Body::empty()).unwrap();
@@ -339,7 +345,7 @@ mod test {
 
 	#[tokio::test]
 	async fn non_existent_page_returns_404_with_text() {
-		let service = make_service();
+		let (service, _) = make_service();
 		let request = Request::get("/non_existent_page")
 			.body(Body::empty())
 			.unwrap();
@@ -348,5 +354,25 @@ mod test {
 		let content = hyper::body::to_bytes(response.into_body()).await.unwrap();
 		let string = String::from_utf8(content.to_vec()).unwrap();
 		assert!(!string.is_empty());
+	}
+
+	#[tokio::test]
+	async fn post_task_output() -> Result<(), Box<dyn Error>> {
+		let (mut service, state) = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse().unwrap());
+		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
+
+		let task_id = state.manager.read().await.allocate().await.unwrap().id;
+
+		let body = Body::from(MKV_SAMPLE.as_slice());
+		let request = Request::builder()
+			.uri(format!("/api/jobs/{job_id}/tasks/{task_id}/output"))
+			.method(Method::POST)
+			.body(body)
+			.unwrap();
+		let response = service.oneshot(request).await.unwrap();
+		assert!(response.status().is_success());
+		Ok(())
 	}
 }
