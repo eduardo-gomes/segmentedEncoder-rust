@@ -57,6 +57,7 @@ impl Job {
 #[derive(Debug, Clone)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Task {
+	pub job_id: Uuid,
 	pub id: Uuid,
 	pub input_path: String,
 	pub parameters: JobParams,

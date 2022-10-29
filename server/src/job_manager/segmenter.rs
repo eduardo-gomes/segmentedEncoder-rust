@@ -15,8 +15,9 @@ struct Segment {
 }
 
 impl Segment {
-	pub(crate) fn into_task(self, task_id: &Uuid) -> Task {
+	pub(crate) fn into_task(self, job_id: &Uuid, task_id: &Uuid) -> Task {
 		Task {
+			job_id: *job_id,
 			id: *task_id,
 			input_path: self.input_path,
 			parameters: self.parameters,
@@ -47,7 +48,7 @@ impl JobSegmenter {
 			.get()
 			.or_else(|| self.next_segment())
 			.cloned()
-			.map(|segment| segment.into_task(&Uuid::new_v4()));
+			.map(|segment| segment.into_task(&self.job_id, &Uuid::new_v4()));
 		*allocated = task.clone();
 		task
 	}
@@ -189,6 +190,19 @@ mod test {
 		let task = segmenter.allocate().await.unwrap();
 		let task_id = task.id;
 		assert!(!task_id.is_nil())
+	}
+
+	#[tokio::test]
+	async fn generated_task_has_job_id() {
+		let source = Source::Local(Uuid::new_v4());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+
+		let task = segmenter.allocate().await.unwrap();
+		let got_job_id = task.job_id;
+		assert_eq!(got_job_id, job_uuid)
 	}
 
 	#[tokio::test]
