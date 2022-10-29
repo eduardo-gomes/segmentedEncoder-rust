@@ -123,7 +123,22 @@ pub(crate) fn make_router(state: Arc<State>) -> Router<Body> {
 		.layer(Extension(state))
 }
 
-async fn task_output() -> Response<Body> {
+async fn task_output(
+	Path((job_id, _task_id)): Path<(Uuid, Uuid)>,
+	state: Extension<Arc<State>>,
+) -> Response<Body> {
+	let found_job = state
+		.manager
+		.read()
+		.await
+		.get_job(&job_id)
+		.ok_or("Job not found");
+	if let Err(reason) = found_job {
+		return Response::builder()
+			.status(StatusCode::NOT_FOUND)
+			.body(Body::from(reason))
+			.unwrap();
+	}
 	Response::new(Body::from("Not implemented"))
 }
 
@@ -361,8 +376,8 @@ mod test {
 		let (mut service, state) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
-		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
 
+		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
 		let task_id = state.manager.read().await.allocate().await.unwrap().id;
 
 		let body = Body::from(MKV_SAMPLE.as_slice());
@@ -373,6 +388,27 @@ mod test {
 			.unwrap();
 		let response = service.oneshot(request).await.unwrap();
 		assert!(response.status().is_success());
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn post_task_output_invalid_job_id_404() -> Result<(), Box<dyn Error>> {
+		let (mut service, state) = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse().unwrap());
+
+		let _job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
+		let task_id = state.manager.read().await.allocate().await.unwrap().id;
+		let invalid_job_id = Uuid::new_v4();
+
+		let body = Body::from(MKV_SAMPLE.as_slice());
+		let request = Request::builder()
+			.uri(format!("/api/jobs/{invalid_job_id}/tasks/{task_id}/output"))
+			.method(Method::POST)
+			.body(body)
+			.unwrap();
+		let response = service.oneshot(request).await.unwrap();
+		assert_eq!(response.status(), StatusCode::NOT_FOUND);
 		Ok(())
 	}
 }
