@@ -25,14 +25,18 @@ impl Segment {
 	}
 }
 
-pub(super) struct JobSegmenter {
+struct JobSegmenter {
 	job: Arc<Job>,
 	job_id: Uuid,
-	allocated: RwLock<Option<Task>>,
 	segment: OnceCell<(Segment, OnceCell<()>)>,
 }
 
-impl JobSegmenter {
+pub(super) struct TaskScheduler {
+	allocated: RwLock<Option<Task>>,
+	segmenter: JobSegmenter,
+}
+
+impl TaskScheduler {
 	///Interface to allocate tasks.
 	///
 	///Only allocate if task is available, wont wait until new task is available.
@@ -41,6 +45,7 @@ impl JobSegmenter {
 	pub(super) async fn allocate(&self) -> Option<Task> {
 		let mut allocated = self.allocated.write().await;
 		let finished = self
+			.segmenter
 			.segment
 			.get()
 			.and_then(|(_, finished)| finished.get())
@@ -50,12 +55,13 @@ impl JobSegmenter {
 			return None;
 		}
 		let task = self
+			.segmenter
 			.segment
 			.get()
 			.map(|(segment, _)| segment)
-			.or_else(|| self.next_segment())
+			.or_else(|| self.segmenter.next_segment())
 			.cloned()
-			.map(|segment| segment.into_task(&self.job_id, &Uuid::new_v4()));
+			.map(|segment| segment.into_task(&self.segmenter.job_id, &Uuid::new_v4()));
 		*allocated = task.clone();
 		task
 	}
@@ -85,7 +91,8 @@ impl JobSegmenter {
 		let take_is_match = |option: &mut Option<Task>| {
 			if option.as_ref().filter(|task| &task.id == task_id).is_some() {
 				option.take();
-				self.segment
+				self.segmenter
+					.segment
 					.get()
 					.and_then(|(_, finished)| finished.set(()).ok());
 				Some(0)
@@ -98,12 +105,14 @@ impl JobSegmenter {
 }
 
 impl Job {
-	pub(super) fn make_segmenter(self: Arc<Self>, uuid: Uuid) -> JobSegmenter {
-		JobSegmenter {
-			job: self,
-			job_id: uuid,
+	pub(super) fn make_segmenter(self: Arc<Self>, uuid: Uuid) -> TaskScheduler {
+		TaskScheduler {
 			allocated: RwLock::new(None), //While we only have one task, and don't restart
-			segment: OnceCell::new(),
+			segmenter: JobSegmenter {
+				job: self,
+				job_id: uuid,
+				segment: OnceCell::new(),
+			},
 		}
 	}
 }
@@ -128,7 +137,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::segmenter::JobSegmenter;
+	use crate::job_manager::segmenter::TaskScheduler;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 
@@ -272,7 +281,7 @@ mod test {
 		assert!(task.is_some())
 	}
 
-	fn new_job_segmenter_with_single_task() -> JobSegmenter {
+	fn new_job_segmenter_with_single_task() -> TaskScheduler {
 		let source = Source::File(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();

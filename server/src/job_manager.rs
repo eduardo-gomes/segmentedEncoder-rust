@@ -8,7 +8,7 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::segmenter::JobSegmenter;
+use crate::job_manager::segmenter::TaskScheduler;
 use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
@@ -35,7 +35,7 @@ impl JobManagerUtils for JobManagerLock {
 }
 
 pub(crate) struct JobManager {
-	map: HashMap<Uuid, (Arc<Job>, JobSegmenter)>,
+	map: HashMap<Uuid, (Arc<Job>, TaskScheduler)>,
 	pub storage: Storage,
 }
 
