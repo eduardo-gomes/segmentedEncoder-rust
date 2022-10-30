@@ -1,11 +1,11 @@
 //! Module that manages tasks from jobs, should handle if task fails, and when job is complete.
 //! Also handle status tracking
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use crate::job_manager::segmenter::job_segmenter::{JobSegmenter, SegmentAllocation};
 use crate::jobs::{Job, JobParams, Task};
 
 ///Stores all the data needed to create a [Task], except the id.
@@ -26,124 +26,159 @@ impl Segment {
 	}
 }
 
-struct JobSegmenter {
-	job: Arc<Job>,
-	job_id: Uuid,
-	segments: OnceCell<SegmentEntry>,
-}
-
-type SegmentData = Arc<(Segment, AtomicU8)>;
-
-///Hold segment data
-struct SegmentEntry(SegmentData);
-
-///RAII wrapper for Segment allocation
-struct SegmentAllocation(SegmentData);
-
-enum AllocationState {
-	Queue = 0,
-	Allocated = 1,
-	Completed = 2,
-}
-
-impl SegmentAllocation {
-	fn as_segment(&self) -> &Segment {
-		&self.0 .0
-	}
-	fn set_completed(&self) -> usize {
-		let state = &self.0 .1;
-		state.store(AllocationState::Completed as u8, Ordering::Release);
-		0
-	}
-}
-
-impl Drop for SegmentAllocation {
-	fn drop(&mut self) {
-		let _ = self.0 .1.compare_exchange(
-			AllocationState::Allocated as u8,
-			AllocationState::Queue as u8,
-			Ordering::SeqCst,
-			Ordering::Acquire,
-		);
-	}
-}
-
-impl SegmentEntry {
-	fn allocate(&self) -> Option<SegmentAllocation> {
-		let bool = &self.0 .1;
-		let allocate = bool.compare_exchange(
-			AllocationState::Queue as u8,
-			AllocationState::Allocated as u8,
-			Ordering::SeqCst,
-			Ordering::Acquire,
-		);
-		allocate.map(|_| SegmentAllocation(self.0.clone())).ok()
-	}
-}
-
-impl JobSegmenter {
-	fn new(job: Arc<Job>, job_id: Uuid) -> Self {
-		Self {
-			job,
-			job_id,
-			segments: OnceCell::new(),
-		}
-	}
-	fn get_available(&self) -> Option<SegmentAllocation> {
-		self.segments
-			.get()
-			.or_else(|| self.next_segment())
-			.and_then(|segment| segment.allocate())
-	}
-}
-
-#[cfg(test)]
-mod job_segmenter_test {
+mod job_segmenter {
+	use std::sync::atomic::{AtomicU8, Ordering};
 	use std::sync::Arc;
 
+	use tokio::sync::OnceCell;
 	use uuid::Uuid;
 
-	use crate::job_manager::segmenter::JobSegmenter;
-	use crate::jobs::{Job, JobParams, Source};
-	use crate::storage::FileRef;
+	use crate::job_manager::segmenter::Segment;
+	use crate::jobs::Job;
 
-	#[test]
-	fn job_segmenter_get_available_return_some_for_do_not_segment() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
-
-		let available = segmenter.get_available();
-		assert!(available.is_some())
+	pub(super) struct JobSegmenter {
+		job: Arc<Job>,
+		job_id: Uuid,
+		segments: OnceCell<SegmentEntry>,
 	}
 
-	#[test]
-	fn job_segmenter_get_available_twice_return_none() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+	type SegmentData = Arc<(Segment, AtomicU8, Uuid)>;
 
-		let _available = segmenter.get_available();
-		let available = segmenter.get_available();
-		assert!(available.is_none())
+	///Hold segment data
+	struct SegmentEntry(SegmentData);
+
+	///RAII wrapper for Segment allocation
+	pub(super) struct SegmentAllocation(SegmentData);
+
+	enum AllocationState {
+		Queue = 0,
+		Allocated = 1,
+		Completed = 2,
 	}
 
-	#[test]
-	fn job_segmenter_after_drop_can_allocate_again() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+	impl SegmentAllocation {
+		pub fn as_segment(&self) -> &Segment {
+			&self.0 .0
+		}
+		pub fn job_id(&self) -> &Uuid {
+			&self.0 .2
+		}
+		pub fn set_completed(&self) -> usize {
+			let state = &self.0 .1;
+			state.store(AllocationState::Completed as u8, Ordering::Release);
+			0
+		}
+	}
 
-		let available = segmenter.get_available();
-		drop(available);
-		let available = segmenter.get_available();
-		assert!(available.is_some())
+	impl Drop for SegmentAllocation {
+		fn drop(&mut self) {
+			let _ = self.0 .1.compare_exchange(
+				AllocationState::Allocated as u8,
+				AllocationState::Queue as u8,
+				Ordering::SeqCst,
+				Ordering::Acquire,
+			);
+		}
+	}
+
+	impl SegmentEntry {
+		fn allocate(&self) -> Option<SegmentAllocation> {
+			let bool = &self.0 .1;
+			let allocate = bool.compare_exchange(
+				AllocationState::Queue as u8,
+				AllocationState::Allocated as u8,
+				Ordering::SeqCst,
+				Ordering::Acquire,
+			);
+			allocate.map(|_| SegmentAllocation(self.0.clone())).ok()
+		}
+	}
+
+	impl JobSegmenter {
+		pub fn new(job: Arc<Job>, job_id: Uuid) -> Self {
+			Self {
+				job,
+				job_id,
+				segments: OnceCell::new(),
+			}
+		}
+		pub fn get_available(&self) -> Option<SegmentAllocation> {
+			self.segments
+				.get()
+				.or_else(|| self.next_segment())
+				.and_then(|segment| segment.allocate())
+		}
+	}
+
+	impl JobSegmenter {
+		///Internal function to segment jobs.
+		///
+		///This may differ for different kinds of segmentation.
+		fn next_segment(&self) -> Option<&SegmentEntry> {
+			let segment = Segment {
+				input_path: format!("/api/jobs/{}/source", self.job_id),
+				parameters: self.job.parameters.clone(),
+			};
+			let segment = Arc::new((
+				segment,
+				AtomicU8::new(AllocationState::Queue as u8),
+				self.job_id,
+			));
+			self.segments
+				.set(SegmentEntry(segment))
+				.ok()
+				.and_then(|()| self.segments.get())
+		}
+	}
+
+	#[cfg(test)]
+	mod test {
+		use std::sync::Arc;
+
+		use uuid::Uuid;
+
+		use crate::job_manager::segmenter::job_segmenter::JobSegmenter;
+		use crate::jobs::{Job, JobParams, Source};
+		use crate::storage::FileRef;
+
+		#[test]
+		fn job_segmenter_get_available_return_some_for_do_not_segment() {
+			let source = Source::File(FileRef::fake());
+			let parameters = JobParams::sample_params();
+			let job_uuid = Uuid::new_v4();
+			let job = Arc::new(Job::new(source, parameters));
+			let segmenter = JobSegmenter::new(job, job_uuid);
+
+			let available = segmenter.get_available();
+			assert!(available.is_some())
+		}
+
+		#[test]
+		fn job_segmenter_get_available_twice_return_none() {
+			let source = Source::File(FileRef::fake());
+			let parameters = JobParams::sample_params();
+			let job_uuid = Uuid::new_v4();
+			let job = Arc::new(Job::new(source, parameters));
+			let segmenter = JobSegmenter::new(job, job_uuid);
+
+			let _available = segmenter.get_available();
+			let available = segmenter.get_available();
+			assert!(available.is_none())
+		}
+
+		#[test]
+		fn job_segmenter_after_drop_can_allocate_again() {
+			let source = Source::File(FileRef::fake());
+			let parameters = JobParams::sample_params();
+			let job_uuid = Uuid::new_v4();
+			let job = Arc::new(Job::new(source, parameters));
+			let segmenter = JobSegmenter::new(job, job_uuid);
+
+			let available = segmenter.get_available();
+			drop(available);
+			let available = segmenter.get_available();
+			assert!(available.is_some())
+		}
 	}
 }
 
@@ -167,9 +202,9 @@ impl TaskScheduler {
 				*allocated = Some((segment, Uuid::new_v4()));
 				allocated
 					.as_ref()
-					.map(|(seg, id)| (seg.as_segment().clone(), id))
+					.map(|(seg, id)| (seg.as_segment().clone(), seg.job_id(), id))
 			})
-			.map(|(segment, id)| segment.into_task(&self.segmenter.job_id, id));
+			.map(|(segment, job_id, id)| segment.into_task(job_id, id));
 		task
 	}
 
@@ -183,7 +218,7 @@ impl TaskScheduler {
 				segment
 					.as_segment()
 					.clone()
-					.into_task(&self.segmenter.job_id, &id)
+					.into_task(segment.job_id(), &id)
 			})
 	}
 
@@ -215,23 +250,6 @@ impl Job {
 			allocated: RwLock::new(None), //While we only have one task, and don't restart
 			segmenter: JobSegmenter::new(self, uuid),
 		}
-	}
-}
-
-impl JobSegmenter {
-	///Internal function to segment jobs.
-	///
-	///This may differ for different kinds of segmentation.
-	fn next_segment(&self) -> Option<&SegmentEntry> {
-		let segment = Segment {
-			input_path: format!("/api/jobs/{}/source", self.job_id),
-			parameters: self.job.parameters.clone(),
-		};
-		let segment = Arc::new((segment, AtomicU8::new(AllocationState::Queue as u8)));
-		self.segments
-			.set(SegmentEntry(segment))
-			.ok()
-			.and_then(|()| self.segments.get())
 	}
 }
 
