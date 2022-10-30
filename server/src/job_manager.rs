@@ -66,7 +66,7 @@ impl JobManager {
 	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<Job>) {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(job);
-		let segmenter = arc.make_segmenter(uuid);
+		let segmenter = arc.clone().make_segmenter(uuid);
 		self.map.insert(uuid, (arc.clone(), segmenter));
 		(uuid, arc)
 	}
