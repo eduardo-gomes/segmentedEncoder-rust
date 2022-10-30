@@ -8,7 +8,7 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::segmenter::TaskScheduler;
+use crate::job_manager::task_scheduler::TaskScheduler;
 use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
@@ -253,4 +253,4 @@ mod test {
 	}
 }
 
-mod segmenter;
+mod task_scheduler;
