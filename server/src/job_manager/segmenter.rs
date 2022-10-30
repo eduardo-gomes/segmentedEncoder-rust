@@ -42,13 +42,17 @@ mod job_segmenter {
 		segments: OnceCell<SegmentEntry>,
 	}
 
-	type SegmentData = Arc<(Segment, AtomicU8, Uuid)>;
+	struct SegmentData {
+		segment: Segment,
+		state: AtomicU8,
+		job_id: Uuid,
+	}
 
 	///Hold segment data
-	struct SegmentEntry(SegmentData);
+	struct SegmentEntry(Arc<SegmentData>);
 
 	///RAII wrapper for Segment allocation
-	pub(super) struct SegmentAllocation(SegmentData);
+	pub(super) struct SegmentAllocation(Arc<SegmentData>);
 
 	enum AllocationState {
 		Queue = 0,
@@ -58,13 +62,13 @@ mod job_segmenter {
 
 	impl SegmentAllocation {
 		pub fn as_segment(&self) -> &Segment {
-			&self.0 .0
+			&self.0.segment
 		}
 		pub fn job_id(&self) -> &Uuid {
-			&self.0 .2
+			&self.0.job_id
 		}
 		pub fn set_completed(&self) -> usize {
-			let state = &self.0 .1;
+			let state = &self.0.state;
 			state.store(AllocationState::Completed as u8, Ordering::Release);
 			0
 		}
@@ -72,7 +76,7 @@ mod job_segmenter {
 
 	impl Drop for SegmentAllocation {
 		fn drop(&mut self) {
-			let _ = self.0 .1.compare_exchange(
+			let _ = self.0.state.compare_exchange(
 				AllocationState::Allocated as u8,
 				AllocationState::Queue as u8,
 				Ordering::SeqCst,
@@ -83,8 +87,8 @@ mod job_segmenter {
 
 	impl SegmentEntry {
 		fn allocate(&self) -> Option<SegmentAllocation> {
-			let bool = &self.0 .1;
-			let allocate = bool.compare_exchange(
+			let state = &self.0.state;
+			let allocate = state.compare_exchange(
 				AllocationState::Queue as u8,
 				AllocationState::Allocated as u8,
 				Ordering::SeqCst,
@@ -115,15 +119,16 @@ mod job_segmenter {
 		///
 		///This may differ for different kinds of segmentation.
 		fn next_segment(&self) -> Option<&SegmentEntry> {
+			let job_id = self.job_id;
 			let segment = Segment {
-				input_path: format!("/api/jobs/{}/source", self.job_id),
+				input_path: format!("/api/jobs/{}/source", job_id),
 				parameters: self.job.parameters.clone(),
 			};
-			let segment = Arc::new((
+			let segment = Arc::new(SegmentData {
 				segment,
-				AtomicU8::new(AllocationState::Queue as u8),
-				self.job_id,
-			));
+				state: AtomicU8::new(AllocationState::Queue as u8),
+				job_id,
+			});
 			self.segments
 				.set(SegmentEntry(segment))
 				.ok()
@@ -195,8 +200,7 @@ impl TaskScheduler {
 	///The returned task will be marked as running.
 	pub(super) async fn allocate(&self) -> Option<Task> {
 		let mut allocated = self.allocated.write().await;
-		let task = self
-			.segmenter
+		self.segmenter
 			.get_available()
 			.and_then(|segment| {
 				*allocated = Some((segment, Uuid::new_v4()));
@@ -204,8 +208,7 @@ impl TaskScheduler {
 					.as_ref()
 					.map(|(seg, id)| (seg.as_segment().clone(), seg.job_id(), id))
 			})
-			.map(|(segment, job_id, id)| segment.into_task(job_id, id));
-		task
+			.map(|(segment, job_id, id)| segment.into_task(job_id, id))
 	}
 
 	pub(crate) async fn get_task(&self, id: &Uuid) -> Option<Task> {
@@ -214,12 +217,7 @@ impl TaskScheduler {
 			.await
 			.as_ref()
 			.filter(|(_, task_id)| task_id == id)
-			.map(|(segment, _)| {
-				segment
-					.as_segment()
-					.clone()
-					.into_task(segment.job_id(), &id)
-			})
+			.map(|(segment, _)| segment.as_segment().clone().into_task(segment.job_id(), id))
 	}
 
 	pub(crate) async fn cancel_task(&self, id: &Uuid) -> Result<(), ()> {
