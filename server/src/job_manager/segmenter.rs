@@ -109,45 +109,34 @@ mod test {
 
 	use uuid::Uuid;
 
+	use crate::job_manager::segmenter::JobSegmenter;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_for_do_not_segment() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let job = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
-		let allocated = job.allocate().await;
+		let allocated = segmenter.allocate().await;
 		assert!(allocated.is_some());
 	}
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_dont_segment_returns_none_second_time() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let job = job.make_segmenter(job_uuid);
+		let (segmenter, _) = new_job_segmenter_with_single_task();
 
-		job.allocate().await;
-		let task = job.allocate().await;
+		segmenter.allocate().await;
+		let task = segmenter.allocate().await;
 		assert!(task.is_none());
 	}
 
 	#[tokio::test]
 	async fn after_failed_allocate_can_get_previous_task() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let job = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
-		let task_id = job.allocate().await.unwrap().id;
-		job.allocate().await;
-		let got_task = job.get_task(&task_id).await;
+		let task_id = segmenter.allocate().await.unwrap().id;
+		segmenter.allocate().await;
+		let got_task = segmenter.get_task(&task_id).await;
 		assert!(got_task.is_some());
 	}
 
@@ -182,11 +171,7 @@ mod test {
 
 	#[tokio::test]
 	async fn generated_task_has_non_null_id() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let task = segmenter.allocate().await.unwrap();
 		let task_id = task.id;
@@ -208,11 +193,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_task_returns_none_invalid_id() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let _task = segmenter.allocate().await.unwrap();
 		let uuid = Uuid::new_v4();
@@ -222,11 +203,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_task_returns_equals_allocate() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let task = segmenter.allocate().await.unwrap();
 		let task_id = task.id;
@@ -236,11 +213,7 @@ mod test {
 
 	#[tokio::test]
 	async fn cancel_task_with_valid_id_returns_ok() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let task_id = segmenter.allocate().await.unwrap().id;
 		let result = segmenter.cancel_task(&task_id).await;
@@ -249,11 +222,7 @@ mod test {
 
 	#[tokio::test]
 	async fn after_cancel_can_not_get_canceled_task() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let task_id = segmenter.allocate().await.unwrap().id;
 		segmenter
@@ -266,11 +235,7 @@ mod test {
 
 	#[tokio::test]
 	async fn cancel_task_with_invalid_id_returns_err() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let _task_id = segmenter.allocate().await.unwrap().id;
 		let other_id = Uuid::new_v4();
@@ -280,15 +245,20 @@ mod test {
 
 	#[tokio::test]
 	async fn after_cancel_can_allocate_again() {
-		let source = Source::File(FileRef::fake());
-		let parameters = JobParams::sample_params();
-		let job_uuid = Uuid::new_v4();
-		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let (segmenter, _job) = new_job_segmenter_with_single_task();
 
 		let task_id = segmenter.allocate().await.unwrap().id;
 		segmenter.cancel_task(&task_id).await.unwrap();
 		let task = segmenter.allocate().await;
 		assert!(task.is_some())
+	}
+
+	fn new_job_segmenter_with_single_task() -> (JobSegmenter, Arc<Job>) {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = job.make_segmenter(job_uuid);
+		(segmenter, job)
 	}
 }
