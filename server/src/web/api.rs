@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::job_manager::{JobManagerLock, JobManagerUtils};
 use crate::jobs::{JobParams, Source};
 use crate::storage::stream::read_to_stream;
+use crate::storage::FileRef;
 use crate::State;
 
 fn parse_job(headers: &HeaderMap) -> Result<JobParams, String> {
@@ -73,8 +74,8 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 	match job {
 		Some(job) => {
 			let source = job.source.clone();
-			async fn send_local(state: &JobManagerLock, uuid: &Uuid) -> Response<Body> {
-				let file = state.read().await.storage.get_file(uuid).await;
+			async fn send_local(state: &JobManagerLock, file: &FileRef) -> Response<Body> {
+				let file = state.read().await.storage.get_file(file).await;
 				match file {
 					Ok(file) => Response::builder()
 						.status(StatusCode::OK)
@@ -88,7 +89,7 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 				}
 			}
 			match source {
-				Source::Local(uuid) => send_local(&state.manager, &uuid).await,
+				Source::Local(file) => send_local(&state.manager, &file).await,
 			}
 		}
 		None => Response::builder()

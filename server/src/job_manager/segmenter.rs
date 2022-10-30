@@ -110,10 +110,11 @@ mod test {
 	use uuid::Uuid;
 
 	use crate::jobs::{Job, JobParams, Source};
+	use crate::storage::FileRef;
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_for_do_not_segment() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -125,7 +126,7 @@ mod test {
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_dont_segment_returns_none_second_time() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -138,7 +139,7 @@ mod test {
 
 	#[tokio::test]
 	async fn after_failed_allocate_can_get_previous_task() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -152,7 +153,7 @@ mod test {
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_has_same_parameters() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -164,7 +165,7 @@ mod test {
 
 	#[tokio::test]
 	async fn segmenter_allocate_task_not_segmented_has_source_as_input() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -181,7 +182,7 @@ mod test {
 
 	#[tokio::test]
 	async fn generated_task_has_non_null_id() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -194,7 +195,7 @@ mod test {
 
 	#[tokio::test]
 	async fn generated_task_has_job_id() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -207,7 +208,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_task_returns_none_invalid_id() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -221,7 +222,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_task_returns_equals_allocate() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -235,7 +236,7 @@ mod test {
 
 	#[tokio::test]
 	async fn cancel_task_with_valid_id_returns_ok() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -248,7 +249,7 @@ mod test {
 
 	#[tokio::test]
 	async fn after_cancel_can_not_get_canceled_task() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -265,7 +266,7 @@ mod test {
 
 	#[tokio::test]
 	async fn cancel_task_with_invalid_id_returns_err() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
@@ -279,7 +280,7 @@ mod test {
 
 	#[tokio::test]
 	async fn after_cancel_can_allocate_again() {
-		let source = Source::Local(Uuid::new_v4());
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));

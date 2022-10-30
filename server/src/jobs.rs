@@ -1,5 +1,7 @@
 use uuid::Uuid;
 
+use crate::storage::FileRef;
+
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct JobParams {
@@ -12,7 +14,7 @@ pub struct JobParams {
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub(crate) enum Source {
-	Local(Uuid),
+	Local(FileRef),
 }
 
 impl JobParams {
@@ -65,13 +67,12 @@ pub struct Task {
 
 #[cfg(test)]
 mod test {
-	use uuid::Uuid;
-
 	use crate::jobs::{Job, JobParams, Source};
+	use crate::storage::FileRef;
 
 	#[test]
-	fn job_takes_source_and_parameters() {
-		let source = Source::Local(Uuid::new_v4());
+	pub(crate) fn job_takes_source_and_parameters() {
+		let source = Source::Local(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job = Job::new(source.clone(), parameters.clone());
 

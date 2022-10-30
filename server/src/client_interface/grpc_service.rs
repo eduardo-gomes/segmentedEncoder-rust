@@ -100,6 +100,7 @@ mod test {
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;
+	use crate::storage::FileRef;
 	use crate::State;
 
 	#[tokio::test]
@@ -192,7 +193,7 @@ mod test {
 	async fn request_task_after_create_task_return_task() -> Result<(), Box<dyn Error>> {
 		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
-		let job = Job::new(Source::Local(Uuid::new_v4()), JobParams::sample_params());
+		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
 		state.manager.write().await.add_job(job);
 
 		let (close, client, url) = start_server(Some(state)).await?;
@@ -211,7 +212,7 @@ mod test {
 		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
 		let params = JobParams::sample_params();
-		let job = Job::new(Source::Local(Uuid::new_v4()), params.clone());
+		let job = Job::new(Source::Local(FileRef::fake()), params.clone());
 		state.manager.write().await.add_job(job);
 
 		let (close, client, url) = start_server(Some(state)).await?;
@@ -242,7 +243,7 @@ mod test {
 		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
 		let params = JobParams::sample_params();
-		let job = Job::new(Source::Local(Uuid::new_v4()), params.clone());
+		let job = Job::new(Source::Local(FileRef::fake()), params.clone());
 		state.manager.write().await.add_job(job);
 
 		let (close, client, url) = start_server(Some(state)).await?;

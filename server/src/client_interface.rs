@@ -87,10 +87,10 @@ mod test {
 	use std::sync::Arc;
 
 	use tokio::sync::RwLock;
-	use uuid::Uuid;
 
 	use crate::client_interface::Service;
 	use crate::jobs::{Job, JobParams, Source};
+	use crate::storage::FileRef;
 	use crate::{JobManager, State, Storage};
 
 	#[test]
@@ -182,7 +182,7 @@ mod test {
 		let manager_lock = {
 			let mut manager = JobManager::new(Storage::new().unwrap());
 			manager.add_job(Job::new(
-				Source::Local(Uuid::new_v4()),
+				Source::Local(FileRef::fake()),
 				JobParams::sample_params(),
 			));
 			RwLock::new(manager)

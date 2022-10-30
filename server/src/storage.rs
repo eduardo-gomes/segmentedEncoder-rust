@@ -13,16 +13,36 @@ pub struct Storage {
 	dir: TempDir,
 }
 
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct FileRef {
+	id: Uuid,
+}
+
+impl FileRef {
+	/// Used only for tests. Will always fail to read.
+	#[cfg(test)]
+	pub(crate) fn fake() -> Self {
+		Self { id: Uuid::nil() }
+	}
+}
+
+impl From<Uuid> for FileRef {
+	fn from(id: Uuid) -> Self {
+		Self { id }
+	}
+}
+
 impl Storage {
-	pub(crate) async fn get_file(&self, uuid: &Uuid) -> io::Result<File> {
-		let path = self.get_file_path(uuid);
+	pub(crate) async fn get_file(&self, file: &FileRef) -> io::Result<File> {
+		let path = self.get_file_path(&file.id);
 		File::open(path).await
 	}
-	pub(crate) async fn create_file(&self) -> io::Result<(File, Uuid)> {
+	pub(crate) async fn create_file(&self) -> io::Result<(File, FileRef)> {
 		let uuid = Uuid::new_v4();
 		let path = self.get_file_path(&uuid);
 		let file = File::create(path).await?;
-		Ok((file, uuid))
+		Ok((file, uuid.into()))
 	}
 
 	fn get_file_path(&self, uuid: &Uuid) -> PathBuf {
@@ -57,8 +77,8 @@ mod test {
 	#[tokio::test]
 	async fn retrieve_nonexistent_file_fails() {
 		let storage = Storage::new().unwrap();
-		let random = Uuid::new_v4();
-		let result = storage.get_file(&random).await;
+		let file_ref = Uuid::new_v4().into();
+		let result = storage.get_file(&file_ref).await;
 		assert!(result.is_err())
 	}
 
