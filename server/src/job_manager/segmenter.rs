@@ -72,6 +72,19 @@ impl JobSegmenter {
 		}
 		should_remove.ok_or(())
 	}
+
+	pub(crate) async fn set_task_as_completed(&self, task_id: &Uuid) -> Option<usize> {
+		let mut lock = self.allocated.write().await;
+		let take_is_match = |option: &mut Option<Task>| {
+			if let Some(_) = option.as_ref().filter(|task| &task.id == task_id) {
+				option.take();
+				Some(0)
+			} else {
+				None
+			}
+		};
+		take_is_match(&mut lock)
+	}
 }
 
 impl Job {
@@ -255,5 +268,34 @@ mod test {
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
 		job.make_segmenter(job_uuid)
+	}
+
+	#[tokio::test]
+	async fn set_invalid_task_as_completed_returns_none() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let _task = segmenter.allocate().await.unwrap();
+		let invalid_id = Uuid::new_v4();
+
+		let res = segmenter.set_task_as_completed(&invalid_id).await;
+		assert!(res.is_none());
+	}
+
+	#[tokio::test]
+	async fn set_task_as_completed_returns_segment_number() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+
+		let res: Option<usize> = segmenter.set_task_as_completed(&task.id).await;
+		assert!(res.is_some())
+	}
+
+	#[tokio::test]
+	async fn after_task_is_completed_get_task_returns_none() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+
+		segmenter.set_task_as_completed(&task.id).await.unwrap();
+		let got = segmenter.get_task(&task.id).await;
+		assert!(got.is_none())
 	}
 }
