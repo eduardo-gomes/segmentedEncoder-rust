@@ -29,7 +29,7 @@ pub(super) struct JobSegmenter {
 	job: Arc<Job>,
 	job_id: Uuid,
 	allocated: RwLock<Option<Task>>,
-	segment: OnceCell<Segment>,
+	segment: OnceCell<(Segment, OnceCell<()>)>,
 }
 
 impl JobSegmenter {
@@ -40,12 +40,19 @@ impl JobSegmenter {
 	///The returned task will be marked as running.
 	pub(super) async fn allocate(&self) -> Option<Task> {
 		let mut allocated = self.allocated.write().await;
-		if allocated.is_some() {
+		let finished = self
+			.segment
+			.get()
+			.and_then(|(_, finished)| finished.get())
+			.and(Some(true))
+			.unwrap_or_default();
+		if allocated.is_some() || finished {
 			return None;
 		}
 		let task = self
 			.segment
 			.get()
+			.map(|(segment, _)| segment)
 			.or_else(|| self.next_segment())
 			.cloned()
 			.map(|segment| segment.into_task(&self.job_id, &Uuid::new_v4()));
@@ -76,8 +83,11 @@ impl JobSegmenter {
 	pub(crate) async fn set_task_as_completed(&self, task_id: &Uuid) -> Option<usize> {
 		let mut lock = self.allocated.write().await;
 		let take_is_match = |option: &mut Option<Task>| {
-			if let Some(_) = option.as_ref().filter(|task| &task.id == task_id) {
+			if option.as_ref().filter(|task| &task.id == task_id).is_some() {
 				option.take();
+				self.segment
+					.get()
+					.and_then(|(_, finished)| finished.set(()).ok());
 				Some(0)
 			} else {
 				None
@@ -107,8 +117,8 @@ impl JobSegmenter {
 			input_path: format!("/api/jobs/{}/source", self.job_id),
 			parameters: self.job.parameters.clone(),
 		};
-		let res = self.segment.set(segment);
-		res.ok().and(self.segment.get())
+		let res = self.segment.set((segment, OnceCell::new()));
+		res.ok().and(self.segment.get().map(|(segment, _)| segment))
 	}
 }
 
@@ -287,6 +297,16 @@ mod test {
 
 		let res: Option<usize> = segmenter.set_task_as_completed(&task.id).await;
 		assert!(res.is_some())
+	}
+
+	#[tokio::test]
+	async fn after_task_is_completed_still_can_not_allocate() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+
+		segmenter.set_task_as_completed(&task.id).await.unwrap();
+		let task = segmenter.allocate().await;
+		assert!(task.is_none(), "Should not allocate completed segment")
 	}
 
 	#[tokio::test]
