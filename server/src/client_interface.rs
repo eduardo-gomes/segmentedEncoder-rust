@@ -182,7 +182,7 @@ mod test {
 		let manager_lock = {
 			let mut manager = JobManager::new(Storage::new().unwrap());
 			manager.add_job(Job::new(
-				Source::Local(FileRef::fake()),
+				Source::File(FileRef::fake()),
 				JobParams::sample_params(),
 			));
 			RwLock::new(manager)

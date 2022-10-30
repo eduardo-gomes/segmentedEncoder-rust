@@ -28,7 +28,7 @@ impl JobManagerUtils for JobManagerLock {
 			res.await?
 		};
 		stream::body_to_file(body, &mut file).await?;
-		let job = Job::new(Source::Local(id), params);
+		let job = Job::new(Source::File(id), params);
 
 		Ok(self.write().await.add_job(job))
 	}
@@ -131,7 +131,7 @@ mod test {
 	#[tokio::test]
 	async fn get_reference_to_job_from_uuid() {
 		let mut manager = make_job_manager();
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 
 		let (uuid, job) = manager.add_job(job);
 		let job2 = manager.get_job(&uuid).unwrap();
@@ -145,7 +145,7 @@ mod test {
 	fn new_manager_has_1_job_after_enqueue() {
 		let mut manager = make_job_manager();
 
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 		assert_eq!(manager.job_count(), 1);
 	}
@@ -153,7 +153,7 @@ mod test {
 	#[test]
 	fn status_turns_into_string_with_job_id() {
 		let mut manager = make_job_manager();
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		let (uuid, _) = manager.add_job(job);
 
 		let status = manager.status();
@@ -188,7 +188,7 @@ mod test {
 			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
-		let Source::Local(uuid) = job.source.clone();
+		let Source::File(uuid) = job.source.clone();
 		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
 
 		let mut content = Vec::new();
@@ -207,7 +207,7 @@ mod test {
 	#[tokio::test]
 	async fn allocate_task_with_do_not_segment_job_returns_task() {
 		let mut manager = make_job_manager();
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
 		let task = manager.allocate().await;
@@ -217,7 +217,7 @@ mod test {
 	#[tokio::test]
 	async fn allocated_task_has_type_task() {
 		let mut manager = make_job_manager();
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
 		let task: Task = manager.allocate().await.unwrap();
@@ -227,7 +227,7 @@ mod test {
 	#[tokio::test]
 	async fn allocate_task_twice_with_one_do_not_segment_job_returns_one_time() {
 		let mut manager = make_job_manager();
-		let job = Job::new(Source::Local(FileRef::fake()), JobParams::sample_params());
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
 		let _task = manager.allocate().await;
@@ -239,11 +239,11 @@ mod test {
 	async fn allocate_task_twice_with_two_do_not_segment_job_returns_twice() {
 		let mut manager = make_job_manager();
 		manager.add_job(Job::new(
-			Source::Local(FileRef::fake()),
+			Source::File(FileRef::fake()),
 			JobParams::sample_params(),
 		));
 		manager.add_job(Job::new(
-			Source::Local(FileRef::fake()),
+			Source::File(FileRef::fake()),
 			JobParams::sample_params(),
 		));
 

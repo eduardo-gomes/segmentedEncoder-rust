@@ -14,7 +14,7 @@ pub struct JobParams {
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub(crate) enum Source {
-	Local(FileRef),
+	File(FileRef),
 }
 
 impl JobParams {
@@ -72,7 +72,7 @@ mod test {
 
 	#[test]
 	pub(crate) fn job_takes_source_and_parameters() {
-		let source = Source::Local(FileRef::fake());
+		let source = Source::File(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job = Job::new(source.clone(), parameters.clone());
 

@@ -89,7 +89,7 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 				}
 			}
 			match source {
-				Source::Local(file) => send_local(&state.manager, &file).await,
+				Source::File(file) => send_local(&state.manager, &file).await,
 			}
 		}
 		None => Response::builder()
