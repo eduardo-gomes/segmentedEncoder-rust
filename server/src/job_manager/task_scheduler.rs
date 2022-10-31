@@ -271,16 +271,6 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn after_task_is_completed_still_can_not_allocate() {
-		let segmenter = new_job_segmenter_with_single_task();
-		let task = segmenter.allocate().await.unwrap();
-
-		segmenter.set_task_as_completed(&task.id).await.unwrap();
-		let task = segmenter.allocate().await;
-		assert!(task.is_none(), "Should not allocate completed segment")
-	}
-
-	#[tokio::test]
 	async fn after_task_is_completed_get_task_returns_none() {
 		let segmenter = new_job_segmenter_with_single_task();
 		let task = segmenter.allocate().await.unwrap();

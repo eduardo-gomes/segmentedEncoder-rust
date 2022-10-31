@@ -7,10 +7,10 @@ use uuid::Uuid;
 use crate::job_manager::task_scheduler::Segment;
 use crate::jobs::Job;
 
-pub(super) struct JobSegmenter {
-	job: Arc<Job>,
-	job_id: Uuid,
-	segments: OnceCell<SegmentEntry>,
+enum AllocationState {
+	Queue = 0,
+	Allocated = 1,
+	Completed = 2,
 }
 
 struct SegmentData {
@@ -19,17 +19,35 @@ struct SegmentData {
 	job_id: Uuid,
 }
 
+impl SegmentData {
+	fn allocate(self: &Arc<Self>) -> Option<Arc<Self>> {
+		self.state
+			.compare_exchange(
+				AllocationState::Queue as u8,
+				AllocationState::Allocated as u8,
+				Ordering::SeqCst,
+				Ordering::Acquire,
+			)
+			.ok()
+			.and(Some(self.clone()))
+	}
+	fn complete(self: &Arc<Self>) {
+		self.state
+			.store(AllocationState::Completed as u8, Ordering::Release)
+	}
+}
+
 ///Hold segment data
-struct SegmentEntry(Arc<SegmentData>);
+pub(super) struct SegmentEntry(Arc<SegmentData>);
+
+impl SegmentEntry {
+	fn allocate(&self) -> Option<SegmentAllocation> {
+		self.0.allocate().map(SegmentAllocation)
+	}
+}
 
 ///RAII wrapper for Segment allocation
 pub(super) struct SegmentAllocation(Arc<SegmentData>);
-
-enum AllocationState {
-	Queue = 0,
-	Allocated = 1,
-	Completed = 2,
-}
 
 impl SegmentAllocation {
 	pub fn as_segment(&self) -> &Segment {
@@ -39,14 +57,14 @@ impl SegmentAllocation {
 		&self.0.job_id
 	}
 	pub fn set_completed(&self) -> usize {
-		let state = &self.0.state;
-		state.store(AllocationState::Completed as u8, Ordering::Release);
+		self.0.complete();
 		0
 	}
 }
 
 impl Drop for SegmentAllocation {
 	fn drop(&mut self) {
+		//Like C++ compare_exchange_strong, this is required not to fail if comparison succeeds
 		let _ = self.0.state.compare_exchange(
 			AllocationState::Allocated as u8,
 			AllocationState::Queue as u8,
@@ -56,21 +74,14 @@ impl Drop for SegmentAllocation {
 	}
 }
 
-impl SegmentEntry {
-	fn allocate(&self) -> Option<SegmentAllocation> {
-		let state = &self.0.state;
-		let allocate = state.compare_exchange(
-			AllocationState::Queue as u8,
-			AllocationState::Allocated as u8,
-			Ordering::SeqCst,
-			Ordering::Acquire,
-		);
-		allocate.map(|_| SegmentAllocation(self.0.clone())).ok()
-	}
+pub(super) struct JobSegmenter {
+	job: Arc<Job>,
+	job_id: Uuid,
+	segments: OnceCell<SegmentEntry>,
 }
 
 impl JobSegmenter {
-	pub fn new(job: Arc<Job>, job_id: Uuid) -> Self {
+	pub(super) fn new(job: Arc<Job>, job_id: Uuid) -> Self {
 		Self {
 			job,
 			job_id,
@@ -82,6 +93,14 @@ impl JobSegmenter {
 			.get()
 			.or_else(|| self.next_segment())
 			.and_then(|segment| segment.allocate())
+	}
+
+	pub fn get_segment(&self, segment_number: usize) -> Option<SegmentEntry> {
+		(segment_number == 0).then_some(()).and_then(|()| {
+			self.segments
+				.get()
+				.map(|entry| SegmentEntry(entry.0.clone()))
+		})
 	}
 }
 
@@ -154,5 +173,64 @@ mod test {
 		drop(available);
 		let available = segmenter.get_available();
 		assert!(available.is_some())
+	}
+
+	#[test]
+	fn set_complete_return_segment_number() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let available = segmenter.get_available().unwrap();
+		//Only check type at compile time
+		let _segment_number: usize = available.set_completed();
+	}
+
+	#[test]
+	fn segment_entry_got_with_segment_number_should_be_equivalent_to_allocated() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let available = segmenter.get_available().unwrap();
+		let segment_number: usize = available.set_completed();
+		let entry = segmenter.get_segment(segment_number).unwrap();
+		assert!(
+			Arc::ptr_eq(&entry.0, &available.0),
+			"Both pointers should be equivalent"
+		)
+	}
+
+	#[test]
+	fn get_segment_with_invalid_number_returns_none() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let available = segmenter.get_available().unwrap();
+		let segment_number: usize = available.set_completed();
+		let entry = segmenter.get_segment(segment_number + 1);
+		assert!(entry.is_none())
+	}
+
+	#[test]
+	fn after_drop_complete_should_not_be_able_to_allocate() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let available = segmenter.get_available().unwrap();
+		available.set_completed();
+		drop(available);
+		let available = segmenter.get_available();
+		assert!(available.is_none())
 	}
 }
