@@ -80,7 +80,7 @@ impl TaskScheduler {
 			.and_then(|(_, id)| (id == task_id).then_some(()));
 		should_remove
 			.and_then(|()| lock.take())
-			.map(|(allocated, _)| allocated.set_completed())
+			.map(|(allocated, _)| allocated.set_completed().segment_number())
 	}
 }
 

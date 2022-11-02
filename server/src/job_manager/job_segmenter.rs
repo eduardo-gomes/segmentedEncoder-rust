@@ -49,6 +49,9 @@ impl SegmentEntry {
 	fn get_output(&self) -> Option<FileRef> {
 		self.0.output.get().cloned()
 	}
+	pub fn segment_number(&self) -> usize {
+		0
+	}
 }
 
 ///RAII wrapper for Segment allocation
@@ -61,9 +64,9 @@ impl SegmentAllocation {
 	pub fn job_id(&self) -> &Uuid {
 		&self.0.job_id
 	}
-	pub fn set_completed(&self) -> usize {
+	pub fn set_completed(self) -> SegmentEntry {
 		self.0.complete();
-		0
+		SegmentEntry(self.0.clone()) //Cannot move out because of drop()
 	}
 	pub fn set_output(&self, output: FileRef) -> Result<(), ()> {
 		self.0.output.set(output).map_err(|_| ())
@@ -194,7 +197,7 @@ mod test {
 
 		let available = segmenter.get_available().unwrap();
 		//Only check type at compile time
-		let _segment_number: usize = available.set_completed();
+		let _segment_number: usize = available.set_completed().segment_number();
 	}
 
 	#[test]
@@ -206,7 +209,8 @@ mod test {
 		let segmenter = JobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
-		let segment_number: usize = available.set_completed();
+		let available = available.set_completed();
+		let segment_number: usize = available.segment_number();
 		let entry = segmenter.get_segment(segment_number).unwrap();
 		assert!(
 			Arc::ptr_eq(&entry.0, &available.0),
@@ -223,7 +227,7 @@ mod test {
 		let segmenter = JobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
-		let segment_number: usize = available.set_completed();
+		let segment_number: usize = available.set_completed().segment_number();
 		let entry = segmenter.get_segment(segment_number + 1);
 		assert!(entry.is_none())
 	}
@@ -237,7 +241,7 @@ mod test {
 		let segmenter = JobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
-		available.set_completed();
+		let available = available.set_completed();
 		drop(available);
 		let available = segmenter.get_available();
 		assert!(available.is_none())
@@ -252,7 +256,7 @@ mod test {
 		let segmenter = JobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
-		let segment_number: usize = available.set_completed();
+		let segment_number: usize = available.set_completed().segment_number();
 		let entry = segmenter.get_segment(segment_number).unwrap();
 
 		let output = entry.get_output();
@@ -271,7 +275,7 @@ mod test {
 
 		let available = segmenter.get_available().unwrap();
 		available.set_output(output.clone()).unwrap();
-		let segment_number: usize = available.set_completed();
+		let segment_number: usize = available.set_completed().segment_number();
 		let entry = segmenter.get_segment(segment_number).unwrap();
 
 		let got_output = entry.get_output().unwrap();
