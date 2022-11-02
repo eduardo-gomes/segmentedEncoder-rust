@@ -46,7 +46,7 @@ impl SegmentEntry {
 	fn allocate(&self) -> Option<SegmentAllocation> {
 		self.0.allocate().map(SegmentAllocation)
 	}
-	fn get_output(&self) -> Option<FileRef> {
+	pub fn get_output(&self) -> Option<FileRef> {
 		self.0.output.get().cloned()
 	}
 	pub fn segment_number(&self) -> usize {

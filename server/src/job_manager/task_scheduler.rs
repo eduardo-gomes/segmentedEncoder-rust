@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::job_manager::task_scheduler::job_segmenter::{JobSegmenter, SegmentAllocation};
 use crate::jobs::{Job, JobParams, Task};
+use crate::storage::FileRef;
 
 ///Stores all the data needed to create a [Task], except the id.
 #[derive(Clone)]
@@ -54,12 +55,10 @@ impl TaskScheduler {
 	}
 
 	pub(crate) async fn get_task(&self, id: &Uuid) -> Option<Task> {
-		self.allocated
-			.read()
-			.await
-			.as_ref()
-			.filter(|(_, task_id)| task_id == id)
-			.map(|(segment, _)| segment.as_segment().clone().into_task(segment.job_id(), id))
+		let segment_into_task = |(segment, _): &(SegmentAllocation, _)| {
+			segment.as_segment().clone().into_task(segment.job_id(), id)
+		};
+		self.find_task_and_map(id, segment_into_task).await
 	}
 
 	pub(crate) async fn cancel_task(&self, id: &Uuid) -> Result<(), ()> {
@@ -81,6 +80,35 @@ impl TaskScheduler {
 		should_remove
 			.and_then(|()| lock.take())
 			.map(|(allocated, _)| allocated.set_completed().segment_number())
+	}
+
+	pub(crate) fn get_segment_output(&self, segment_number: usize) -> Option<FileRef> {
+		self.segmenter
+			.get_segment(segment_number)
+			.map(|segment| segment.get_output())
+			.unwrap_or_default()
+	}
+
+	pub(crate) async fn set_task_output(
+		&self,
+		id: &Uuid,
+		output: FileRef,
+	) -> Option<Result<(), ()>> {
+		let set_output = |(allocation, _): &(SegmentAllocation, _)| allocation.set_output(output);
+		self.find_task_and_map(id, set_output).await
+	}
+
+	///Get the stored [SegmentAllocation] by task id and map the result using mapper
+	async fn find_task_and_map<U, F>(&self, id: &Uuid, mapper: F) -> Option<U>
+	where
+		F: FnOnce(&(SegmentAllocation, Uuid)) -> U,
+	{
+		self.allocated
+			.read()
+			.await
+			.as_ref()
+			.filter(|(_, task_id)| task_id == id)
+			.map(mapper)
 	}
 }
 
@@ -278,5 +306,65 @@ mod test {
 		segmenter.set_task_as_completed(&task.id).await.unwrap();
 		let got = segmenter.get_task(&task.id).await;
 		assert!(got.is_none())
+	}
+
+	#[tokio::test]
+	async fn set_task_output() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+		let output = FileRef::fake();
+
+		let res = segmenter.set_task_output(&task.id, output).await.unwrap();
+		assert!(res.is_ok())
+	}
+
+	#[tokio::test]
+	async fn set_task_output_with_invalid_task_id_returns_none() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let _task = segmenter.allocate().await.unwrap();
+		let output = FileRef::fake();
+		let id = Uuid::new_v4();
+
+		let res = segmenter.set_task_output(&id, output).await;
+		assert!(res.is_none())
+	}
+
+	#[tokio::test]
+	async fn set_task_output_second_time_fails() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+		let output = FileRef::fake();
+
+		segmenter
+			.set_task_output(&task.id, output.clone())
+			.await
+			.unwrap()
+			.unwrap();
+		let res = segmenter.set_task_output(&task.id, output).await.unwrap();
+		assert!(res.is_err())
+	}
+
+	#[tokio::test]
+	async fn get_segment_output_with_invalid_segment_returns_none() {
+		let segmenter = new_job_segmenter_with_single_task();
+
+		let output = segmenter.get_segment_output(10);
+		assert!(output.is_none())
+	}
+
+	#[tokio::test]
+	async fn get_segment_output_after_set_task_output_and_complete() {
+		let segmenter = new_job_segmenter_with_single_task();
+		let task = segmenter.allocate().await.unwrap();
+		let output = FileRef::fake();
+
+		segmenter
+			.set_task_output(&task.id, output.clone())
+			.await
+			.unwrap()
+			.unwrap();
+		let number = segmenter.set_task_as_completed(&task.id).await.unwrap();
+		let got_output = segmenter.get_segment_output(number).unwrap();
+		assert_eq!(got_output, output)
 	}
 }
