@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::job_manager::task_scheduler::Segment;
 use crate::jobs::Job;
+use crate::storage::FileRef;
 
 enum AllocationState {
 	Queue = 0,
@@ -17,6 +18,7 @@ struct SegmentData {
 	segment: Segment,
 	state: AtomicU8,
 	job_id: Uuid,
+	output: OnceCell<FileRef>,
 }
 
 impl SegmentData {
@@ -44,6 +46,9 @@ impl SegmentEntry {
 	fn allocate(&self) -> Option<SegmentAllocation> {
 		self.0.allocate().map(SegmentAllocation)
 	}
+	fn get_output(&self) -> Option<FileRef> {
+		self.0.output.get().cloned()
+	}
 }
 
 ///RAII wrapper for Segment allocation
@@ -59,6 +64,9 @@ impl SegmentAllocation {
 	pub fn set_completed(&self) -> usize {
 		self.0.complete();
 		0
+	}
+	pub fn set_output(&self, output: FileRef) -> Result<(), ()> {
+		self.0.output.set(output).map_err(|_| ())
 	}
 }
 
@@ -118,6 +126,7 @@ impl JobSegmenter {
 			segment,
 			state: AtomicU8::new(AllocationState::Queue as u8),
 			job_id,
+			output: OnceCell::new(),
 		});
 		self.segments
 			.set(SegmentEntry(segment))
@@ -232,5 +241,57 @@ mod test {
 		drop(available);
 		let available = segmenter.get_available();
 		assert!(available.is_none())
+	}
+
+	#[test]
+	fn get_segment_output_returns_none() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let available = segmenter.get_available().unwrap();
+		let segment_number: usize = available.set_completed();
+		let entry = segmenter.get_segment(segment_number).unwrap();
+
+		let output = entry.get_output();
+		assert!(output.is_none())
+	}
+
+	#[test]
+	fn get_segment_output_after_set_output_returns_the_same_value_from_set() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let output = FileRef::from(Uuid::new_v4());
+
+		let available = segmenter.get_available().unwrap();
+		available.set_output(output.clone()).unwrap();
+		let segment_number: usize = available.set_completed();
+		let entry = segmenter.get_segment(segment_number).unwrap();
+
+		let got_output = entry.get_output().unwrap();
+		assert_eq!(got_output, output);
+	}
+
+	#[test]
+	fn segment_set_output_second_time_fails() {
+		let source = Source::File(FileRef::fake());
+		let parameters = JobParams::sample_params();
+		let job_uuid = Uuid::new_v4();
+		let job = Arc::new(Job::new(source, parameters));
+		let segmenter = JobSegmenter::new(job, job_uuid);
+
+		let output = FileRef::from(Uuid::new_v4());
+		let output2 = FileRef::from(Uuid::new_v4());
+
+		let available = segmenter.get_available().unwrap();
+		available.set_output(output).unwrap();
+		let res = available.set_output(output2);
+		assert!(res.is_err());
 	}
 }
