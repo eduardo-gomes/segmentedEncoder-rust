@@ -38,7 +38,7 @@ pub(super) struct TaskScheduler {
 impl TaskScheduler {
 	///Interface to allocate tasks.
 	///
-	///Only allocate if task is available, wont wait until new task is available.
+	///Only allocate if task is available, won't wait until new task is available.
 	///
 	///The returned task will be marked as running.
 	pub(super) async fn allocate(&self) -> Option<Task> {

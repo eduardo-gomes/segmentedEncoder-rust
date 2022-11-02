@@ -14,7 +14,7 @@ pub struct Storage {
 }
 
 #[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct FileRef {
 	id: Uuid,
 }

@@ -57,7 +57,7 @@ impl Job {
 ///
 ///It is able to tell the input and output files
 #[derive(Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Task {
 	pub job_id: Uuid,
 	pub id: Uuid,
