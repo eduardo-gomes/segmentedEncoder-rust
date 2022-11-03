@@ -39,6 +39,12 @@ pub(crate) struct JobManager {
 	pub storage: Storage,
 }
 
+impl JobManager {
+	fn get_segmenter(&self, job_id: &Uuid) -> Option<&TaskScheduler> {
+		self.map.get(job_id).map(|(_, a)| a)
+	}
+}
+
 impl Debug for JobManager {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		//map to use uuid as hyphenated
@@ -250,6 +256,21 @@ mod test {
 		let _task = manager.allocate().await;
 		let task = manager.allocate().await;
 		assert!(task.is_some());
+	}
+
+	#[tokio::test]
+	async fn get_task_scheduler_get_task_give_the_same_task() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
+		manager.add_job(job);
+		let task: Task = manager.allocate().await.unwrap();
+
+		let scheduler = manager.get_segmenter(&task.job_id).unwrap();
+		let got_task = scheduler
+			.get_task(&task.id)
+			.await
+			.expect("Should have task");
+		assert_eq!(got_task, task)
 	}
 }
 

@@ -30,7 +30,7 @@ impl Segment {
 #[path = "job_segmenter.rs"]
 mod job_segmenter;
 
-pub(super) struct TaskScheduler {
+pub(crate) struct TaskScheduler {
 	allocated: RwLock<Option<(SegmentAllocation, Uuid)>>,
 	segmenter: JobSegmenter,
 }
