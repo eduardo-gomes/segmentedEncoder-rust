@@ -39,12 +39,6 @@ pub(crate) struct JobManager {
 	pub storage: Storage,
 }
 
-impl JobManager {
-	fn get_segmenter(&self, job_id: &Uuid) -> Option<&TaskScheduler> {
-		self.map.get(job_id).map(|(_, a)| a)
-	}
-}
-
 impl Debug for JobManager {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		//map to use uuid as hyphenated
@@ -72,8 +66,8 @@ impl JobManager {
 	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<Job>) {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(job);
-		let segmenter = arc.clone().make_segmenter(uuid);
-		self.map.insert(uuid, (arc.clone(), segmenter));
+		let task_scheduler = arc.clone().make_segmenter_and_scheduler(uuid);
+		self.map.insert(uuid, (arc.clone(), task_scheduler));
 		(uuid, arc)
 	}
 
@@ -83,8 +77,8 @@ impl JobManager {
 
 	pub(crate) async fn allocate(&self) -> Option<Task> {
 		{
-			for (_, segmenter) in self.map.values() {
-				let allocated = segmenter.allocate().await;
+			for (_, task_scheduler) in self.map.values() {
+				let allocated = task_scheduler.allocate().await;
 				if allocated.is_some() {
 					return allocated;
 				}
@@ -98,6 +92,10 @@ impl JobManager {
 			map: Default::default(),
 			storage,
 		}
+	}
+
+	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&TaskScheduler> {
+		self.map.get(job_id).map(|(_, scheduler)| scheduler)
 	}
 }
 
@@ -265,7 +263,7 @@ mod test {
 		manager.add_job(job);
 		let task: Task = manager.allocate().await.unwrap();
 
-		let scheduler = manager.get_segmenter(&task.job_id).unwrap();
+		let scheduler = manager.get_task_scheduler(&task.job_id).unwrap();
 		let got_task = scheduler
 			.get_task(&task.id)
 			.await

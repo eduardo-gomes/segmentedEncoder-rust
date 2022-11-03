@@ -113,7 +113,7 @@ impl TaskScheduler {
 }
 
 impl Job {
-	pub(super) fn make_segmenter(self: Arc<Self>, uuid: Uuid) -> TaskScheduler {
+	pub(super) fn make_segmenter_and_scheduler(self: Arc<Self>, uuid: Uuid) -> TaskScheduler {
 		TaskScheduler {
 			allocated: RwLock::new(None), //While we only have one task, and don't restart
 			segmenter: JobSegmenter::new(self, uuid),
@@ -164,7 +164,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.clone().make_segmenter(job_uuid);
+		let segmenter = job.clone().make_segmenter_and_scheduler(job_uuid);
 
 		let task = segmenter.allocate().await.unwrap();
 		assert_eq!(task.parameters, job.parameters);
@@ -176,7 +176,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let job_with_id = job.make_segmenter(job_uuid);
+		let job_with_id = job.make_segmenter_and_scheduler(job_uuid);
 
 		let task = job_with_id.allocate().await.unwrap();
 		let expected_path = format!("/api/jobs/{job_uuid}/source");
@@ -202,7 +202,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = job.make_segmenter(job_uuid);
+		let segmenter = job.make_segmenter_and_scheduler(job_uuid);
 
 		let task = segmenter.allocate().await.unwrap();
 		let got_job_id = task.job_id;
@@ -276,7 +276,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		job.make_segmenter(job_uuid)
+		job.make_segmenter_and_scheduler(job_uuid)
 	}
 
 	#[tokio::test]
