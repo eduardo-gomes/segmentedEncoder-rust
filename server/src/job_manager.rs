@@ -35,7 +35,7 @@ impl JobManagerUtils for JobManagerLock {
 }
 
 pub(crate) struct JobManager {
-	map: HashMap<Uuid, (Arc<Job>, TaskScheduler)>,
+	map: HashMap<Uuid, (Arc<Job>, Arc<TaskScheduler>)>,
 	pub storage: Storage,
 }
 
@@ -67,7 +67,8 @@ impl JobManager {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(job);
 		let task_scheduler = arc.clone().make_segmenter_and_scheduler(uuid);
-		self.map.insert(uuid, (arc.clone(), task_scheduler));
+		self.map
+			.insert(uuid, (arc.clone(), Arc::new(task_scheduler)));
 		(uuid, arc)
 	}
 
@@ -94,7 +95,7 @@ impl JobManager {
 		}
 	}
 
-	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&TaskScheduler> {
+	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<TaskScheduler>> {
 		self.map.get(job_id).map(|(_, scheduler)| scheduler)
 	}
 }
