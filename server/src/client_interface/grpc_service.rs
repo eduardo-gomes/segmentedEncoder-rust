@@ -4,7 +4,7 @@ use tokio::sync::{RwLock, RwLockReadGuard};
 use tonic::{Request, Response, Status};
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
-use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse, Task};
+use grpc_proto::proto::{Empty, RegistrationRequest, RegistrationResponse, Task, TaskId};
 
 use crate::client_interface::grpc_service::auth_interceptor::AuthenticationExtension;
 use crate::State;
@@ -72,6 +72,10 @@ impl SegmentedEncoder for ServiceLock {
 		.map(|task| {
 			let params = task.parameters;
 			Response::new(Task {
+				id: Some(TaskId {
+					job_id: task.job_id.as_ref().to_vec(),
+					task_id: task.id.as_ref().to_vec(),
+				}),
 				input_path: task.input_path,
 				v_codec: params.video_encoder.unwrap_or_default(),
 				v_params: params.video_args.unwrap_or_default(),
@@ -235,6 +239,44 @@ mod test {
 			"Task: {:?}\nParams: {:?}\nBoth should have same parameters\n",
 			task, params
 		);
+		close.await
+	}
+
+	#[tokio::test]
+	async fn request_task_check_job_id_and_task_id() -> Result<(), Box<dyn Error>> {
+		use crate::jobs::{Job, JobParams, Source};
+		let state = new_state();
+		let params = JobParams::sample_params();
+		let job = Job::new(Source::File(FileRef::fake()), params.clone());
+		state.manager.write().await.add_job(job);
+
+		let (close, client, url) = start_server(Some(state.clone())).await?;
+		let (mut client, _) = register_connect(client, &url).await?;
+
+		let task = client
+			.request_task(())
+			.await
+			.expect("Should return after a job is created")
+			.into_inner();
+
+		let id = task.id.unwrap_or_default();
+		let job_id = Uuid::from_slice(id.job_id.as_slice()).expect("job_id should have 16 bytes");
+		let is_valid_job_id = { state.manager.read().await.get_job(&job_id).is_some() };
+		assert!(is_valid_job_id);
+		let task_id =
+			Uuid::from_slice(id.task_id.as_slice()).expect("task_id should have 16 bytes");
+		let is_valid_task_id = {
+			state
+				.manager
+				.read()
+				.await
+				.get_task_scheduler(&job_id)
+				.unwrap()
+				.get_task(&task_id)
+				.await
+				.is_some()
+		};
+		assert!(is_valid_task_id);
 		close.await
 	}
 

@@ -11,13 +11,13 @@ message RegistrationResponse{
 
 message Empty{}
 
-//message TaskId{
-//  bytes job_id = 1;
-//  bytes run_id = 2;
-//}
+message TaskId{
+  bytes job_id = 1;
+  bytes task_id = 2;
+}
 
 message Task{
-  //  TaskId id = 1;
+  TaskId id = 1;
   string input_path = 2;
   string v_codec = 3;
   string v_params = 4;
