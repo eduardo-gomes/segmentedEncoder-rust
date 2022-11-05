@@ -104,6 +104,7 @@ mod test {
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;
+	use crate::jobs::Job;
 	use crate::storage::FileRef;
 	use crate::State;
 
@@ -195,10 +196,8 @@ mod test {
 
 	#[tokio::test]
 	async fn request_task_after_create_task_return_task() -> Result<(), Box<dyn Error>> {
-		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
-		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
-		state.manager.write().await.add_job(job);
+		create_sample_job(&state).await;
 
 		let (close, client, url) = start_server(Some(state)).await?;
 		let (mut client, _) = register_connect(client, &url).await?;
@@ -213,11 +212,8 @@ mod test {
 
 	#[tokio::test]
 	async fn request_task_check_task_params() -> Result<(), Box<dyn Error>> {
-		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
-		let params = JobParams::sample_params();
-		let job = Job::new(Source::File(FileRef::fake()), params.clone());
-		state.manager.write().await.add_job(job);
+		let (_, job) = create_sample_job(&state).await;
 
 		let (close, client, url) = start_server(Some(state)).await?;
 		let (mut client, _) = register_connect(client, &url).await?;
@@ -228,7 +224,7 @@ mod test {
 			.expect("Should return after a job is created")
 			.into_inner();
 		let has_same_parameters = {
-			let params = params.clone();
+			let params = job.parameters.clone();
 			task.a_codec == params.audio_encoder.unwrap_or_default()
 				&& task.a_params == params.audio_args.unwrap_or_default()
 				&& task.v_codec == params.video_encoder.unwrap_or_default()
@@ -237,18 +233,15 @@ mod test {
 		assert!(
 			has_same_parameters,
 			"Task: {:?}\nParams: {:?}\nBoth should have same parameters\n",
-			task, params
+			task, job.parameters
 		);
 		close.await
 	}
 
 	#[tokio::test]
 	async fn request_task_check_job_id_and_task_id() -> Result<(), Box<dyn Error>> {
-		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
-		let params = JobParams::sample_params();
-		let job = Job::new(Source::File(FileRef::fake()), params.clone());
-		state.manager.write().await.add_job(job);
+		create_sample_job(&state).await;
 
 		let (close, client, url) = start_server(Some(state.clone())).await?;
 		let (mut client, _) = register_connect(client, &url).await?;
@@ -282,11 +275,8 @@ mod test {
 
 	#[tokio::test]
 	async fn request_task_has_valid_input_path() -> Result<(), Box<dyn Error>> {
-		use crate::jobs::{Job, JobParams, Source};
 		let state = new_state();
-		let params = JobParams::sample_params();
-		let job = Job::new(Source::File(FileRef::fake()), params.clone());
-		state.manager.write().await.add_job(job);
+		create_sample_job(&state).await;
 
 		let (close, client, url) = start_server(Some(state)).await?;
 		let (mut client, _) = register_connect(client, &url).await?;
@@ -317,6 +307,13 @@ mod test {
 		use crate::storage::Storage;
 		let manager = JobManager::new(Storage::new().unwrap()).into();
 		State::new(manager, Service::new().into_lock())
+	}
+
+	async fn create_sample_job(state: &Arc<State>) -> (Uuid, Arc<Job>) {
+		use crate::jobs::{JobParams, Source};
+		let params = JobParams::sample_params();
+		let job = Job::new(Source::File(FileRef::fake()), params.clone());
+		state.manager.write().await.add_job(job)
 	}
 
 	async fn register_connect(
