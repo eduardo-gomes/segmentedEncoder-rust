@@ -137,3 +137,39 @@ mod bundle_web {
 		Ok(())
 	}
 }
+
+pub mod esbuild {
+	use std::ffi::OsStr;
+	use std::io::Error;
+	use std::process::Command;
+
+	#[cfg(not(windows))]
+	const NPX: &str = "npx";
+	#[cfg(windows)]
+	const NPX: &str = "npx.cmd";
+	#[cfg(not(windows))]
+	const ESBUILD: &str = "esbuild";
+	#[cfg(windows)]
+	const ESBUILD: &str = "esbuild.exe";
+
+	///Run esbuild trying first `esbuild`, and could not run, try `npx esbuild`
+	pub fn run<S>(args: &[S]) -> Result<bool, Error>
+	where
+		S: AsRef<OsStr>,
+	{
+		let mut esbuild_npm = Command::new(NPX);
+		esbuild_npm.arg("esbuild");
+		let esbuild_executable = Command::new(ESBUILD);
+
+		let run_build = |mut command: Command, args: &[S]| -> Result<bool, Error> {
+			println!("Trying to build with: {:?}", command);
+			command.args(args).status().map(|status| status.success())
+		};
+
+		run_build(esbuild_executable, args).or_else(|error| {
+			dbg!(error);
+			println!("Could not run esbuild, trying with npx");
+			run_build(esbuild_npm, args)
+		})
+	}
+}
