@@ -1,5 +1,5 @@
 [workspace]
-members = ["grpc-proto", "web-packer", "web-frontend", "server", "client"]
+members = ["grpc-proto", "server", "client"]
 
 [profile.release-lto]
 inherits = "release"
