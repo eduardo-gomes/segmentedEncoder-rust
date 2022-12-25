@@ -15,5 +15,5 @@ build({
 }).catch(() => process.exit(1));
 
 fs.mkdirSync("./out", {recursive: true});
-fs.copyFileSync("./src/index.xhtml", "./out/index.xhtml");
+fs.copyFileSync("./src/index.html", "./out/index.html");
 fs.copyFileSync("./src/style.css", "./out/style.css");
