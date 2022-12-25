@@ -1,4 +1,5 @@
 import Tab from "./tab";
+import {get_api_path} from "./api";
 
 const jobs_div = document.createElement("div");
 const input_div = document.createElement("div");
@@ -125,7 +126,7 @@ async function send_task(task: Task) {
 		audio_args: visible_ascii(task.audio_args),
 	};
 	console.debug("Encoded header:", headers);
-	return await fetch("/api/jobs", {
+	return await fetch(get_api_path() + "/jobs", {
 		method: "POST",
 		headers: headers,
 		body: task.file

@@ -1,4 +1,5 @@
 import Tab from "./tab";
+import {get_api_path} from "./api";
 
 const status_div = document.createElement("div");
 const out = document.createElement("pre");
@@ -8,7 +9,7 @@ status_div.appendChild(out);
 async function refresh() {
 	let res;
 	try {
-		res = await fetch("/api/status");
+		res = await fetch(get_api_path() + "/status");
 	} catch (e) {
 		const message = "Fetch failed";
 		out.innerText = message;
