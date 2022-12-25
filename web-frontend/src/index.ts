@@ -1,3 +1,4 @@
+import "./style.css"
 import status_div from "./status";
 import jobs_div from "./jobs";
 import type Tab from "./tab";
