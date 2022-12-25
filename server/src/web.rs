@@ -2,8 +2,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::handler::Handler;
-use axum::response::Redirect;
-use axum::routing::get;
 use axum::{
 	body::Body,
 	extract::ConnectInfo,
@@ -23,12 +21,10 @@ async fn log(req: Request<Body>, next: Next<Body>) -> Response {
 }
 
 pub(super) fn make_service(state: Arc<State>) -> Router<Body> {
-	let redirect = get(|| async { Redirect::permanent("/index.xhtml") });
 	async fn fallback() -> (StatusCode, &'static str) {
 		(StatusCode::NOT_FOUND, "Not found")
 	}
-	web_frontend::get_router()
-		.route("/", redirect)
+	Router::new()
 		.nest("/api", api::make_router(state))
 		.layer(from_fn(log))
 		.fallback(fallback.into_service())

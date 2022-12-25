@@ -846,7 +846,6 @@ dependencies = [
  "tonic",
  "tower",
  "uuid",
- "web-frontend",
 ]
 
 [[package]]
