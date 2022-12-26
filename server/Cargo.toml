@@ -18,6 +18,7 @@ grpc-proto = { path = "../grpc-proto" }
 tonic = { version = "0.8.2", default-features = false }
 multiplex-tonic-hyper = "0.1.0"
 tower = "0.4.13"
+tower-http = { version = "0.3.5", features = ["cors"] }
 
 [dev-dependencies]
 tonic = "0.8.2"

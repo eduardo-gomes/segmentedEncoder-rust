@@ -40,7 +40,11 @@ pub fn make_multiplexed_service(
 	let state = State::new(manager_lock, service_lock);
 	let grpc_service = state.grpc.clone().with_auth();
 
-	let web = web::make_service(state).into_make_service_with_connect_info::<SocketAddr>();
+	let web_router = web::make_service(state);
+	use tower_http::cors::CorsLayer;
+	let cors = CorsLayer::permissive();
+	let web_router = web_router.layer(cors);
+	let web = web_router.into_make_service_with_connect_info::<SocketAddr>();
 	MakeMultiplexer::new(Shared::new(grpc_service), web)
 }
 
