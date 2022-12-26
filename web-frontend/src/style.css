@@ -6,12 +6,12 @@
 	display: none !important;
 }
 
-#tabs {
+.tabs {
 	display: flex;
 	gap: 0.5em;
 }
 
-#tabs button {
+.tabs button {
 	padding-left: 1em;
 	padding-right: 1em;
 }

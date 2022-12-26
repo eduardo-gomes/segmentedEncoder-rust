@@ -2,7 +2,7 @@
   "name": "segmentedencoder-frontend",
   "version": "1.0.0",
   "description": "",
-  "main": "src/index.ts",
+  "main": "src/index.tsx",
   "type": "module",
   "scripts": {
     "build": "node build.js",

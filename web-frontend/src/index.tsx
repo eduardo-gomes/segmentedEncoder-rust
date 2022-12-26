@@ -2,9 +2,11 @@ import "./style.css"
 import status_div from "./status";
 import jobs_div from "./jobs";
 import type Tab from "./tab";
+import {render} from "solid-js/web";
 
-const tabs = document.getElementById("tabs") as HTMLDivElement;
-const container = document.getElementById("container") as HTMLDivElement;
+const tabs = document.createElement("div") as HTMLDivElement;
+tabs.className = "tabs";
+const container = document.createElement("div") as HTMLDivElement;
 const tab_list = new Map<string, Tab>();
 
 function show_tab(tab: Tab) {
@@ -26,3 +28,14 @@ function add_tab(tab: Tab) {
 add_tab(status_div);
 add_tab(jobs_div);
 show_tab(status_div);
+
+function App() {
+	return (
+		<>
+			{tabs}
+			{container}
+		</>
+	)
+}
+
+render(() => <App/>, document.getElementById("App") as HTMLDivElement);
