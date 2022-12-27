@@ -1,39 +1,23 @@
 import "./style.css"
 import status_div from "./status";
 import jobs_div from "./jobs";
-import type Tab from "./tab";
+import {Tab, TabBar} from "./tabs";
 import {render} from "solid-js/web";
 
-const tabs = document.createElement("div") as HTMLDivElement;
-tabs.className = "tabs";
-const container = document.createElement("div") as HTMLDivElement;
-const tab_list = new Map<string, Tab>();
-
-function show_tab(tab: Tab) {
-	tab_list.forEach((tab) => tab.hide());
-	tab.show();
-}
-
-function add_tab(tab: Tab) {
-	tab_list.set(tab.label, tab);
-	const button = document.createElement("button");
-	button.innerText = tab.label;
-	tabs.appendChild(button);
-	tab.hide();
-	container.appendChild(tab.element);
-
-	button.addEventListener("click", () => show_tab(tab));
-}
-
-add_tab(status_div);
-add_tab(jobs_div);
-show_tab(status_div);
+//We need to make tab able to interrupt the work with reactivity
+status_div.show();
 
 function App() {
 	return (
 		<>
-			{tabs}
-			{container}
+			<TabBar>
+				<Tab title={"Status"}>
+					{status_div.element}
+				</Tab>
+				<Tab title={"Jobs"}>
+					{jobs_div.element}
+				</Tab>
+			</TabBar>
 		</>
 	)
 }
