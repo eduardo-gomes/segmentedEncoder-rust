@@ -1,5 +1,6 @@
 import Tab from "./lib/tab";
 import {get_api_path} from "./lib/api";
+import {createEffect} from "solid-js";
 
 const status_div = document.createElement("div");
 const out = document.createElement("pre");
@@ -43,4 +44,11 @@ function background() {
 }
 
 const status_tab = new Tab(status_div, "Status", foreground, background);
-export default status_tab;
+
+function StatusTab(props: { visible: boolean }) {
+
+	createEffect(() => props.visible ? status_tab.show() : status_tab.hide());
+	return status_tab.element;
+}
+
+export default StatusTab;

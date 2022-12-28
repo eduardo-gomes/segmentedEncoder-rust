@@ -1,18 +1,17 @@
 import "./style.css"
-import status_div from "./status";
+import StatusTab from "./status";
 import jobs_div from "./jobs";
 import {Tab, TabBar} from "./tabs";
 import {render} from "solid-js/web";
-
-//We need to make tab able to interrupt the work with reactivity
-status_div.show();
+import {createSignal} from "solid-js";
 
 function App() {
+	const [statusActive, setStatusActive] = createSignal(false);
 	return (
 		<>
 			<TabBar>
-				<Tab title={"Status"}>
-					{status_div.element}
+				<Tab title={"Status"} onVisibilityChange={setStatusActive}>
+					<StatusTab visible={statusActive()}/>
 				</Tab>
 				<Tab title={"Jobs"}>
 					{jobs_div.element}
