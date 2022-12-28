@@ -1,9 +1,9 @@
 import "./style.css"
 import StatusTab from "./status";
-import jobs_div from "./jobs";
-import {Tab, TabBar} from "./tabs";
-import {render} from "solid-js/web";
-import {createSignal} from "solid-js";
+import JobsTab from "./jobs";
+import { Tab, TabBar } from "./tabs";
+import { render } from "solid-js/web";
+import { createSignal } from "solid-js";
 
 function App() {
 	const [statusActive, setStatusActive] = createSignal(false);
@@ -14,7 +14,7 @@ function App() {
 					<StatusTab visible={statusActive()}/>
 				</Tab>
 				<Tab title={"Jobs"}>
-					{jobs_div.element}
+					<JobsTab/>
 				</Tab>
 			</TabBar>
 		</>
