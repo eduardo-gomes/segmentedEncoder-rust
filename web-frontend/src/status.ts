@@ -1,5 +1,5 @@
-import Tab from "./tab";
-import {get_api_path} from "./api";
+import Tab from "./lib/tab";
+import {get_api_path} from "./lib/api";
 
 const status_div = document.createElement("div");
 const out = document.createElement("pre");

@@ -1,5 +1,5 @@
-import Tab from "./tab";
-import {get_api_path} from "./api";
+import Tab from "./lib/tab";
+import {get_api_path} from "./lib/api";
 
 const jobs_div = document.createElement("div");
 const input_div = document.createElement("div");
@@ -60,9 +60,9 @@ input_div.appendChild(status_label);
 
 function create_task() {
 	function get_input() {
-		let files = file_input.files;
+		const files = file_input.files;
 		if (files == null || files.length < 1) throw new Error("No file selected");
-		let task: Task = {
+		const task: Task = {
 			video_encoder: video_codec.value,
 			video_args: video_args.value,
 			audio_encoder: audio_codec.value,
@@ -76,7 +76,7 @@ function create_task() {
 		console.debug("Created task response:", res);
 		if (res.ok)
 			res.text().then(function (text) {
-				let url = new URL(`/api/jobs/${text}/source`, window.location.origin);
+				const url = new URL(`/api/jobs/${text}/source`, window.location.origin);
 				console.info("Source available at:", url.href)
 				status_text.innerText = "Created job " + text;
 			});
@@ -86,12 +86,12 @@ function create_task() {
 		}
 	}
 
-	function send_rejected(e: any) {
+	function send_rejected(e: unknown) {
 		console.error("Create task error:", e);
 		status_text.innerText = "Upload job request failed";
 	}
 
-	let task = get_input();
+	const task = get_input();
 	console.debug("Task to create:", task);
 
 	status_label.classList.remove("disabled");

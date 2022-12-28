@@ -17,6 +17,7 @@ const Tab: TabComponent = function (props) {
 function TabBar(props: { children: JSX.Element[] }) {
 	const c = children(() => props.children) as Accessor<ResolvedJSXElement[]>;
 	const [tabs, setTabs] = createSignal<string[]>([]);
+	//Get tab names
 	createEffect(() => {
 		const tabs = c();
 		const names: string[] = tabs.map(item => (item as HTMLElement).dataset.title ?? "unnamed");
