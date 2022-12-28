@@ -1,54 +1,52 @@
-import Tab from "./lib/tab";
 import {get_api_path} from "./lib/api";
-import {createEffect} from "solid-js";
-
-const status_div = document.createElement("div");
-const out = document.createElement("pre");
-status_div.insertAdjacentHTML("afterbegin", "Auto refreshing /latest:");
-status_div.appendChild(out);
-
-async function refresh() {
-	let res;
-	try {
-		res = await fetch(get_api_path() + "/status");
-	} catch (e) {
-		const message = "Fetch failed";
-		out.innerText = message;
-		throw new Error(message, {cause: e as Error});
-	}
-	if (res.status >= 400) {
-		const message = `Refresh got status code: ${res.status}`;
-		out.innerText = message;
-		throw new Error(message);
-	}
-	out.innerText = await res.text();
-	console.debug("Request got:", res.status);
-}
-
-function status_updater() {
-	refresh().then().catch((e) => console.error("Failed to update status:", e));
-}
-
-let interval: undefined | number;
-
-function foreground() {
-	if (interval != undefined) return;
-	interval = setInterval(status_updater, 2000);
-	status_updater();
-}
-
-function background() {
-	if (interval === undefined) return;
-	clearInterval(interval);
-	interval = undefined;
-}
-
-const status_tab = new Tab(status_div, "Status", foreground, background);
+import {createEffect, createSignal, onCleanup} from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
+	const [status, setStatus] = createSignal("");
 
-	createEffect(() => props.visible ? status_tab.show() : status_tab.hide());
-	return status_tab.element;
+	async function refresh() {
+		let res;
+		try {
+			res = await fetch(get_api_path() + "/status");
+		} catch (e) {
+			const message = "Fetch failed";
+			setStatus(message);
+			throw new Error(message, {cause: e as Error});
+		}
+		if (res.status >= 400) {
+			const message = `Refresh got status code: ${res.status}`;
+			setStatus(message);
+			throw new Error(message);
+		}
+		setStatus(await res.text());
+		console.debug("Request got:", res.status);
+	}
+
+	function status_updater() {
+		refresh().then().catch((e) => console.error("Failed to update status:", e));
+	}
+
+	let interval: undefined | number;
+
+	function foreground() {
+		if (interval != undefined) return;
+		interval = setInterval(status_updater, 2000);
+		status_updater();
+	}
+
+	function background() {
+		if (interval === undefined) return;
+		clearInterval(interval);
+		interval = undefined;
+	}
+
+	createEffect(() => props.visible ? foreground() : background());
+	onCleanup(() => clearInterval(interval));
+
+	return (<>
+		Auto refreshing /latest:
+		<pre>{status()}</pre>
+	</>);
 }
 
 export default StatusTab;
