@@ -12,16 +12,15 @@ class Tab {
 	}
 
 	show() {
-		this.div.classList.remove("disabled");
 		if (this.foreground)
 			this.foreground();
 		console.debug("Show", this._label);
 	}
 
 	hide() {
-		this.div.classList.add("disabled");
 		if (this.background)
 			this.background();
+		console.debug("Show", this._label);
 	}
 
 	get element() {

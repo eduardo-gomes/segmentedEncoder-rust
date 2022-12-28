@@ -2,10 +2,6 @@
 	color-scheme: light dark;
 }
 
-.disabled {
-	display: none !important;
-}
-
 .tabs {
 	display: flex;
 	gap: 0.5em;
