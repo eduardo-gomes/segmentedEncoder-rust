@@ -1,5 +1,5 @@
-import {get_api_path} from "./lib/api";
-import {createEffect, createSignal, onCleanup} from "solid-js";
+import { get_api_path } from "./lib/api";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
 	const [status, setStatus] = createSignal("");
@@ -22,26 +22,30 @@ function StatusTab(props: { visible: boolean }) {
 		console.debug("Request got:", res.status);
 	}
 
-	function status_updater() {
-		refresh().then().catch((e) => console.error("Failed to update status:", e));
+	let timeout: undefined | number;
+	let should_rerun = false;
+
+	function rerun() {
+		clearTimeout(timeout);
+		if (should_rerun)
+			timeout = setTimeout(status_updater, 1000);
 	}
 
-	let interval: undefined | number;
+	function status_updater() {
+		refresh().catch((e) => console.error("Failed to update status:", e)).finally(rerun);
+	}
 
 	function foreground() {
-		if (interval != undefined) return;
-		interval = setInterval(status_updater, 2000);
+		should_rerun = true;
 		status_updater();
 	}
 
 	function background() {
-		if (interval === undefined) return;
-		clearInterval(interval);
-		interval = undefined;
+		should_rerun = false;
 	}
 
 	createEffect(() => props.visible ? foreground() : background());
-	onCleanup(() => clearInterval(interval));
+	onCleanup(() => clearTimeout(timeout));
 
 	return (<>
 		Auto refreshing /latest:
