@@ -1,5 +1,5 @@
 import { get_api_path } from "./lib/api";
-import { createSignal } from "solid-js";
+import { createSignal, Setter, Show } from "solid-js";
 
 function create_task(task: Task, setStatus: (status: string) => void) {
 	function send_fulfilled(res: Response) {
@@ -64,7 +64,7 @@ async function send_task(task: Task) {
 function JobsTab() {
 	const [videoCodec, setVideoCodec] = createSignal("libsvtav1");
 	const [videoArgs, setVideoArgs] = createSignal("-preset 4 -crf 27");
-	const [audioCodec, setAudioCodec] = createSignal("opus");
+	const [audioCodec, setAudioCodec] = createSignal("libopus");
 	const [audioArgs, setAudioArgs] = createSignal("-b:a 96k");
 
 	let file_list: FileList | null;
@@ -87,6 +87,10 @@ function JobsTab() {
 		return task;
 	}
 
+	function textChange(fn: Setter<string>) {
+		return (e: Event & { currentTarget: HTMLInputElement }) => fn(e.currentTarget.value);
+	}
+
 	const [status, setStatus] = createSignal("");
 	return (<>
 			Add job:
@@ -97,16 +101,16 @@ function JobsTab() {
 				</label>
 				<label>
 					<span>video encoder:</span>
-					<input type="text" value={videoCodec()} onChange={setVideoCodec}/></label>
+					<input type="text" value={videoCodec()} onChange={textChange(setVideoCodec)}/></label>
 				<label>
 					<span>video args:</span>
-					<input type="text" value={videoArgs()} onChange={setVideoArgs}/></label>
+					<input type="text" value={videoArgs()} onChange={textChange(setVideoArgs)}/></label>
 				<label>
 					<span>audio encoder:</span>
-					<input type="text" value={audioCodec()} onChange={setAudioCodec}/></label>
+					<input type="text" value={audioCodec()} onChange={textChange(setAudioCodec)}/></label>
 				<label>
 					<span>audio args:</span>
-					<input type="text" value={audioArgs()} onChange={setAudioArgs}/>
+					<input type="text" value={audioArgs()} onChange={textChange(setAudioArgs)}/>
 				</label>
 				<input type="button" value="Add job" onClick={() => create_task(get_task(), setStatus)}/>
 				<label class={status() ? undefined : "disabled"}>
