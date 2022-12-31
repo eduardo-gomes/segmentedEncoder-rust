@@ -113,10 +113,12 @@ function JobsTab() {
 					<input type="text" value={audioArgs()} onChange={textChange(setAudioArgs)}/>
 				</label>
 				<input type="button" value="Add job" onClick={() => create_task(get_task(), setStatus)}/>
-				<label class={status() ? undefined : "disabled"}>
-					<span>Status:</span>
-					<span>{status()}</span>
-				</label>
+				<Show when={status()}>
+					<label>
+						<span>Status:</span>
+						<span>{status()}</span>
+					</label>
+				</Show>
 			</div>
 		</>
 	);
