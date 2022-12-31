@@ -35,17 +35,15 @@ function StatusTab(props: { visible: boolean }) {
 		refresh().catch((e) => console.error("Failed to update status:", e)).finally(rerun);
 	}
 
-	function foreground() {
-		should_rerun = true;
-		status_updater();
-	}
-
-	function background() {
-		should_rerun = false;
-	}
-
-	createEffect(() => props.visible ? foreground() : background());
-	onCleanup(() => clearTimeout(timeout));
+	createEffect(() => {
+		should_rerun = props.visible;
+		if (should_rerun)
+			status_updater();
+		onCleanup(() => {
+			should_rerun = false;
+			clearTimeout(timeout);
+		});
+	});
 
 	return (<>
 		Auto refreshing /latest:
