@@ -6,8 +6,9 @@ function create_task(task: Task, setStatus: (status: string) => void) {
 		console.debug("Created task response:", res);
 		if (res.ok)
 			res.text().then(function (text) {
-				const url = new URL(`/api/jobs/${text}/source`, window.location.origin);
-				console.info("Source available at:", url.href)
+				const url = get_api_path();
+				url.pathname += `/jobs/${text}/source`;
+				console.info("Source available at:", url.href);
 				setStatus("Created job " + text);
 			});
 		else {
