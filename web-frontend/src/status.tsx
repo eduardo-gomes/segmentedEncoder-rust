@@ -1,4 +1,4 @@
-import { get_api_path } from "./lib/api";
+import { get_path_on_api } from "./lib/api";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
@@ -7,7 +7,7 @@ function StatusTab(props: { visible: boolean }) {
 	async function refresh() {
 		let res;
 		try {
-			res = await fetch(get_api_path() + "/status");
+			res = await fetch(get_path_on_api("/status"));
 		} catch (e) {
 			const message = "Fetch failed";
 			setStatus(message);

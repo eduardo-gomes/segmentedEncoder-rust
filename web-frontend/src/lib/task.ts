@@ -1,4 +1,4 @@
-import { get_api_path } from "./api";
+import { get_path_on_api } from "./api";
 
 type Successful = { job: string, isErr: false };
 type Rejected = { text: string, isErr: true };
@@ -8,8 +8,7 @@ export function create_task(task: Task): Promise<Rejected | Successful> {
 		console.debug("Created task response:", res);
 		if (res.ok) {
 			const text = await res.text();
-			const url = get_api_path();
-			url.pathname += `/jobs/${text}/source`;
+			const url = get_path_on_api(`/jobs/${text}/source`);
 			console.info("Source available at:", url.href);
 			return {job: text, isErr: false};
 		} else {
@@ -54,7 +53,7 @@ async function send_task(task: Task) {
 		audio_args: visible_ascii(task.audio_args),
 	};
 	console.debug("Encoded header:", headers);
-	return await fetch(get_api_path() + "/jobs", {
+	return await fetch(get_path_on_api("/jobs"), {
 		method: "POST",
 		headers: headers,
 		body: task.file
