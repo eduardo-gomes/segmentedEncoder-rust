@@ -7,7 +7,7 @@ edition = "2021"
 tonic = "0.8"
 prost = "0.11"
 futures-util = "0.3"
-tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.23", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1.10"
 tower = "0.4.13"
 uuid = "1.1.2"
