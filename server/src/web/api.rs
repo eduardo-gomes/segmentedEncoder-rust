@@ -114,7 +114,7 @@ async fn job_info(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Res
 	}
 }
 
-pub(crate) fn make_router(state: Arc<State>) -> Router<Body> {
+pub(crate) fn make_router(state: Arc<State>) -> Router<(), Body> {
 	Router::new()
 		.route("/status", get(get_status))
 		.route("/jobs", post(job_post))
@@ -166,7 +166,7 @@ mod test {
 
 	use crate::{State, Storage, MKV_SAMPLE, WEBM_SAMPLE};
 
-	fn make_service() -> (Router<Body>, Arc<State>) {
+	fn make_service() -> (Router<(), Body>, Arc<State>) {
 		use crate::web;
 		let state = {
 			use crate::job_manager::JobManager;
