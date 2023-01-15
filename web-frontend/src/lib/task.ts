@@ -1,14 +1,14 @@
-import { get_path_on_api } from "./api";
+import type { ApiContextType } from "./api";
 
 type Successful = { job: string, isErr: false };
 type Rejected = { text: string, isErr: true };
 
-export function create_task(task: Task): Promise<Rejected | Successful> {
+export function create_task(api: ApiContextType, task: Task): Promise<Rejected | Successful> {
 	async function send_fulfilled(res: Response): Promise<Rejected | Successful> {
 		console.debug("Created task response:", res);
 		if (res.ok) {
 			const text = await res.text();
-			const url = get_path_on_api(`/jobs/${text}/source`);
+			const url = api.path_on_url(`/jobs/${text}/source`);
 			console.info("Source available at:", url.href);
 			return {job: text, isErr: false};
 		} else {
@@ -24,7 +24,7 @@ export function create_task(task: Task): Promise<Rejected | Successful> {
 
 	console.debug("Task to create:", task);
 
-	return send_task(task)
+	return send_task(api, task)
 		.then(send_fulfilled)
 		.catch(send_rejected);
 }
@@ -45,7 +45,7 @@ function visible_ascii(str: string) {
 	return str;
 }
 
-async function send_task(task: Task) {
+async function send_task(api: ApiContextType, task: Task) {
 	const headers = {
 		video_encoder: visible_ascii(task.video_encoder),
 		video_args: visible_ascii(task.video_args),
@@ -53,7 +53,7 @@ async function send_task(task: Task) {
 		audio_args: visible_ascii(task.audio_args),
 	};
 	console.debug("Encoded header:", headers);
-	return await fetch(get_path_on_api("/jobs"), {
+	return await fetch(api.path_on_url("/jobs"), {
 		method: "POST",
 		headers: headers,
 		body: task.file

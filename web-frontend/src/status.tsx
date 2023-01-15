@@ -1,13 +1,15 @@
-import { get_path_on_api } from "./lib/api";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { ApiContext } from "./lib/api";
+import { createEffect, createSignal, onCleanup, useContext } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
 	const [status, setStatus] = createSignal("");
 
+	const {path_on_url} = useContext(ApiContext);
+
 	async function refresh() {
 		let res;
 		try {
-			res = await fetch(get_path_on_api("/status"));
+			res = await fetch(path_on_url("/status"));
 		} catch (e) {
 			const message = "Fetch failed";
 			setStatus(message);

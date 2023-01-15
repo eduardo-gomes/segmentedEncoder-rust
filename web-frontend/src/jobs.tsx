@@ -1,8 +1,10 @@
-import { createSignal, Setter, Show } from "solid-js";
+import { createSignal, Setter, Show, useContext } from "solid-js";
 import type { Task } from "./lib/task";
 import { create_task } from "./lib/task";
+import { ApiContext } from "./lib/api";
 
 function JobsTab() {
+	const api = useContext(ApiContext);
 	const [videoCodec, setVideoCodec] = createSignal("libsvtav1");
 	const [videoArgs, setVideoArgs] = createSignal("-preset 4 -crf 27");
 	const [audioCodec, setAudioCodec] = createSignal("libopus");
@@ -29,7 +31,7 @@ function JobsTab() {
 
 	function onCreate() {
 		setStatus("Uploading job!");
-		create_task(get_task()).then((res) => {
+		create_task(api, get_task()).then((res) => {
 				if (!res.isErr)
 					setStatus("Created job " + res.job);
 				else

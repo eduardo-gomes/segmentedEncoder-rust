@@ -4,6 +4,7 @@ import JobsTab from "./jobs";
 import { Tab, TabBar } from "./tabs";
 import { render } from "solid-js/web";
 import { createSignal } from "solid-js";
+import { ApiProvider } from "./lib/api";
 
 function App() {
 	const [statusActive, setStatusActive] = createSignal(false);
@@ -21,4 +22,8 @@ function App() {
 	)
 }
 
-render(() => <App/>, document.getElementById("App") as HTMLDivElement);
+render(() => (
+	<ApiProvider url={new URL("http://localhost:8888/api")}>
+		<App/>
+	</ApiProvider>
+), document.getElementById("App") as HTMLDivElement);
