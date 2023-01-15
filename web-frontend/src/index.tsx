@@ -1,6 +1,7 @@
 import "./style.css"
 import StatusTab from "./status";
 import JobsTab from "./jobs";
+import ServerSelector from "./serverSelector";
 import { Tab, TabBar } from "./tabs";
 import { render } from "solid-js/web";
 import { createSignal } from "solid-js";
@@ -16,6 +17,9 @@ function App() {
 				</Tab>
 				<Tab title={"Jobs"}>
 					<JobsTab/>
+				</Tab>
+				<Tab title={"Server"}>
+					<ServerSelector/>
 				</Tab>
 			</TabBar>
 		</>
