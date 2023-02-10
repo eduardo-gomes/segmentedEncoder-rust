@@ -1,4 +1,4 @@
-import { ApiContext } from "./lib/api";
+import { ApiContext } from "../../lib/api";
 import { createSignal, Setter, useContext } from "solid-js";
 
 function ServerSelector() {

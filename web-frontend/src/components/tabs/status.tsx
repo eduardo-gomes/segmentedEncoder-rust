@@ -1,4 +1,4 @@
-import { ApiContext } from "./lib/api";
+import { ApiContext } from "../../lib/api";
 import { createEffect, createSignal, onCleanup, useContext } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {

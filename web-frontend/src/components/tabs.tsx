@@ -1,6 +1,6 @@
-import type {Accessor, JSX, ParentComponent} from 'solid-js';
-import {children, createEffect, createSelector, createSignal, For, mapArray, Show} from "solid-js";
-import type {ResolvedJSXElement} from "solid-js/types/reactive/signal";
+import type { Accessor, JSX, ParentComponent } from 'solid-js';
+import { children, createEffect, createSelector, createSignal, For, mapArray, Show } from "solid-js";
+import type { ResolvedJSXElement } from "solid-js/types/reactive/signal";
 
 type TabComponent = ParentComponent<{ title: string, onVisibilityChange?: (visible: boolean) => void }>;
 const Tab: TabComponent = function (props) {
@@ -54,4 +54,4 @@ function TabBar(props: { children: JSX.Element[] }) {
 	)
 }
 
-export {TabBar, Tab};
+export { TabBar, Tab };

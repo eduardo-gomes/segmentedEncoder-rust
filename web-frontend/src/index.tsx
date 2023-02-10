@@ -1,8 +1,8 @@
 import "./style.css"
-import StatusTab from "./status";
-import JobsTab from "./jobs";
-import ServerSelector from "./serverSelector";
-import { Tab, TabBar } from "./tabs";
+import StatusTab from "./components/tabs/status";
+import JobsTab from "./components/tabs/jobs";
+import ServerSelector from "./components/tabs/serverSelector";
+import { Tab, TabBar } from "./components/tabs";
 import { render } from "solid-js/web";
 import { createSignal } from "solid-js";
 import { ApiProvider } from "./lib/api";

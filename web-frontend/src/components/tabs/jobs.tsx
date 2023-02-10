@@ -1,7 +1,7 @@
 import { createSignal, Setter, Show, useContext } from "solid-js";
-import type { Task } from "./lib/task";
-import { create_task } from "./lib/task";
-import { ApiContext } from "./lib/api";
+import type { Task } from "../../lib/task";
+import { create_task } from "../../lib/task";
+import { ApiContext } from "../../lib/api";
 
 function JobsTab() {
 	const api = useContext(ApiContext);
