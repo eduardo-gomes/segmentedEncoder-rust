@@ -8,7 +8,7 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::task_scheduler::TaskScheduler;
+use crate::job_manager::old_task_scheduler::OldTaskScheduler;
 use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
@@ -35,7 +35,7 @@ impl JobManagerUtils for JobManagerLock {
 }
 
 pub(crate) struct JobManager {
-	map: HashMap<Uuid, (Arc<Job>, Arc<TaskScheduler>)>,
+	map: HashMap<Uuid, (Arc<Job>, Arc<OldTaskScheduler>)>,
 	pub storage: Storage,
 }
 
@@ -95,7 +95,7 @@ impl JobManager {
 		}
 	}
 
-	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<TaskScheduler>> {
+	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<OldTaskScheduler>> {
 		self.map.get(job_id).map(|(_, scheduler)| scheduler)
 	}
 }
@@ -274,4 +274,4 @@ mod test {
 }
 
 #[deprecated]
-mod task_scheduler;
+mod old_task_scheduler;

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::job_manager::task_scheduler::Segment;
+use crate::job_manager::old_task_scheduler::Segment;
 use crate::jobs::Job;
 use crate::storage::FileRef;
 
@@ -14,14 +14,14 @@ enum AllocationState {
 	Completed = 2,
 }
 
-struct SegmentData {
+struct OldSegmentData {
 	segment: Segment,
 	state: AtomicU8,
 	job_id: Uuid,
 	output: OnceCell<FileRef>,
 }
 
-impl SegmentData {
+impl OldSegmentData {
 	fn allocate(self: &Arc<Self>) -> Option<Arc<Self>> {
 		self.state
 			.compare_exchange(
@@ -40,11 +40,11 @@ impl SegmentData {
 }
 
 ///Hold segment data
-pub(super) struct SegmentEntry(Arc<SegmentData>);
+pub(super) struct OldSegmentEntry(Arc<OldSegmentData>);
 
-impl SegmentEntry {
-	fn allocate(&self) -> Option<SegmentAllocation> {
-		self.0.allocate().map(SegmentAllocation)
+impl OldSegmentEntry {
+	fn allocate(&self) -> Option<OldSegmentAllocation> {
+		self.0.allocate().map(OldSegmentAllocation)
 	}
 	pub fn get_output(&self) -> Option<FileRef> {
 		self.0.output.get().cloned()
@@ -55,25 +55,25 @@ impl SegmentEntry {
 }
 
 ///RAII wrapper for Segment allocation
-pub(super) struct SegmentAllocation(Arc<SegmentData>);
+pub(super) struct OldSegmentAllocation(Arc<OldSegmentData>);
 
-impl SegmentAllocation {
+impl OldSegmentAllocation {
 	pub fn as_segment(&self) -> &Segment {
 		&self.0.segment
 	}
 	pub fn job_id(&self) -> &Uuid {
 		&self.0.job_id
 	}
-	pub fn set_completed(self) -> SegmentEntry {
+	pub fn set_completed(self) -> OldSegmentEntry {
 		self.0.complete();
-		SegmentEntry(self.0.clone()) //Cannot move out because of drop()
+		OldSegmentEntry(self.0.clone()) //Cannot move out because of drop()
 	}
 	pub fn set_output(&self, output: FileRef) -> Result<(), ()> {
 		self.0.output.set(output).map_err(|_| ())
 	}
 }
 
-impl Drop for SegmentAllocation {
+impl Drop for OldSegmentAllocation {
 	fn drop(&mut self) {
 		//Like C++ compare_exchange_strong, this is required not to fail if comparison succeeds
 		let _ = self.0.state.compare_exchange(
@@ -85,13 +85,13 @@ impl Drop for SegmentAllocation {
 	}
 }
 
-pub(super) struct JobSegmenter {
+pub(super) struct OldJobSegmenter {
 	job: Arc<Job>,
 	job_id: Uuid,
-	segments: OnceCell<SegmentEntry>,
+	segments: OnceCell<OldSegmentEntry>,
 }
 
-impl JobSegmenter {
+impl OldJobSegmenter {
 	pub(super) fn new(job: Arc<Job>, job_id: Uuid) -> Self {
 		Self {
 			job,
@@ -99,40 +99,40 @@ impl JobSegmenter {
 			segments: OnceCell::new(),
 		}
 	}
-	pub fn get_available(&self) -> Option<SegmentAllocation> {
+	pub fn get_available(&self) -> Option<OldSegmentAllocation> {
 		self.segments
 			.get()
 			.or_else(|| self.next_segment())
 			.and_then(|segment| segment.allocate())
 	}
 
-	pub fn get_segment(&self, segment_number: usize) -> Option<SegmentEntry> {
+	pub fn get_segment(&self, segment_number: usize) -> Option<OldSegmentEntry> {
 		(segment_number == 0).then_some(()).and_then(|()| {
 			self.segments
 				.get()
-				.map(|entry| SegmentEntry(entry.0.clone()))
+				.map(|entry| OldSegmentEntry(entry.0.clone()))
 		})
 	}
 }
 
-impl JobSegmenter {
+impl OldJobSegmenter {
 	///Internal function to segment jobs.
 	///
 	///This may differ for different kinds of segmentation.
-	fn next_segment(&self) -> Option<&SegmentEntry> {
+	fn next_segment(&self) -> Option<&OldSegmentEntry> {
 		let job_id = self.job_id;
 		let segment = Segment {
 			input_path: format!("/api/jobs/{}/source", job_id),
 			parameters: self.job.parameters.clone(),
 		};
-		let segment = Arc::new(SegmentData {
+		let segment = Arc::new(OldSegmentData {
 			segment,
 			state: AtomicU8::new(AllocationState::Queue as u8),
 			job_id,
 			output: OnceCell::new(),
 		});
 		self.segments
-			.set(SegmentEntry(segment))
+			.set(OldSegmentEntry(segment))
 			.ok()
 			.and_then(|()| self.segments.get())
 	}
@@ -144,7 +144,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::task_scheduler::job_segmenter::JobSegmenter;
+	use crate::job_manager::old_task_scheduler::old_job_segmenter::OldJobSegmenter;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 
@@ -154,7 +154,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available();
 		assert!(available.is_some())
@@ -166,7 +166,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let _available = segmenter.get_available();
 		let available = segmenter.get_available();
@@ -179,7 +179,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available();
 		drop(available);
@@ -193,7 +193,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
 		//Only check type at compile time
@@ -206,7 +206,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
 		let available = available.set_completed();
@@ -224,7 +224,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
 		let segment_number: usize = available.set_completed().segment_number();
@@ -238,7 +238,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
 		let available = available.set_completed();
@@ -253,7 +253,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let available = segmenter.get_available().unwrap();
 		let segment_number: usize = available.set_completed().segment_number();
@@ -269,7 +269,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let output = FileRef::from(Uuid::new_v4());
 
@@ -288,7 +288,7 @@ mod test {
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
 		let job = Arc::new(Job::new(source, parameters));
-		let segmenter = JobSegmenter::new(job, job_uuid);
+		let segmenter = OldJobSegmenter::new(job, job_uuid);
 
 		let output = FileRef::from(Uuid::new_v4());
 		let output2 = FileRef::from(Uuid::new_v4());

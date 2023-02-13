@@ -5,7 +5,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::task_scheduler::job_segmenter::{JobSegmenter, SegmentAllocation};
+use crate::job_manager::old_task_scheduler::old_job_segmenter::{
+	OldJobSegmenter, OldSegmentAllocation,
+};
 use crate::jobs::{Job, JobParams, Task};
 use crate::storage::FileRef;
 
@@ -28,15 +30,15 @@ impl Segment {
 }
 
 #[deprecated]
-#[path = "job_segmenter.rs"]
-mod job_segmenter;
+#[path = "old_job_segmenter.rs"]
+mod old_job_segmenter;
 
-pub(crate) struct TaskScheduler {
-	allocated: RwLock<Option<(SegmentAllocation, Uuid)>>,
-	segmenter: JobSegmenter,
+pub(crate) struct OldTaskScheduler {
+	allocated: RwLock<Option<(OldSegmentAllocation, Uuid)>>,
+	segmenter: OldJobSegmenter,
 }
 
-impl TaskScheduler {
+impl OldTaskScheduler {
 	///Interface to allocate tasks.
 	///
 	///Only allocate if task is available, won't wait until new task is available.
@@ -56,7 +58,7 @@ impl TaskScheduler {
 	}
 
 	pub(crate) async fn get_task(&self, id: &Uuid) -> Option<Task> {
-		let segment_into_task = |(segment, _): &(SegmentAllocation, _)| {
+		let segment_into_task = |(segment, _): &(OldSegmentAllocation, _)| {
 			segment.as_segment().clone().into_task(segment.job_id(), id)
 		};
 		self.find_task_and_map(id, segment_into_task).await
@@ -95,14 +97,15 @@ impl TaskScheduler {
 		id: &Uuid,
 		output: FileRef,
 	) -> Option<Result<(), ()>> {
-		let set_output = |(allocation, _): &(SegmentAllocation, _)| allocation.set_output(output);
+		let set_output =
+			|(allocation, _): &(OldSegmentAllocation, _)| allocation.set_output(output);
 		self.find_task_and_map(id, set_output).await
 	}
 
-	///Get the stored [SegmentAllocation] by task id and map the result using mapper
+	///Get the stored [OldSegmentAllocation] by task id and map the result using mapper
 	async fn find_task_and_map<U, F>(&self, id: &Uuid, mapper: F) -> Option<U>
 	where
-		F: FnOnce(&(SegmentAllocation, Uuid)) -> U,
+		F: FnOnce(&(OldSegmentAllocation, Uuid)) -> U,
 	{
 		self.allocated
 			.read()
@@ -114,10 +117,11 @@ impl TaskScheduler {
 }
 
 impl Job {
-	pub(super) fn make_segmenter_and_scheduler(self: Arc<Self>, uuid: Uuid) -> TaskScheduler {
-		TaskScheduler {
+	#[deprecated]
+	pub(super) fn make_segmenter_and_scheduler(self: Arc<Self>, uuid: Uuid) -> OldTaskScheduler {
+		OldTaskScheduler {
 			allocated: RwLock::new(None), //While we only have one task, and don't restart
-			segmenter: JobSegmenter::new(self, uuid),
+			segmenter: OldJobSegmenter::new(self, uuid),
 		}
 	}
 }
@@ -128,7 +132,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::task_scheduler::TaskScheduler;
+	use crate::job_manager::old_task_scheduler::OldTaskScheduler;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 
@@ -272,7 +276,7 @@ mod test {
 		assert!(task.is_some())
 	}
 
-	fn new_job_segmenter_with_single_task() -> TaskScheduler {
+	fn new_job_segmenter_with_single_task() -> OldTaskScheduler {
 		let source = Source::File(FileRef::fake());
 		let parameters = JobParams::sample_params();
 		let job_uuid = Uuid::new_v4();
