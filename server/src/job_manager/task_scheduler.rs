@@ -27,6 +27,7 @@ impl Segment {
 	}
 }
 
+#[deprecated]
 #[path = "job_segmenter.rs"]
 mod job_segmenter;
 

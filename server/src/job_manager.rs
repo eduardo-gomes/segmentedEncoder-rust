@@ -273,4 +273,5 @@ mod test {
 	}
 }
 
+#[deprecated]
 mod task_scheduler;
