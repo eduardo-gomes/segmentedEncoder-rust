@@ -1,13 +1,10 @@
 import { ApiContext } from "../../lib/api";
-import { createSignal, Setter, useContext } from "solid-js";
+import { createSignal, useContext } from "solid-js";
+import { textChange } from "../../lib/utils";
 
 function ServerSelector() {
 	const {url, set_url} = useContext(ApiContext);
 	const [value, setValue] = createSignal("")
-
-	function textChange(fn: Setter<string>) {
-		return (e: Event & { currentTarget: HTMLInputElement }) => fn(e.currentTarget.value);
-	}
 
 	return (
 		<>

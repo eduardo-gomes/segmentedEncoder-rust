@@ -1,7 +1,8 @@
-import { createSignal, Setter, Show, useContext } from "solid-js";
+import { createSignal, Show, useContext } from "solid-js";
 import type { Task } from "../../lib/task";
 import { create_task } from "../../lib/task";
 import { ApiContext } from "../../lib/api";
+import { textChange } from "../../lib/utils";
 
 function JobsTab() {
 	const api = useContext(ApiContext);
@@ -23,10 +24,6 @@ function JobsTab() {
 			file: files[0]
 		};
 		return task;
-	}
-
-	function textChange(fn: Setter<string>) {
-		return (e: Event & { currentTarget: HTMLInputElement }) => fn(e.currentTarget.value);
 	}
 
 	function onCreate() {
