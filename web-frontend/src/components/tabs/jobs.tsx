@@ -1,3 +1,4 @@
+import "./jobs.css";
 import { createSignal, Show, useContext } from "solid-js";
 import type { Task } from "../../lib/task";
 import { create_task } from "../../lib/task";
