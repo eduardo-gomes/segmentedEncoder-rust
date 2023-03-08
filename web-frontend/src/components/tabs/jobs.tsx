@@ -40,7 +40,7 @@ function JobsTab() {
 	const [status, setStatus] = createSignal("");
 	return (<>
 			Add job:
-			<div id="job-div">
+			<div class="job-div">
 				<label>
 					<span>Input file:</span>
 					<input ref={ref => file_input = ref} type="file" accept="video/*"/>

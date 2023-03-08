@@ -12,17 +12,17 @@
 	padding-right: 1em;
 }
 
-#job-div {
+.job-div {
 	display: grid;
 	grid-template-columns: max-content auto;
 	grid-column-gap: .5em;
 	grid-row-gap: .2em;
 }
 
-#job-div label {
+.job-div label {
 	display: contents;
 }
 
-#job-div > input {
+.job-div > input {
 	grid-column: 1 / 3;
 }
