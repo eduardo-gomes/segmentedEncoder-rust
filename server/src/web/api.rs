@@ -115,12 +115,16 @@ async fn job_info(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Res
 }
 
 pub(crate) fn make_router(state: Arc<State>) -> Router<(), Body> {
+	async fn version() -> String {
+		format!("SegmentedEncoder server v{}\n", env!("CARGO_PKG_VERSION"))
+	}
 	Router::new()
 		.route("/status", get(get_status))
 		.route("/jobs", post(job_post))
 		.route("/jobs/:job_id/source", get(job_source))
 		.route("/jobs/:job_id/info", get(job_info))
 		.route("/jobs/:job_id/tasks/:task_id/output", post(task_output))
+		.route("/version", get(version))
 		.layer(Extension(state))
 }
 
@@ -187,6 +191,23 @@ mod test {
 		let response = service.ready().await?.call(request).await?;
 
 		assert_eq!(response.status(), StatusCode::OK);
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn api_returns_server_version() -> Result<(), Box<dyn Error>> {
+		let (mut service, _) = make_service();
+		let request = Request::builder().uri("/api/version").body(Body::empty())?;
+		let response = service.ready().await?.call(request).await?;
+
+		assert_eq!(response.status(), StatusCode::OK);
+		let data = hyper::body::to_bytes(response.into_body()).await?;
+		let text = String::from_utf8(data.into()).map_err(|_| "Did not return UTF-8")?;
+		let version = format!("v{}", env!("CARGO_PKG_VERSION"));
+		assert!(
+			text.contains(&version),
+			"Package version is not included in the response"
+		);
 		Ok(())
 	}
 
