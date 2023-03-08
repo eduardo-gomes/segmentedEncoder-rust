@@ -5,7 +5,11 @@ extends:
   - eslint:recommended
   - plugin:@typescript-eslint/recommended
   - plugin:solid/typescript
-overrides: [ ]
+overrides:
+  - files: [ "build.js" ]
+    env:
+      node: true
+
 parser: '@typescript-eslint/parser'
 parserOptions:
   ecmaVersion: latest
