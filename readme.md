@@ -8,3 +8,10 @@ Each client will get one task, and if necessary will fetch the video, then trans
 
 Since gRPC uses HTTP, the server will also use it to make the files available.
 Also, we could provide an API with a web interface to manage the server.
+
+# Building
+
+## Protocol Buffers
+
+This application depends on `protoc` to compile.
+You can use the `protobuf-compiler` package on Debian or similar for your system or manually install and add to PATH
