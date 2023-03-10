@@ -17,7 +17,7 @@ function ServerSelector() {
 				try {
 					const url = new URL(value());
 					set_url(url);
-					console.log("Changed url to", url);
+					console.log("Changed url to", url.href);
 				} catch (e) {
 					alert(e)
 				}
