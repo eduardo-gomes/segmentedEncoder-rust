@@ -23,6 +23,12 @@ export const ApiContext = createContext<ApiContextType>({
 	set_url: () => undefined
 } as ApiContextType);
 
+/**
+ * Receives a signal to the server URL an creates a derivated signal
+ * that gets the server version
+ * @param url server url signal
+ * @returns Accessor<string | undefined>
+ */
 function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 	const [version, setVersion] = createSignal<string | undefined>(undefined);
 
@@ -42,13 +48,22 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 		onCleanup(() => controller.abort());
 		const signal = controller.signal
 		const request = new Request(path.href, {signal});
+		let cancelTimeout: () => void = () => null;
+		onCleanup(() => cancelTimeout());
 
 		function fetch_reject(err: unknown): Promise<Response> {
 			console.error("Fetch failed:", err);
 			if (err instanceof DOMException && err.name === "AbortError")
 				return Promise.reject(err);
-			else
-				return fetch(request).catch(fetch_reject);
+			else //Some kind of network error, retry
+				return new Promise((resolve, reject) => {
+					const timeout = setTimeout(resolve, 5000);
+					cancelTimeout = () => {
+						clearTimeout(timeout);
+						reject("Timeout cancelled");
+					};
+				})
+					.then(() => fetch(request).catch(fetch_reject));
 		}
 
 		fetch(request)
@@ -72,6 +87,7 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 export function ApiProvider(props: ParentProps<{ url: URL }>) {
 	// eslint-disable-next-line solid/reactivity
 	const [path, setPath] = createSignal(props.url);
+	// eslint-disable-next-line solid/reactivity
 	const version = versionWatcher(path);
 	const clone_url = () => new URL(path());
 	const api: ApiContextType = {
