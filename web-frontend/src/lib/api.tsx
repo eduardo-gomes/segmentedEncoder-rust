@@ -1,4 +1,4 @@
-import { Accessor, createContext, createEffect, createSignal, ParentProps, Setter } from "solid-js";
+import { Accessor, createContext, createEffect, createSignal, onCleanup, ParentProps, Setter } from "solid-js";
 
 function get_path_on_api(url: URL, path: string) {
 	url.pathname += path;
@@ -29,26 +29,41 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 	async function version_parser(response: Response): Promise<string> {
 		const res = await response.text();
 		const prefix = "SegmentedEncoder server";
-		if (!res.includes(prefix)) throw "Invalid server";
+		if (!res.includes(prefix)) throw new Error("Invalid server", {cause: `response is (${res})`});
 		return res.substring(res.indexOf("v", prefix.length));
 	}
 
 	createEffect(() => {
 		setVersion(undefined);
 		const path = get_path_on_api(new URL(url()), "/version");
-		console.info("Checking version of api at", path.href);
-		fetch(path.href)
-			.catch((err) => {
-				console.error("Fetch failed:", err);
-				throw err;
-			})
-			.then(version_parser)
-			.then(setVersion)
-			.catch(() => console.error("Is not segmentedEncoder server"));
+		console.log("Checking version of api at", path.href);
+
+		const controller = new AbortController();
+		onCleanup(() => controller.abort());
+		const signal = controller.signal
+		const request = new Request(path.href, {signal});
+
+		function fetch_reject(err: unknown): Promise<Response> {
+			console.error("Fetch failed:", err);
+			if (err instanceof DOMException && err.name === "AbortError")
+				return Promise.reject(err);
+			else
+				return fetch(request).catch(fetch_reject);
+		}
+
+		fetch(request)
+			.catch(fetch_reject)
+			.then((res) =>
+				version_parser(res)
+					.then(setVersion)
+					.catch((err) =>
+						console.error("Is not segmentedEncoder server", err)
+					)
+			);
 	});
 	createEffect((initial) => {
 		if (version() || !initial)
-			console.log("Version:", version());
+			console.info("Version:", version());
 		return false;
 	}, true);
 	return version;
