@@ -3,12 +3,14 @@ import { createSignal, useContext } from "solid-js";
 import { textChange } from "../../lib/utils";
 
 function ServerSelector() {
-	const {url, set_url} = useContext(ApiContext);
+	const {url, set_url, version} = useContext(ApiContext);
 	const [value, setValue] = createSignal("")
 
 	return (
 		<>
 			<label>Selected server <output>{url().toString()}</output></label>
+			<br/>
+			<label>Version: <output>{version() ?? "Not connected"}</output></label>
 			<br/>
 			Enter new server address to change server.
 			<br/>
