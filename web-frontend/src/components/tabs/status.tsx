@@ -13,7 +13,8 @@ function StatusTab(props: { visible: boolean }) {
 		} catch (e) {
 			const message = "Fetch failed";
 			setStatus(message);
-			throw new Error(message, {cause: e as Error});
+			console.warn(Error(message, {cause: e as Error}));
+			return;
 		}
 		if (res.status >= 400) {
 			const message = `Refresh got status code: ${res.status}`;

@@ -52,7 +52,7 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 		onCleanup(() => cancelTimeout());
 
 		function fetch_reject(err: unknown): Promise<Response> {
-			console.error("Fetch failed:", err);
+			console.warn("Failed to fetch version:", err);
 			if (err instanceof DOMException && err.name === "AbortError")
 				return Promise.reject(err);
 			else //Some kind of network error, retry
