@@ -1,10 +1,10 @@
 import { ApiContext } from "../../lib/api";
-import { createEffect, createSignal, onCleanup, useContext } from "solid-js";
+import { createEffect, createSignal, Match, onCleanup, Switch, useContext } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
 	const [status, setStatus] = createSignal("");
 
-	const {path_on_url} = useContext(ApiContext);
+	const {path_on_url, is_connected} = useContext(ApiContext);
 
 	async function refresh() {
 		let res;
@@ -39,7 +39,7 @@ function StatusTab(props: { visible: boolean }) {
 	}
 
 	createEffect(() => {
-		should_rerun = props.visible;
+		should_rerun = props.visible && is_connected();
 		if (should_rerun)
 			status_updater();
 		onCleanup(() => {
@@ -50,7 +50,11 @@ function StatusTab(props: { visible: boolean }) {
 
 	return (<>
 		Auto refreshing /latest:
-		<pre>{status()}</pre>
+		<Switch fallback={<div style={{"font-size": "x-large"}}>Not connected to the server</div>}>
+			<Match when={is_connected()}>
+				<pre>{status()}</pre>
+			</Match>
+		</Switch>
 	</>);
 }
 
