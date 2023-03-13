@@ -10,6 +10,7 @@ export type ApiContextType = {
 	url: Accessor<URL>,
 	/**Return server version string if is connected or undefined*/
 	version: Accessor<string | undefined>,
+	is_connected: Accessor<boolean>,
 	set_url: Setter<URL>
 	path_on_url: (path: string) => URL
 };
@@ -19,6 +20,7 @@ const fallback_url = new URL("http://localhost:8888/api");
 export const ApiContext = createContext<ApiContextType>({
 	url: () => fallback_url,
 	version: () => undefined,
+	is_connected: () => false,
 	path_on_url: (p) => get_path_on_api(fallback_url, p),
 	set_url: () => undefined
 } as ApiContextType);
@@ -93,6 +95,7 @@ export function ApiProvider(props: ParentProps<{ url: URL }>) {
 	const api: ApiContextType = {
 		url: clone_url,
 		version,
+		is_connected: () => version() != undefined,
 		path_on_url: (path) => get_path_on_api(clone_url(), path),
 		set_url: setPath
 	};
