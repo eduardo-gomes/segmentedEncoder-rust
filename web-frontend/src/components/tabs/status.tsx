@@ -25,26 +25,20 @@ function StatusTab(props: { visible: boolean }) {
 		console.debug("Request got:", res.status);
 	}
 
-	let timeout: undefined | number;
-	let should_rerun = false;
-
-	function rerun() {
-		clearTimeout(timeout);
-		if (should_rerun)
-			timeout = setTimeout(status_updater, 1000);
-	}
+	let waiting_last = false;
 
 	function status_updater() {
-		refresh().catch((e) => console.error("Failed to update status:", e)).finally(rerun);
+		if (waiting_last) return;//Ongoing request
+		waiting_last = true;
+		refresh().catch((e) => console.error("Failed to update status:", e)).finally(() => waiting_last = false);
 	}
 
 	createEffect(() => {
-		should_rerun = props.visible && is_connected();
-		if (should_rerun)
-			status_updater();
+		const should_run = props.visible && is_connected();
+		if (!should_run) return;
+		const interval = setInterval(status_updater, 1000);
 		onCleanup(() => {
-			should_rerun = false;
-			clearTimeout(timeout);
+			clearTimeout(interval);
 		});
 	});
 
