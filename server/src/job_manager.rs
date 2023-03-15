@@ -12,6 +12,8 @@ use crate::job_manager::old_task_scheduler::OldTaskScheduler;
 use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
+mod job_scheduler;
+
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
 #[async_trait]
