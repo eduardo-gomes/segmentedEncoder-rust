@@ -34,3 +34,20 @@ impl JobScheduler {
 		None
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use uuid::Uuid;
+
+	use crate::job_manager::job_scheduler::JobScheduler;
+	use crate::jobs::Job;
+
+	#[test]
+	fn new_job_scheduler_stores_uuid_passed_to_constructor() {
+		let job = Job::fake().into();
+		let uuid = Uuid::new_v4();
+		let scheduler = JobScheduler::new(job, uuid);
+
+		assert_eq!(scheduler.uuid, uuid);
+	}
+}
