@@ -51,6 +51,15 @@ impl Job {
 			segmenter: Segmenter::DoNotSegment,
 		}
 	}
+	///Simple job with non existent input
+	#[cfg(test)]
+	pub(crate) fn fake() -> Self {
+		Job {
+			source: Source::File(FileRef::fake()),
+			parameters: JobParams::sample_params(),
+			segmenter: Segmenter::DoNotSegment,
+		}
+	}
 }
 
 ///Struct containing all data used by client to execute a task.
