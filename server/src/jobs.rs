@@ -1,5 +1,7 @@
 use uuid::Uuid;
 
+pub(crate) use segmenter::Segmenter;
+
 use crate::storage::FileRef;
 
 #[derive(Clone, Debug)]
@@ -29,11 +31,7 @@ impl JobParams {
 	}
 }
 
-#[derive(Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-pub(crate) enum Segmenter {
-	DoNotSegment,
-}
+mod segmenter;
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
