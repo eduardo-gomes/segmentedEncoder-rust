@@ -2,27 +2,35 @@ import "./style.css"
 import StatusTab from "./components/tabs/status";
 import JobsTab from "./components/tabs/jobs";
 import ServerSelector from "./components/tabs/serverSelector";
-import { Tab, TabBar } from "./components/tabs";
+import { TabBar } from "./components/tabs";
 import { render } from "solid-js/web";
 import { createSignal } from "solid-js";
 import { ApiProvider } from "./lib/api";
 
+import { hashIntegration, Router } from "@solidjs/router";
+
 function App() {
 	const [statusActive, setStatusActive] = createSignal(false);
 	return (
-		<>
+		<Router source={hashIntegration()}>
 			<TabBar>
-				<Tab title={"Status"} onVisibilityChange={setStatusActive}>
-					<StatusTab visible={statusActive()}/>
-				</Tab>
-				<Tab title={"Jobs"}>
-					<JobsTab/>
-				</Tab>
-				<Tab title={"Server"}>
-					<ServerSelector/>
-				</Tab>
+				{[
+					{
+						title: "Status",
+						component: <StatusTab visible={statusActive()}/>,
+						visibilityChange: setStatusActive
+					},
+					{
+						title: "Jobs",
+						component: <JobsTab/>,
+					},
+					{
+						title: "Server",
+						component: <ServerSelector/>,
+					},
+				]}
 			</TabBar>
-		</>
+		</Router>
 	)
 }
 

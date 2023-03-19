@@ -1,57 +1,44 @@
-import type { Accessor, JSX, ParentComponent } from 'solid-js';
-import { children, createEffect, createSelector, createSignal, For, mapArray, Show } from "solid-js";
-import type { ResolvedJSXElement } from "solid-js/types/reactive/signal";
+import { A, Navigate, Route, Routes, useMatch } from '@solidjs/router';
+import type { JSX } from 'solid-js';
+import { createEffect, createMemo, For, mapArray } from "solid-js";
 
-type TabComponent = ParentComponent<{ title: string, onVisibilityChange?: (visible: boolean) => void }>;
-const Tab: TabComponent = function (props) {
-	const onVisibilityChange = (e: CustomEvent<{ visibility: boolean }>) =>
-		props.onVisibilityChange?.(e.detail.visibility);
-
-	return (
-		<div data-title={props.title} on:VisibilityChange={onVisibilityChange}>
-			{props.children}
-		</div>
-	);
+type TabElement = {
+	title: string,
+	component: JSX.Element,
+	visibilityChange?: (visible: boolean) => void
 };
 
-function TabBar(props: { children: JSX.Element[] }) {
-	const c = children(() => props.children) as Accessor<ResolvedJSXElement[]>;
-	const [tabs, setTabs] = createSignal<string[]>([]);
-	//Get tab names
-	createEffect(() => {
-		const tabs = c();
-		const names: string[] = tabs.map(item => (item as HTMLElement).dataset.title ?? "unnamed");
-		setTabs(names);
-	});
-	const [selected, setSelected] = createSignal(0);
-	const isSelected = createSelector(selected);
+function TabBar(props: { children: TabElement[] }) {
+	const c = createMemo(() => props.children);
 
-	//Track visibility and emit events to Tab
-	mapArray(c, (el, index) => {
+	//Track visibility and notify callback
+	mapArray(c, (el) => {
+		const match = useMatch(() => el.title);
 		createEffect(() => {
-			const visibility = isSelected(index());
-			const event = new CustomEvent("VisibilityChange", {detail: {visibility}});
-			if (el instanceof Element)
-				el.dispatchEvent(event);
+			const visibility = Boolean(match());
+			el.visibilityChange?.(visibility);
 		});
 	})();
 
 	return (
 		<>
 			<div class={"tabs"}>
-				<For each={tabs()}>
-					{(tab, index) =>
-						<button onClick={() => setSelected(index())}>{tab}</button>}
+				<For each={c()}>
+					{(tab) =>
+						<A href={tab.title}>
+							<button>{tab.title}</button>
+						</A>}
 				</For>
 			</div>
-			<For each={c() as ResolvedJSXElement[]}>
-				{(tab, index) =>
-					<Show when={isSelected(index())}>
-						{tab}
-					</Show>}
-			</For>
+			<Routes>
+				<Route path={"/*"} element={<Navigate href={"status"}/>}/>
+				<For each={c()}>
+					{(tab) =>
+						<Route path={tab.title} element={tab.component}/>}
+				</For>
+			</Routes>
 		</>
 	)
 }
 
-export { TabBar, Tab };
+export { TabBar };
