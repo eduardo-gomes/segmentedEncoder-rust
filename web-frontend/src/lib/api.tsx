@@ -1,5 +1,6 @@
 import type { Accessor, ParentProps, Setter, } from "solid-js";
 import { createContext, createEffect, createSignal, onCleanup } from "solid-js";
+import { router_extract_server_url } from "./router_util";
 
 function get_path_on_api(url: URL, path: string) {
 	url.pathname += path;
@@ -89,7 +90,8 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 
 export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	// eslint-disable-next-line solid/reactivity
-	const [path, setPath] = createSignal(props.url ?? fallback_url);
+	const url = router_extract_server_url() ?? props.url ?? fallback_url;
+	const [path, setPath] = createSignal(url);
 	// eslint-disable-next-line solid/reactivity
 	const version = versionWatcher(path);
 	const clone_url = () => new URL(path());

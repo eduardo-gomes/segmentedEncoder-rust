@@ -6,14 +6,12 @@ import { TabBar } from "./components/tabs";
 import StatusTab from "./components/tabs/status";
 import JobsTab from "./components/tabs/jobs";
 import ServerSelector from "./components/tabs/serverSelector";
-import { ApiExtractServer } from "./lib/apiExtractServer";
 
 export function App() {
 	const [statusActive, setStatusActive] = createSignal(false);
 	return (
-		<ApiProvider>
-			<Router source={hashIntegration()}>
-				<ApiExtractServer/>
+		<Router source={hashIntegration()}>
+			<ApiProvider>
 				<TabBar>
 					{[
 						{
@@ -31,7 +29,7 @@ export function App() {
 						},
 					]}
 				</TabBar>
-			</Router>
-		</ApiProvider>
+			</ApiProvider>
+		</Router>
 	)
 }
