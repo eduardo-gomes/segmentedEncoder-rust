@@ -14,7 +14,7 @@ impl Segmenter {
 	/// Will generate TaskInfos and SubJobs.
 	///
 	/// TaskInfo can be turned into a [Task](super::Task), and SubJob into a [Job]
-	fn segment(job: &Job) -> JobSegments {
+	pub fn segment(job: &Job) -> JobSegments {
 		match job.segmenter {
 			Segmenter::DoNotSegment => {
 				let task = TaskInfo {
@@ -27,13 +27,13 @@ impl Segmenter {
 	}
 }
 
-struct JobSegments {
+pub(crate) struct JobSegments {
 	tasks: Vec<TaskInfo>,
 }
 
-struct TaskInfo {
-	input: Source,
-	parameters: JobParams,
+pub(crate) struct TaskInfo {
+	pub(crate) input: Source,
+	pub(crate) parameters: JobParams,
 }
 
 #[cfg(test)]

@@ -31,7 +31,7 @@ impl JobParams {
 	}
 }
 
-mod segmenter;
+pub(crate) mod segmenter;
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
