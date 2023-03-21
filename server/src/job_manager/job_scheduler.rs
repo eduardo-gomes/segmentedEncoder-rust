@@ -16,13 +16,13 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::jobs::segmenter::TaskInfo;
-use crate::jobs::{Job, Source};
-use crate::storage::FileRef;
+use crate::jobs::{Job, Segmenter};
 
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	uuid: Uuid,
 	allocated: AtomicBool,
+	tasks: Vec<TaskInfo>,
 }
 
 pub struct AllocatedTask {
@@ -31,10 +31,13 @@ pub struct AllocatedTask {
 
 impl JobScheduler {
 	pub(super) fn new(job: Arc<Job>, uuid: Uuid) -> Self {
+		let tasks = Segmenter::segment(job.as_ref()).tasks;
+		let allocated = false.into();
 		Self {
 			job,
 			uuid,
-			allocated: false.into(),
+			allocated,
+			tasks,
 		}
 	}
 	/// Allocate tasks from the job
@@ -45,11 +48,10 @@ impl JobScheduler {
 	pub(super) async fn allocate(&self) -> Option<AllocatedTask> {
 		let old = self.allocated.swap(true, Ordering::AcqRel);
 		if !old {
-			let task_info = TaskInfo {
-				input: Source::File(FileRef::from(Uuid::nil())),
-				parameters: self.job.parameters.clone(),
-			};
-			Some(AllocatedTask { task: task_info })
+			self.tasks
+				.first()
+				.cloned()
+				.map(|task| AllocatedTask { task })
 		} else {
 			None
 		}

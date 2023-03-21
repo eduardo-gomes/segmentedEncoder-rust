@@ -28,9 +28,10 @@ impl Segmenter {
 }
 
 pub(crate) struct JobSegments {
-	tasks: Vec<TaskInfo>,
+	pub(crate) tasks: Vec<TaskInfo>,
 }
 
+#[derive(Clone)]
 pub(crate) struct TaskInfo {
 	pub(crate) input: Source,
 	pub(crate) parameters: JobParams,
