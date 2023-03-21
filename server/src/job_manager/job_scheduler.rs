@@ -18,11 +18,15 @@ use uuid::Uuid;
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 
+struct ScheduledTaskInfo {
+	allocated: AtomicBool,
+	task: TaskInfo,
+}
+
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	uuid: Uuid,
-	allocated: AtomicBool,
-	tasks: Vec<TaskInfo>,
+	tasks: Vec<ScheduledTaskInfo>,
 }
 
 pub struct AllocatedTask {
@@ -31,14 +35,15 @@ pub struct AllocatedTask {
 
 impl JobScheduler {
 	pub(super) fn new(job: Arc<Job>, uuid: Uuid) -> Self {
-		let tasks = Segmenter::segment(job.as_ref()).tasks;
-		let allocated = false.into();
-		Self {
-			job,
-			uuid,
-			allocated,
-			tasks,
-		}
+		let tasks = Segmenter::segment(job.as_ref())
+			.tasks
+			.into_iter()
+			.map(|info| ScheduledTaskInfo {
+				allocated: false.into(),
+				task: info,
+			})
+			.collect();
+		Self { job, uuid, tasks }
 	}
 	/// Allocate tasks from the job
 	///
@@ -46,15 +51,18 @@ impl JobScheduler {
 	///
 	/// The returned object contains all info the client needs to start processing
 	pub(super) async fn allocate(&self) -> Option<AllocatedTask> {
-		let old = self.allocated.swap(true, Ordering::AcqRel);
-		if !old {
-			self.tasks
-				.first()
-				.cloned()
-				.map(|task| AllocatedTask { task })
-		} else {
-			None
-		}
+		self.tasks
+			.first()
+			.and_then(|scheduled| {
+				let old = scheduled.allocated.swap(true, Ordering::AcqRel);
+				if !old {
+					Some(&scheduled.task)
+				} else {
+					None
+				}
+			})
+			.cloned()
+			.map(|task| AllocatedTask { task })
 	}
 }
 
