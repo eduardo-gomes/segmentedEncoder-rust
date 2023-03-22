@@ -1,4 +1,4 @@
-import { A, Navigate, Route, Routes, useMatch } from '@solidjs/router';
+import { A, Route, Routes, useMatch } from '@solidjs/router';
 import type { JSX } from 'solid-js';
 import { createEffect, createMemo, For, mapArray } from "solid-js";
 
@@ -8,14 +8,18 @@ type TabElement = {
 	visibilityChange?: (visible: boolean) => void
 };
 
-function TabBar(props: { children: TabElement[] }) {
+type NonEmptyArray<T> = [T, ...T[]];
+
+function TabBar(props: { children: NonEmptyArray<TabElement> }) {
 	const c = createMemo(() => props.children);
 
+	const match_root = useMatch(() => "");
 	//Track visibility and notify callback
-	mapArray(c, (el) => {
+	mapArray(c, (el, i) => {
 		const match = useMatch(() => el.title);
 		createEffect(() => {
-			const visibility = Boolean(match());
+			const root_vis = i() === 0 ? Boolean(match_root()) : false;
+			const visibility = Boolean(match()) || root_vis;
 			el.visibilityChange?.(visibility);
 		});
 	})();
@@ -31,7 +35,7 @@ function TabBar(props: { children: TabElement[] }) {
 				</For>
 			</div>
 			<Routes>
-				<Route path={"/*"} element={<Navigate href={"status"}/>}/>
+				<Route path={"/"} element={c()[0].component}/>
 				<For each={c()}>
 					{(tab) =>
 						<Route path={tab.title} element={tab.component}/>}
