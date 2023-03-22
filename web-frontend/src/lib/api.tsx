@@ -4,7 +4,7 @@ import { router_extract_server_url } from "./router_util";
 
 function get_path_on_api(url: URL, path: string) {
 	url.pathname += path;
-	console.debug(url);
+	console.debug("Get path to", path, url);
 	return url;
 }
 

@@ -1,10 +1,9 @@
 import { useSearchParams } from "@solidjs/router";
 
-/** Get server from search params, set as server and clear server param*/
+/** Get server from search params and set as server*/
 export function router_extract_server_url(): URL | undefined {
-	const [params, setParams] = useSearchParams();
+	const [params] = useSearchParams();
 	const search = params["server"];
 	if (!search) return undefined;
-	setParams({server: undefined});
 	return new URL(search);
 }
