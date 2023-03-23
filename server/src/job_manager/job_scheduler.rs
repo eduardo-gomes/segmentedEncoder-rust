@@ -13,8 +13,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use uuid::Uuid;
-
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 
@@ -22,6 +20,7 @@ struct ScheduledTaskInfo {
 	allocated: AtomicBool,
 	task: TaskInfo,
 }
+
 impl ScheduledTaskInfo {
 	///Check if task is available, and return an [AllocatedTask] tracking this task allocation
 	fn allocate(self: &Arc<Self>) -> Option<AllocatedTask> {
@@ -37,7 +36,6 @@ impl ScheduledTaskInfo {
 
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
-	uuid: Uuid,
 	tasks: Vec<Arc<ScheduledTaskInfo>>,
 }
 
@@ -62,7 +60,7 @@ impl Drop for AllocatedTask {
 }
 
 impl JobScheduler {
-	pub(super) fn new(job: Arc<Job>, uuid: Uuid) -> Self {
+	pub(super) fn new(job: Arc<Job>) -> Self {
 		let tasks = Segmenter::segment(job.as_ref())
 			.tasks
 			.into_iter()
@@ -74,7 +72,7 @@ impl JobScheduler {
 				.into()
 			})
 			.collect();
-		Self { job, uuid, tasks }
+		Self { job, tasks }
 	}
 	/// Allocate tasks from the job
 	///
@@ -90,25 +88,13 @@ impl JobScheduler {
 mod test {
 	use std::sync::Arc;
 
-	use uuid::Uuid;
-
 	use crate::job_manager::job_scheduler::JobScheduler;
 	use crate::jobs::Job;
-
-	#[test]
-	fn new_job_scheduler_stores_uuid_passed_to_constructor() {
-		let job = Job::fake().into();
-		let uuid = Uuid::new_v4();
-		let scheduler = JobScheduler::new(job, uuid);
-
-		assert_eq!(scheduler.uuid, uuid);
-	}
 
 	#[tokio::test]
 	async fn do_not_segment_job_allocate_return_some() {
 		let job = Job::fake().into();
-		let uuid = Uuid::new_v4();
-		let scheduler = JobScheduler::new(job, uuid);
+		let scheduler = JobScheduler::new(job);
 		let allocated = scheduler.allocate().await;
 
 		assert!(allocated.is_some());
@@ -117,8 +103,7 @@ mod test {
 	#[tokio::test]
 	async fn do_not_segment_job_allocate_return_only_once() {
 		let job = Job::fake().into();
-		let uuid = Uuid::new_v4();
-		let scheduler = JobScheduler::new(job, uuid);
+		let scheduler = JobScheduler::new(job);
 		let _allocated = scheduler.allocate().await;
 		let allocated = scheduler.allocate().await;
 
@@ -128,8 +113,7 @@ mod test {
 	#[tokio::test]
 	async fn allocated_job_will_be_available_again_after_allocated_destruction() {
 		let job = Job::fake().into();
-		let uuid = Uuid::new_v4();
-		let scheduler = JobScheduler::new(job, uuid);
+		let scheduler = JobScheduler::new(job);
 		{
 			let allocated = scheduler.allocate().await;
 			let none_allocated = scheduler.allocate().await;
@@ -148,8 +132,7 @@ mod test {
 	#[tokio::test]
 	async fn do_not_segment_job_allocatd_has_same_job_parameters() {
 		let job: Arc<_> = Job::fake().into();
-		let uuid = Uuid::new_v4();
-		let scheduler = JobScheduler::new(job.clone(), uuid);
+		let scheduler = JobScheduler::new(job.clone());
 		let allocated = scheduler.allocate().await.expect("Should be available");
 		assert_eq!(allocated.as_task().parameters, job.parameters);
 	}
