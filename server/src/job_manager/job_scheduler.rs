@@ -26,11 +26,27 @@ struct ScheduledTaskInfo {
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	uuid: Uuid,
-	tasks: Vec<ScheduledTaskInfo>,
+	tasks: Vec<Arc<ScheduledTaskInfo>>,
 }
 
+///Marks an allocated task
+///
+/// This object keeps the task allocated until it is dropped.
+/// Also allow access to the allocated task
 pub struct AllocatedTask {
-	task: TaskInfo,
+	scheduled: Arc<ScheduledTaskInfo>,
+}
+
+impl AllocatedTask {
+	fn as_task(&self) -> &TaskInfo {
+		&self.scheduled.task
+	}
+}
+
+impl Drop for AllocatedTask {
+	fn drop(&mut self) {
+		self.scheduled.allocated.store(false, Ordering::Release);
+	}
 }
 
 impl JobScheduler {
@@ -38,9 +54,12 @@ impl JobScheduler {
 		let tasks = Segmenter::segment(job.as_ref())
 			.tasks
 			.into_iter()
-			.map(|info| ScheduledTaskInfo {
-				allocated: false.into(),
-				task: info,
+			.map(|info| {
+				ScheduledTaskInfo {
+					allocated: false.into(),
+					task: info,
+				}
+				.into()
 			})
 			.collect();
 		Self { job, uuid, tasks }
@@ -56,13 +75,13 @@ impl JobScheduler {
 			.and_then(|scheduled| {
 				let old = scheduled.allocated.swap(true, Ordering::AcqRel);
 				if !old {
-					Some(&scheduled.task)
+					Some(scheduled)
 				} else {
 					None
 				}
 			})
 			.cloned()
-			.map(|task| AllocatedTask { task })
+			.map(|scheduled| AllocatedTask { scheduled })
 	}
 }
 
@@ -106,11 +125,31 @@ mod test {
 	}
 
 	#[tokio::test]
+	async fn allocated_job_will_be_available_again_after_allocated_destruction() {
+		let job = Job::fake().into();
+		let uuid = Uuid::new_v4();
+		let scheduler = JobScheduler::new(job, uuid);
+		{
+			let allocated = scheduler.allocate().await;
+			let none_allocated = scheduler.allocate().await;
+			assert!(
+				allocated.is_some() && none_allocated.is_none(),
+				"Second should not be allocated"
+			);
+		}
+		let allocated = scheduler.allocate().await;
+		assert!(
+			allocated.is_some(),
+			"Should be allocated after first get destructed"
+		);
+	}
+
+	#[tokio::test]
 	async fn do_not_segment_job_allocatd_has_same_job_parameters() {
 		let job: Arc<_> = Job::fake().into();
 		let uuid = Uuid::new_v4();
 		let scheduler = JobScheduler::new(job.clone(), uuid);
 		let allocated = scheduler.allocate().await.expect("Should be available");
-		assert_eq!(allocated.task.parameters, job.parameters);
+		assert_eq!(allocated.as_task().parameters, job.parameters);
 	}
 }
