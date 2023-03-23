@@ -22,6 +22,18 @@ struct ScheduledTaskInfo {
 	allocated: AtomicBool,
 	task: TaskInfo,
 }
+impl ScheduledTaskInfo {
+	///Check if task is available, and return an [AllocatedTask] tracking this task allocation
+	fn allocate(self: &Arc<Self>) -> Option<AllocatedTask> {
+		let allocated = self.allocated.swap(true, Ordering::AcqRel);
+		match allocated {
+			false => Some(AllocatedTask {
+				scheduled: self.clone(),
+			}),
+			true => None,
+		}
+	}
+}
 
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
@@ -70,18 +82,7 @@ impl JobScheduler {
 	///
 	/// The returned object contains all info the client needs to start processing
 	pub(super) async fn allocate(&self) -> Option<AllocatedTask> {
-		self.tasks
-			.first()
-			.and_then(|scheduled| {
-				let old = scheduled.allocated.swap(true, Ordering::AcqRel);
-				if !old {
-					Some(scheduled)
-				} else {
-					None
-				}
-			})
-			.cloned()
-			.map(|scheduled| AllocatedTask { scheduled })
+		self.tasks.first().and_then(ScheduledTaskInfo::allocate)
 	}
 }
 
