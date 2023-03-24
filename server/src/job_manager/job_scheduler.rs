@@ -10,8 +10,12 @@
 //! - **Post-execution**: Useful to merge all the artifacts into a single file
 //!
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
+
+use tokio::sync::RwLock;
+use uuid::Uuid;
 
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
@@ -37,6 +41,7 @@ impl ScheduledTaskInfo {
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	tasks: Vec<Arc<ScheduledTaskInfo>>,
+	allocated: RwLock<HashMap<Uuid, Weak<AllocatedTask>>>,
 }
 
 ///Marks an allocated task
@@ -72,21 +77,52 @@ impl JobScheduler {
 				.into()
 			})
 			.collect();
-		Self { job, tasks }
+		let allocated = Default::default();
+		Self {
+			job,
+			tasks,
+			allocated,
+		}
 	}
 	/// Allocate tasks from the job
 	///
 	/// This function will not wait for tasks to be available.
 	///
 	/// The returned object contains all info the client needs to start processing
-	pub(super) async fn allocate(&self) -> Option<AllocatedTask> {
-		self.tasks.first().and_then(ScheduledTaskInfo::allocate)
+	pub(super) async fn allocate(&self) -> Option<(Uuid, Arc<AllocatedTask>)> {
+		let allocated = self.tasks.first().and_then(ScheduledTaskInfo::allocate);
+		match allocated {
+			None => None,
+			Some(allocated) => {
+				let id = Uuid::new_v4();
+				let allocated = Arc::new(allocated);
+				self.allocated
+					.write()
+					.await
+					.insert(id, Arc::downgrade(&allocated));
+				Some((id, allocated))
+			}
+		}
+	}
+	/// Get allocated task from its id
+	///
+	/// While the task is allocated, JobScheduler will keep a reference to it and its id.
+	/// This allows other parts to get access to the allocated task
+	pub(crate) async fn get_allocated(&self, uuid: &Uuid) -> Option<Arc<AllocatedTask>> {
+		self.allocated
+			.read()
+			.await
+			.get(uuid)
+			.map(Weak::upgrade)
+			.unwrap_or_default()
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use std::sync::Arc;
+
+	use uuid::Uuid;
 
 	use crate::job_manager::job_scheduler::JobScheduler;
 	use crate::jobs::Job;
@@ -98,6 +134,35 @@ mod test {
 		let allocated = scheduler.allocate().await;
 
 		assert!(allocated.is_some());
+	}
+
+	#[tokio::test]
+	async fn allocated_task_has_id() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (id, _allocated): (Uuid, _) = scheduler.allocate().await.expect("Should allocate");
+
+		assert!(!id.is_nil());
+	}
+
+	#[tokio::test]
+	async fn access_allocated_task_from_id() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (id, allocated): (Uuid, _) = scheduler.allocate().await.expect("Should allocate");
+
+		let got = scheduler.get_allocated(&id).await.expect("Should find");
+		assert!(Arc::ptr_eq(&got, &allocated));
+	}
+
+	#[tokio::test]
+	async fn access_allocated_with_invalid_id_returns_none() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+
+		let uuid = Uuid::from_u64_pair(123, 123);
+		let got = scheduler.get_allocated(&uuid).await;
+		assert!(got.is_none());
 	}
 
 	#[tokio::test]
@@ -133,7 +198,7 @@ mod test {
 	async fn do_not_segment_job_allocatd_has_same_job_parameters() {
 		let job: Arc<_> = Job::fake().into();
 		let scheduler = JobScheduler::new(job.clone());
-		let allocated = scheduler.allocate().await.expect("Should be available");
+		let (_, allocated) = scheduler.allocate().await.expect("Should be available");
 		assert_eq!(allocated.as_task().parameters, job.parameters);
 	}
 }
