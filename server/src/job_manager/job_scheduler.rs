@@ -44,6 +44,135 @@ pub(crate) struct JobScheduler {
 	allocated: RwLock<HashMap<Uuid, Weak<AllocatedTask>>>,
 }
 
+mod allocator {
+	//!Allocata and deallocate tasks with RAII idiom
+	//!
+	//! This provides a HashMap to weak references.
+	//! When the weakly referenced object gets dropped, the associated entry in the map is removed.
+
+	use std::collections::HashMap;
+	use std::ops::Deref;
+	use std::sync::{Arc, Weak};
+
+	use futures::executor::block_on;
+	use tokio::sync::RwLock;
+	use uuid::Uuid;
+
+	struct WeakMapEntry<T> {
+		value: T,
+		id: Uuid,
+		map: Weak<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
+	}
+
+	impl<T> Drop for WeakMapEntry<T> {
+		fn drop(&mut self) {
+			if let Some(map) = self.map.upgrade() {
+				block_on(async { map.write().await.remove(&self.id) });
+			}
+		}
+	}
+
+	impl<T> Deref for WeakMapEntry<T> {
+		type Target = T;
+
+		fn deref(&self) -> &Self::Target {
+			&self.value
+		}
+	}
+
+	struct WeakUuidMap<T> {
+		map: Arc<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
+	}
+
+	impl<T> WeakUuidMap<T> {
+		pub fn new() -> Self {
+			Self {
+				map: Default::default(),
+			}
+		}
+		pub async fn len(&self) -> usize {
+			self.map.read().await.len()
+		}
+		pub async fn is_empty(&self) -> bool {
+			self.map.read().await.is_empty()
+		}
+		pub async fn insert(&self, value: T) -> (Uuid, Arc<WeakMapEntry<T>>) {
+			let id = Uuid::new_v4();
+			let entry = Arc::new(WeakMapEntry {
+				value,
+				map: Arc::downgrade(&self.map),
+				id,
+			});
+			self.map.write().await.insert(id, Arc::downgrade(&entry));
+			(id, entry)
+		}
+		pub async fn get(&self, id: &Uuid) -> Option<Arc<WeakMapEntry<T>>> {
+			self.map
+				.read()
+				.await
+				.get(id)
+				.and_then(|weak| weak.upgrade())
+		}
+	}
+
+	#[cfg(test)]
+	mod test {
+		use std::sync::Arc;
+
+		use uuid::Uuid;
+
+		use crate::job_manager::job_scheduler::allocator::WeakUuidMap;
+
+		#[tokio::test]
+		async fn new_weak_map_len_is_zero_and_is_empty() {
+			let weak_map = WeakUuidMap::<()>::new();
+			assert_eq!(weak_map.len().await, 0);
+			assert!(weak_map.is_empty().await);
+		}
+
+		#[tokio::test]
+		async fn weak_map_insert_arc_returns_uuid() {
+			let weak_map = WeakUuidMap::<()>::new();
+			let (id, arc): (Uuid, _) = weak_map.insert(()).await;
+			assert!(!id.is_nil());
+		}
+
+		#[tokio::test]
+		async fn weak_map_after_insert_is_not_empty() {
+			let weak_map = WeakUuidMap::<()>::new();
+			let (_, arc) = weak_map.insert(()).await;
+			assert!(!weak_map.is_empty().await);
+			assert_eq!(weak_map.len().await, 1);
+		}
+
+		#[tokio::test]
+		async fn weak_map_get_unknow_id_returns_none() {
+			let weak_map = WeakUuidMap::<()>::new();
+			let id = Uuid::new_v4();
+
+			let got = weak_map.get(&id).await;
+			assert!(got.is_none());
+		}
+
+		#[tokio::test]
+		async fn weak_map_get_arc_from_id() {
+			let weak_map = WeakUuidMap::<()>::new();
+			let (id, arc) = weak_map.insert(()).await;
+
+			let got = weak_map.get(&id).await.expect("Should get");
+			assert!(Arc::ptr_eq(&got, &arc));
+		}
+
+		#[tokio::test]
+		async fn weak_map_after_droping_arc_is_empty() {
+			let weak_map = WeakUuidMap::<()>::new();
+			let (_, arc) = weak_map.insert(()).await;
+			drop(arc);
+			assert!(weak_map.is_empty().await);
+		}
+	}
+}
+
 ///Marks an allocated task
 ///
 /// This object keeps the task allocated until it is dropped.
