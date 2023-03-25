@@ -64,6 +64,8 @@ mod allocator {
 		map: Weak<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
 	}
 
+	struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
+
 	impl<T> Drop for WeakMapEntry<T> {
 		fn drop(&mut self) {
 			if let Some(map) = self.map.upgrade() {
@@ -72,11 +74,11 @@ mod allocator {
 		}
 	}
 
-	impl<T> Deref for WeakMapEntry<T> {
+	impl<T> Deref for WeakMapEntryArc<T> {
 		type Target = T;
 
 		fn deref(&self) -> &Self::Target {
-			&self.value
+			&self.0.value
 		}
 	}
 
@@ -96,7 +98,7 @@ mod allocator {
 		pub async fn is_empty(&self) -> bool {
 			self.map.read().await.is_empty()
 		}
-		pub async fn insert(&self, value: T) -> (Uuid, Arc<WeakMapEntry<T>>) {
+		pub async fn insert(&self, value: T) -> (Uuid, WeakMapEntryArc<T>) {
 			let id = Uuid::new_v4();
 			let entry = Arc::new(WeakMapEntry {
 				value,
@@ -104,20 +106,21 @@ mod allocator {
 				id,
 			});
 			self.map.write().await.insert(id, Arc::downgrade(&entry));
-			(id, entry)
+			(id, WeakMapEntryArc(entry))
 		}
-		pub async fn get(&self, id: &Uuid) -> Option<Arc<WeakMapEntry<T>>> {
+		pub async fn get(&self, id: &Uuid) -> Option<WeakMapEntryArc<T>> {
 			self.map
 				.read()
 				.await
 				.get(id)
 				.and_then(|weak| weak.upgrade())
+				.map(WeakMapEntryArc)
 		}
 	}
 
 	#[cfg(test)]
 	mod test {
-		use std::sync::Arc;
+		use std::ptr;
 
 		use uuid::Uuid;
 
@@ -160,7 +163,7 @@ mod allocator {
 			let (id, arc) = weak_map.insert(()).await;
 
 			let got = weak_map.get(&id).await.expect("Should get");
-			assert!(Arc::ptr_eq(&got, &arc));
+			assert!(ptr::eq(&*got, &*arc));
 		}
 
 		#[tokio::test]
