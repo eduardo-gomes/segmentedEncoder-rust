@@ -118,6 +118,10 @@ impl JobScheduler {
 			.map(Weak::upgrade)
 			.unwrap_or_default()
 	}
+
+	pub async fn allocated_count(&self) -> usize {
+		self.allocated.read().await.len()
+	}
 }
 
 #[cfg(test)]
@@ -202,5 +206,21 @@ mod test {
 		let scheduler = JobScheduler::new(job.clone());
 		let (_, allocated) = scheduler.allocate().await.expect("Should be available");
 		assert_eq!(allocated.as_task().parameters, job.parameters);
+	}
+
+	#[tokio::test]
+	async fn new_scheduler_has_zero_allocated_tasks() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		assert_eq!(scheduler.allocated_count().await, 0);
+	}
+
+	#[tokio::test]
+	async fn allocate_increments_allocated_count() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let _allocated = scheduler.allocate().await.expect("Should allocate");
+
+		assert_eq!(scheduler.allocated_count().await, 1);
 	}
 }
