@@ -17,7 +17,7 @@ struct WeakMapEntry<T> {
 	map: Weak<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
 }
 
-struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
+pub struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
 
 impl<T> Drop for WeakMapEntry<T> {
 	fn drop(&mut self) {
@@ -35,7 +35,7 @@ impl<T> Deref for WeakMapEntryArc<T> {
 	}
 }
 
-struct WeakUuidMap<T> {
+pub struct WeakUuidMap<T> {
 	map: Arc<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
 }
 

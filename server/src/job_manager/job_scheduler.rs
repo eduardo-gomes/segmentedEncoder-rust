@@ -10,13 +10,12 @@
 //! - **Post-execution**: Useful to merge all the artifacts into a single file
 //!
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use crate::job_manager::job_scheduler::allocator::{WeakMapEntryArc, WeakUuidMap};
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 
@@ -43,7 +42,7 @@ impl ScheduledTaskInfo {
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	tasks: Vec<Arc<ScheduledTaskInfo>>,
-	allocated: RwLock<HashMap<Uuid, Weak<AllocatedTask>>>,
+	allocated: WeakUuidMap<AllocatedTask>,
 }
 
 ///Marks an allocated task
@@ -79,7 +78,7 @@ impl JobScheduler {
 				.into()
 			})
 			.collect();
-		let allocated = Default::default();
+		let allocated = WeakUuidMap::new();
 		Self {
 			job,
 			tasks,
@@ -91,18 +90,13 @@ impl JobScheduler {
 	/// This function will not wait for tasks to be available.
 	///
 	/// The returned object contains all info the client needs to start processing
-	pub(super) async fn allocate(&self) -> Option<(Uuid, Arc<AllocatedTask>)> {
+	pub(super) async fn allocate(&self) -> Option<(Uuid, WeakMapEntryArc<AllocatedTask>)> {
 		let allocated = self.tasks.first().and_then(ScheduledTaskInfo::allocate);
 		match allocated {
 			None => None,
 			Some(allocated) => {
-				let id = Uuid::new_v4();
-				let allocated = Arc::new(allocated);
-				self.allocated
-					.write()
-					.await
-					.insert(id, Arc::downgrade(&allocated));
-				Some((id, allocated))
+				let (id, arc) = self.allocated.insert(allocated).await;
+				Some((id, arc))
 			}
 		}
 	}
@@ -110,22 +104,21 @@ impl JobScheduler {
 	///
 	/// While the task is allocated, JobScheduler will keep a reference to it and its id.
 	/// This allows other parts to get access to the allocated task
-	pub(crate) async fn get_allocated(&self, uuid: &Uuid) -> Option<Arc<AllocatedTask>> {
-		self.allocated
-			.read()
-			.await
-			.get(uuid)
-			.map(Weak::upgrade)
-			.unwrap_or_default()
+	pub(crate) async fn get_allocated(
+		&self,
+		uuid: &Uuid,
+	) -> Option<WeakMapEntryArc<AllocatedTask>> {
+		self.allocated.get(uuid).await
 	}
 
 	pub async fn allocated_count(&self) -> usize {
-		self.allocated.read().await.len()
+		self.allocated.len().await
 	}
 }
 
 #[cfg(test)]
 mod test {
+	use std::ptr;
 	use std::sync::Arc;
 
 	use uuid::Uuid;
@@ -158,7 +151,7 @@ mod test {
 		let (id, allocated): (Uuid, _) = scheduler.allocate().await.expect("Should allocate");
 
 		let got = scheduler.get_allocated(&id).await.expect("Should find");
-		assert!(Arc::ptr_eq(&got, &allocated));
+		assert!(ptr::eq(&*got, &*allocated));
 	}
 
 	#[tokio::test]
@@ -222,5 +215,15 @@ mod test {
 		let _allocated = scheduler.allocate().await.expect("Should allocate");
 
 		assert_eq!(scheduler.allocated_count().await, 1);
+	}
+
+	#[tokio::test]
+	async fn droping_allocated_decrements_allocated_count() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let allocated = scheduler.allocate().await.expect("Should allocate");
+		assert_eq!(scheduler.allocated_count().await, 1);
+		drop(allocated);
+		assert_eq!(scheduler.allocated_count().await, 0);
 	}
 }
