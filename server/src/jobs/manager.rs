@@ -1,3 +1,5 @@
+//! Manages jobs and job's tasks. Allocate, restart, and provide access to tasks from each job
+
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io;
@@ -8,11 +10,11 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::old_task_scheduler::OldTaskScheduler;
+use crate::jobs::manager::old_task_scheduler::OldTaskScheduler;
 use crate::jobs::{Job, JobParams, Source, Task};
 use crate::storage::{stream, Storage};
 
-mod job_scheduler;
+mod scheduler;
 
 pub(crate) type JobManagerLock = RwLock<JobManager>;
 
@@ -111,7 +113,7 @@ mod test {
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
-	use crate::job_manager::{JobManager, JobManagerUtils};
+	use crate::jobs::manager::{JobManager, JobManagerUtils};
 	use crate::jobs::{Job, JobParams, Source, Task};
 	use crate::storage::FileRef;
 	use crate::{Storage, WEBM_SAMPLE};

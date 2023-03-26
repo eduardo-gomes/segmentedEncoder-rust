@@ -4,6 +4,9 @@ pub(crate) use segmenter::Segmenter;
 
 use crate::storage::FileRef;
 
+#[allow(dead_code)]
+pub(crate) mod manager;
+
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct JobParams {
@@ -49,7 +52,7 @@ impl Job {
 			segmenter: Segmenter::DoNotSegment,
 		}
 	}
-	///Simple job with non existent input
+	///Simple job with non-existent input
 	#[cfg(test)]
 	pub(crate) fn fake() -> Self {
 		Job {

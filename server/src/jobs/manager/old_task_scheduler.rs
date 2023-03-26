@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::job_manager::old_task_scheduler::old_job_segmenter::{
+use crate::jobs::manager::old_task_scheduler::old_job_segmenter::{
 	OldJobSegmenter, OldSegmentAllocation,
 };
 use crate::jobs::{Job, JobParams, Task};
@@ -132,7 +132,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::old_task_scheduler::OldTaskScheduler;
+	use crate::jobs::manager::old_task_scheduler::OldTaskScheduler;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 

@@ -7,7 +7,7 @@ use axum::{Extension, Router};
 use hyper::{Body, Response, StatusCode};
 use uuid::Uuid;
 
-use crate::job_manager::{JobManagerLock, JobManagerUtils};
+use crate::jobs::manager::{JobManagerLock, JobManagerUtils};
 use crate::jobs::{JobParams, Source};
 use crate::storage::stream::read_to_stream;
 use crate::storage::FileRef;
@@ -173,7 +173,7 @@ mod test {
 	fn make_service() -> (Router<(), Body>, Arc<State>) {
 		use crate::web;
 		let state = {
-			use crate::job_manager::JobManager;
+			use crate::jobs::manager::JobManager;
 			use tokio::sync::RwLock;
 			let storage = Storage::new().unwrap();
 			let manager_lock = RwLock::new(JobManager::new(storage));

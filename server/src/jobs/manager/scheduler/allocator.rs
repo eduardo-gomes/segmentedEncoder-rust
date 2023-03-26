@@ -77,7 +77,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::job_scheduler::allocator::WeakUuidMap;
+	use crate::jobs::manager::scheduler::allocator::WeakUuidMap;
 
 	#[tokio::test]
 	async fn new_weak_map_len_is_zero_and_is_empty() {

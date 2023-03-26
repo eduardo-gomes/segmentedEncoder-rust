@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use tower::make::Shared;
 
 use crate::client_interface::{ServiceLock, ServiceWithAuth};
-use crate::job_manager::{JobManager, JobManagerLock};
+use crate::jobs::manager::{JobManager, JobManagerLock};
 use crate::storage::Storage;
 
 #[allow(dead_code)] //until we use
@@ -52,9 +52,6 @@ pub fn make_multiplexed_service(
 mod storage;
 
 mod jobs;
-
-#[allow(dead_code)]
-mod job_manager;
 
 //Sample webm file, to use on tests
 #[cfg(test)]

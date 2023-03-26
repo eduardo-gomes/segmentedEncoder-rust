@@ -303,7 +303,7 @@ mod test {
 	}
 
 	fn new_state() -> Arc<State> {
-		use crate::job_manager::JobManager;
+		use crate::jobs::manager::JobManager;
 		use crate::storage::Storage;
 		let manager = JobManager::new(Storage::new().unwrap()).into();
 		State::new(manager, Service::new().into_lock())

@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::job_manager::job_scheduler::allocator::{WeakMapEntryArc, WeakUuidMap};
+use crate::jobs::manager::scheduler::allocator::{WeakMapEntryArc, WeakUuidMap};
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 
@@ -123,7 +123,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::job_scheduler::JobScheduler;
+	use crate::jobs::manager::scheduler::JobScheduler;
 	use crate::jobs::Job;
 
 	#[tokio::test]

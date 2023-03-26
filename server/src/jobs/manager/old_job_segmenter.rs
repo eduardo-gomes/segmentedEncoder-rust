@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::OnceCell;
 use uuid::Uuid;
 
-use crate::job_manager::old_task_scheduler::Segment;
+use crate::jobs::manager::old_task_scheduler::Segment;
 use crate::jobs::Job;
 use crate::storage::FileRef;
 
@@ -144,7 +144,7 @@ mod test {
 
 	use uuid::Uuid;
 
-	use crate::job_manager::old_task_scheduler::old_job_segmenter::OldJobSegmenter;
+	use crate::jobs::manager::old_task_scheduler::old_job_segmenter::OldJobSegmenter;
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 
