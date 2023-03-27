@@ -49,6 +49,9 @@ pub(crate) struct JobScheduler {
 	allocated: WeakUuidMap<AllocatedTask>,
 }
 
+/// Reference coutnting pointer to [AllocatedTask] inside a [WeakUuidMap]
+pub type AllocatedTaskRef = WeakMapEntryArc<AllocatedTask>;
+
 #[derive(Debug)] //Derive debug for temporary log
 ///Marks an allocated task
 ///
@@ -57,7 +60,6 @@ pub(crate) struct JobScheduler {
 pub struct AllocatedTask {
 	scheduled: Arc<ScheduledTaskInfo>,
 }
-pub type AllocatedTaskRef = WeakMapEntryArc<AllocatedTask>;
 
 impl AllocatedTask {
 	pub(crate) fn as_task(&self) -> &TaskInfo {
@@ -96,7 +98,7 @@ impl JobScheduler {
 	/// This function will not wait for tasks to be available.
 	///
 	/// The returned object contains all info the client needs to start processing
-	pub(super) async fn allocate(&self) -> Option<(Uuid, WeakMapEntryArc<AllocatedTask>)> {
+	pub(super) async fn allocate(&self) -> Option<(Uuid, AllocatedTaskRef)> {
 		let allocated = self.tasks.first().and_then(ScheduledTaskInfo::allocate);
 		match allocated {
 			None => None,
@@ -110,10 +112,7 @@ impl JobScheduler {
 	///
 	/// While the task is allocated, JobScheduler will keep a reference to it and its id.
 	/// This allows other parts to get access to the allocated task
-	pub(crate) async fn get_allocated(
-		&self,
-		uuid: &Uuid,
-	) -> Option<WeakMapEntryArc<AllocatedTask>> {
+	pub(crate) async fn get_allocated(&self, uuid: &Uuid) -> Option<AllocatedTaskRef> {
 		self.allocated.get(uuid).await
 	}
 

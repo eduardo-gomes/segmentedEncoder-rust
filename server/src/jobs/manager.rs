@@ -10,10 +10,8 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-pub(crate) use scheduler::AllocatedTask;
 pub(crate) use scheduler::AllocatedTaskRef;
 pub(crate) use scheduler::JobScheduler;
-pub(crate) use scheduler::WeakMapEntryArc;
 
 use crate::jobs::{Job, JobParams, Source};
 use crate::storage::{stream, Storage};
@@ -101,7 +99,7 @@ impl JobManager {
 		self.map.len()
 	}
 
-	pub(crate) async fn allocate(&self) -> Option<(TaskId, WeakMapEntryArc<AllocatedTask>)> {
+	pub(crate) async fn allocate(&self) -> Option<(TaskId, AllocatedTaskRef)> {
 		{
 			for (job_id, scheduler) in self.map.iter() {
 				let allocated = scheduler.allocate().await;
@@ -143,8 +141,7 @@ mod test {
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
-	use crate::jobs::manager::scheduler::WeakMapEntryArc;
-	use crate::jobs::manager::{AllocatedTask, JobManager, JobManagerUtils};
+	use crate::jobs::manager::{AllocatedTaskRef, JobManager, JobManagerUtils};
 	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 	use crate::{Storage, WEBM_SAMPLE};
@@ -261,7 +258,7 @@ mod test {
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let (_, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
+		let (_, task): (_, AllocatedTaskRef) = manager.allocate().await.unwrap();
 		dbg!(task);
 	}
 
@@ -271,7 +268,7 @@ mod test {
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let (id, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
+		let (id, task): (_, AllocatedTaskRef) = manager.allocate().await.unwrap();
 
 		let got_from_id = manager
 			.get_task_scheduler(&id.job)
@@ -318,7 +315,7 @@ mod test {
 		let mut manager = make_job_manager();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		let (job_id, _) = manager.add_job(job);
-		let (id, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
+		let (id, task): (_, AllocatedTaskRef) = manager.allocate().await.unwrap();
 		let scheduler = manager.get_task_scheduler(&job_id).unwrap();
 		let got_task = scheduler
 			.get_allocated(&id.task)

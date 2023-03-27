@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
 pub(crate) use grpc_service::ServiceLock;
 
-use crate::jobs::manager::{AllocatedTask, AllocatedTaskRef, TaskId, WeakMapEntryArc};
+use crate::jobs::manager::{AllocatedTaskRef, TaskId};
 use crate::State;
 
 #[derive(Debug)]
@@ -83,21 +83,17 @@ impl Service {
 	pub(crate) fn request_task(
 		&self,
 		client: &Uuid,
-	) -> Result<impl Future<Output = Option<(TaskId, WeakMapEntryArc<AllocatedTask>)>>, &'static str>
-	{
+	) -> Result<impl Future<Output = Option<(TaskId, AllocatedTaskRef)>>, &'static str> {
 		let client = self.clients.get(client).ok_or("Invalid client")?.clone();
-
 		//The future owns the upgraded arc, write may be locked outside the ServiceLock
-		self.state
-			.upgrade()
-			.ok_or("Service was dropped!")
-			.map(|service| async move {
-				let allocated = service.manager.write().await.allocate().await;
-				if let Some((_, allocated)) = &allocated {
-					client.allocated.write().await.push(allocated.clone());
-				}
-				allocated
-			})
+		let service = self.state.upgrade().ok_or("Service was dropped!")?;
+		Ok(async move {
+			let allocated = service.manager.write().await.allocate().await;
+			if let Some((_, allocated)) = &allocated {
+				client.allocated.write().await.push(allocated.clone());
+			}
+			allocated
+		})
 	}
 
 	pub(crate) fn new() -> Self {
