@@ -326,6 +326,3 @@ mod test {
 		assert!(ptr::eq(got_task.deref(), task.deref()));
 	}
 }
-
-#[deprecated]
-mod old_task_scheduler;
