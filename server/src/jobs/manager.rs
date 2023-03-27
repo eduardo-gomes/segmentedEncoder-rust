@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub(crate) use scheduler::AllocatedTask;
+pub(crate) use scheduler::AllocatedTaskRef;
 pub(crate) use scheduler::JobScheduler;
 pub(crate) use scheduler::WeakMapEntryArc;
 

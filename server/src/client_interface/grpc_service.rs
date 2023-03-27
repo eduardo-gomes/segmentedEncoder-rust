@@ -1,6 +1,6 @@
 use std::sync::Weak;
 
-use tokio::sync::{RwLock, RwLockReadGuard};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use tonic::{Request, Response, Status};
 
 use grpc_proto::proto::segmented_encoder_server::SegmentedEncoder;
@@ -22,6 +22,9 @@ impl ServiceLock {
 	}
 	pub(crate) async fn read(&self) -> RwLockReadGuard<'_, Service> {
 		self.0.read().await
+	}
+	pub(crate) async fn write(&self) -> RwLockWriteGuard<'_, Service> {
+		self.0.write().await
 	}
 }
 
@@ -56,12 +59,15 @@ impl SegmentedEncoder for ServiceLock {
 		}))
 	}
 
-	async fn request_task(&self, _request: Request<Empty>) -> Result<Response<Task>, Status> {
+	async fn request_task(&self, request: Request<Empty>) -> Result<Response<Task>, Status> {
+		let worker_id = AuthenticationExtension::verify_request(&request, self)
+			.await
+			.successful()?;
 		let got = self
 			.0
 			.read()
 			.await
-			.request_task()
+			.request_task(&worker_id)
 			.map_err(Status::unknown)?
 			.await;
 		got.ok_or_else(|| {

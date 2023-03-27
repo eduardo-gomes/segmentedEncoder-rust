@@ -31,6 +31,12 @@ impl<T> Drop for WeakMapEntry<T> {
 #[derive(Debug)]
 pub struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
 
+impl<T> Clone for WeakMapEntryArc<T> {
+	fn clone(&self) -> Self {
+		Self(self.0.clone())
+	}
+}
+
 impl<T> Deref for WeakMapEntryArc<T> {
 	type Target = T;
 

@@ -5,22 +5,36 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::sync::{Arc, Weak};
 
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
 pub(crate) use grpc_service::ServiceLock;
 
-use crate::jobs::manager::{AllocatedTask, TaskId, WeakMapEntryArc};
+use crate::jobs::manager::{AllocatedTask, AllocatedTaskRef, TaskId, WeakMapEntryArc};
 use crate::State;
 
-type ClientEntry = Arc<()>;
+#[derive(Debug)]
+pub struct Client {
+	allocated: RwLock<Vec<AllocatedTaskRef>>,
+}
+
+impl Client {
+	fn new() -> Self {
+		Client {
+			allocated: Default::default(),
+		}
+	}
+}
+
+type ClientEntry = Arc<Client>;
 
 mod grpc_service;
 
 pub(crate) struct Service {
 	///The Uuid is the client id. The access token will be stored(~~when implemented~~) on the map
 	/// and should be verified before external access.
-	clients: HashMap<Uuid, Arc<()>>,
+	clients: HashMap<Uuid, Arc<Client>>,
 	state: Weak<State>,
 }
 
@@ -61,20 +75,29 @@ impl Service {
 
 	pub(crate) fn register_client(&mut self) -> (Uuid, ClientEntry) {
 		let id = Uuid::new_v4();
-		let arc = Arc::new(());
+		let arc = Arc::new(Client::new());
 		self.clients.insert(id, arc.clone());
 		(id, arc)
 	}
 
 	pub(crate) fn request_task(
 		&self,
+		client: &Uuid,
 	) -> Result<impl Future<Output = Option<(TaskId, WeakMapEntryArc<AllocatedTask>)>>, &'static str>
 	{
+		let client = self.clients.get(client).ok_or("Invalid client")?.clone();
+
 		//The future owns the upgraded arc, write may be locked outside the ServiceLock
 		self.state
 			.upgrade()
 			.ok_or("Service was dropped!")
-			.map(|service| async move { service.manager.write().await.allocate().await })
+			.map(|service| async move {
+				let allocated = service.manager.write().await.allocate().await;
+				if let Some((_, allocated)) = &allocated {
+					client.allocated.write().await.push(allocated.clone());
+				}
+				allocated
+			})
 	}
 
 	pub(crate) fn new() -> Self {
@@ -109,6 +132,14 @@ mod test {
 		assert_eq!(service.client_count(), 1);
 		service.register_client();
 		assert_eq!(service.client_count(), 2);
+	}
+
+	#[tokio::test]
+	async fn new_client_has_no_allocated_task() {
+		let mut service = Service::new();
+		let (_id, client) = service.register_client();
+
+		assert!(client.allocated.read().await.is_empty());
 	}
 
 	#[test]
@@ -168,7 +199,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn request_task_returns_none() {
+	async fn request_task_without_any_available_returns_none() {
 		let manager_lock = {
 			let manager = JobManager::new(Storage::new().unwrap());
 			RwLock::new(manager)
@@ -176,7 +207,8 @@ mod test {
 		let service = Service::new().into_lock();
 		let state = State::new(manager_lock, service);
 		let service = state.grpc.clone();
-		let task = service.read().await.request_task().unwrap().await;
+		let client_id = service.write().await.register_client().0;
+		let task = service.read().await.request_task(&client_id).unwrap().await;
 		assert!(task.is_none());
 	}
 
@@ -194,7 +226,34 @@ mod test {
 		let service = Service::new().into_lock();
 		let state = State::new(manager_lock, service);
 		let service = state.grpc.clone();
-		let task = service.read().await.request_task().unwrap().await;
+		let client_id = service.write().await.register_client().0;
+		let task = service.read().await.request_task(&client_id).unwrap().await;
 		assert!(task.is_some());
+	}
+
+	#[tokio::test]
+	async fn requested_task_is_stored_on_client_state() {
+		let manager_lock = {
+			let mut manager = JobManager::new(Storage::new().unwrap());
+			manager.add_job(Job::new(
+				Source::File(FileRef::fake()),
+				JobParams::sample_params(),
+			));
+			RwLock::new(manager)
+		};
+
+		let service = Service::new().into_lock();
+		let state = State::new(manager_lock, service);
+		let service = state.grpc.clone();
+
+		let (id, client) = service.write().await.register_client();
+		let _task = service
+			.read()
+			.await
+			.request_task(&id)
+			.unwrap()
+			.await
+			.expect("Should allocate");
+		assert_eq!(client.allocated.read().await.len(), 1);
 	}
 }

@@ -57,6 +57,7 @@ pub(crate) struct JobScheduler {
 pub struct AllocatedTask {
 	scheduled: Arc<ScheduledTaskInfo>,
 }
+pub type AllocatedTaskRef = WeakMapEntryArc<AllocatedTask>;
 
 impl AllocatedTask {
 	pub(crate) fn as_task(&self) -> &TaskInfo {
