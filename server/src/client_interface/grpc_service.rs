@@ -69,14 +69,14 @@ impl SegmentedEncoder for ServiceLock {
 				"Deadline exceeded immediately because timeout was not implemented",
 			)
 		})
-		.map(|task| {
-			let params = task.parameters;
+		.map(|(id, task)| {
+			let params = task.as_task().parameters.clone();
 			Response::new(Task {
 				id: Some(TaskId {
-					job_id: task.job_id.as_ref().to_vec(),
-					task_id: task.id.as_ref().to_vec(),
+					job_id: id.job.as_ref().to_vec(),
+					task_id: id.task.as_ref().to_vec(),
 				}),
-				input_path: task.input_path,
+				input_path: format!("/api/jobs/{}/source", id.job),
 				v_codec: params.video_encoder.unwrap_or_default(),
 				v_params: params.video_args.unwrap_or_default(),
 				a_codec: params.audio_encoder.unwrap_or_default(),
@@ -104,6 +104,7 @@ mod test {
 
 	use crate::client_interface::grpc_service::ServiceLock;
 	use crate::client_interface::Service;
+	use crate::jobs::manager::JobScheduler;
 	use crate::jobs::Job;
 	use crate::storage::FileRef;
 	use crate::State;
@@ -224,7 +225,7 @@ mod test {
 			.expect("Should return after a job is created")
 			.into_inner();
 		let has_same_parameters = {
-			let params = job.parameters.clone();
+			let params = job.get_job().parameters.clone();
 			task.a_codec == params.audio_encoder.unwrap_or_default()
 				&& task.a_params == params.audio_args.unwrap_or_default()
 				&& task.v_codec == params.video_encoder.unwrap_or_default()
@@ -233,7 +234,8 @@ mod test {
 		assert!(
 			has_same_parameters,
 			"Task: {:?}\nParams: {:?}\nBoth should have same parameters\n",
-			task, job.parameters
+			task,
+			job.get_job().parameters
 		);
 		close.await
 	}
@@ -265,7 +267,7 @@ mod test {
 				.await
 				.get_task_scheduler(&job_id)
 				.unwrap()
-				.get_task(&task_id)
+				.get_allocated(&task_id)
 				.await
 				.is_some()
 		};
@@ -309,7 +311,7 @@ mod test {
 		State::new(manager, Service::new().into_lock())
 	}
 
-	async fn create_sample_job(state: &Arc<State>) -> (Uuid, Arc<Job>) {
+	async fn create_sample_job(state: &Arc<State>) -> (Uuid, Arc<JobScheduler>) {
 		use crate::jobs::{JobParams, Source};
 		let params = JobParams::sample_params();
 		let job = Job::new(Source::File(FileRef::fake()), params.clone());

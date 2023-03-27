@@ -10,8 +10,11 @@ use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::jobs::manager::old_task_scheduler::OldTaskScheduler;
-use crate::jobs::{Job, JobParams, Source, Task};
+pub(crate) use scheduler::AllocatedTask;
+pub(crate) use scheduler::JobScheduler;
+pub(crate) use scheduler::WeakMapEntryArc;
+
+use crate::jobs::{Job, JobParams, Source};
 use crate::storage::{stream, Storage};
 
 mod scheduler;
@@ -20,12 +23,20 @@ pub(crate) type JobManagerLock = RwLock<JobManager>;
 
 #[async_trait]
 pub(crate) trait JobManagerUtils {
-	async fn create_job(&self, body: Body, params: JobParams) -> io::Result<(Uuid, Arc<Job>)>;
+	async fn create_job(
+		&self,
+		body: Body,
+		params: JobParams,
+	) -> io::Result<(Uuid, Arc<JobScheduler>)>;
 }
 
 #[async_trait]
 impl JobManagerUtils for JobManagerLock {
-	async fn create_job(&self, body: Body, params: JobParams) -> io::Result<(Uuid, Arc<Job>)> {
+	async fn create_job(
+		&self,
+		body: Body,
+		params: JobParams,
+	) -> io::Result<(Uuid, Arc<JobScheduler>)> {
 		let (mut file, id) = {
 			let read = self.read().await;
 			let res = read.storage.create_file();
@@ -39,17 +50,17 @@ impl JobManagerUtils for JobManagerLock {
 }
 
 pub(crate) struct JobManager {
-	map: HashMap<Uuid, (Arc<Job>, Arc<OldTaskScheduler>)>,
+	map: HashMap<Uuid, Arc<JobScheduler>>,
 	pub storage: Storage,
 }
 
 impl Debug for JobManager {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		//map to use uuid as hyphenated
-		let map: Vec<(String, &Arc<Job>)> = self
+		let map: Vec<(String, &Arc<JobScheduler>)> = self
 			.map
 			.iter()
-			.map(|(u, (job, _))| (u.as_hyphenated().to_string(), job))
+			.map(|(u, scheduler)| (u.as_hyphenated().to_string(), scheduler))
 			.collect();
 		f.debug_struct("JobManager")
 			.field("count", &self.job_count())
@@ -58,34 +69,51 @@ impl Debug for JobManager {
 	}
 }
 
+pub struct TaskId {
+	pub job: Uuid,
+	pub task: Uuid,
+}
+
 impl JobManager {
 	pub(crate) fn status(&self) -> String {
 		format!("{:#?}", self)
 	}
 
 	pub(crate) fn get_job(&self, uuid: &Uuid) -> Option<Arc<Job>> {
-		self.map.get(uuid).map(|(job, _)| job).cloned()
+		self.map
+			.get(uuid)
+			.map(|scheduler| scheduler.get_job())
+			.cloned()
 	}
 
-	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<Job>) {
+	///Retuns the new job id, and the job scheduler for this job
+	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<JobScheduler>) {
 		let uuid = Uuid::new_v4();
 		let arc = Arc::new(job);
-		let task_scheduler = arc.clone().make_segmenter_and_scheduler(uuid);
-		self.map
-			.insert(uuid, (arc.clone(), Arc::new(task_scheduler)));
-		(uuid, arc)
+		let job_scheduler = JobScheduler::new(arc.clone());
+		let arc1 = Arc::new(job_scheduler);
+		self.map.insert(uuid, arc1.clone());
+		(uuid, arc1)
 	}
 
 	pub fn job_count(&self) -> usize {
 		self.map.len()
 	}
 
-	pub(crate) async fn allocate(&self) -> Option<Task> {
+	pub(crate) async fn allocate(&self) -> Option<(TaskId, WeakMapEntryArc<AllocatedTask>)> {
 		{
-			for (_, task_scheduler) in self.map.values() {
-				let allocated = task_scheduler.allocate().await;
+			for (job_id, scheduler) in self.map.iter() {
+				let allocated = scheduler.allocate().await;
 				if allocated.is_some() {
-					return allocated;
+					return allocated.map(|(task, allocated)| {
+						(
+							TaskId {
+								job: job_id.clone(),
+								task,
+							},
+							allocated,
+						)
+					});
 				}
 			}
 		};
@@ -99,22 +127,24 @@ impl JobManager {
 		}
 	}
 
-	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<OldTaskScheduler>> {
-		self.map.get(job_id).map(|(_, scheduler)| scheduler)
+	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<JobScheduler>> {
+		self.map.get(job_id).map(|scheduler| scheduler)
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use std::ops::Deref;
+	use std::ptr;
 
 	use hyper::Body;
 	use tokio::io::AsyncReadExt;
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
-	use crate::jobs::manager::{JobManager, JobManagerUtils};
-	use crate::jobs::{Job, JobParams, Source, Task};
+	use crate::jobs::manager::scheduler::WeakMapEntryArc;
+	use crate::jobs::manager::{AllocatedTask, JobManager, JobManagerUtils};
+	use crate::jobs::{Job, JobParams, Source};
 	use crate::storage::FileRef;
 	use crate::{Storage, WEBM_SAMPLE};
 
@@ -145,7 +175,7 @@ mod test {
 		let (uuid, job) = manager.add_job(job);
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert!(
-			std::ptr::eq(job.deref(), job2.deref()),
+			ptr::eq(job.get_job().deref(), job2.deref()),
 			"Should be reference to same object"
 		);
 	}
@@ -184,7 +214,7 @@ mod test {
 			.await
 			.unwrap();
 		let job2 = manager.read().await.get_job(&uuid).unwrap();
-		assert_eq!(job.deref(), job2.deref());
+		assert_eq!(job.get_job().deref(), job2.deref());
 	}
 
 	#[tokio::test]
@@ -197,6 +227,7 @@ mod test {
 			.create_job(body, JobParams::sample_params())
 			.await
 			.unwrap();
+		let job = job.get_job();
 		let Source::File(uuid) = job.source.clone();
 		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
 
@@ -224,13 +255,33 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn allocated_task_has_type_task() {
+	async fn allocated_task_has_type_allocated_task() {
 		let mut manager = make_job_manager();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
-		let task: Task = manager.allocate().await.unwrap();
+		let (_, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
 		dbg!(task);
+	}
+
+	#[tokio::test]
+	async fn allocated_task_has_job_and_task_ids() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
+		manager.add_job(job);
+
+		let (id, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
+
+		let got_from_id = manager
+			.get_task_scheduler(&id.job)
+			.expect("Should get job")
+			.get_allocated(&id.task)
+			.await
+			.expect("Should get allocated task");
+		assert!(
+			ptr::eq(got_from_id.deref(), task.deref()),
+			"Both should be the same object"
+		);
 	}
 
 	#[tokio::test]
@@ -265,15 +316,14 @@ mod test {
 	async fn get_task_scheduler_get_task_give_the_same_task() {
 		let mut manager = make_job_manager();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
-		manager.add_job(job);
-		let task: Task = manager.allocate().await.unwrap();
-
-		let scheduler = manager.get_task_scheduler(&task.job_id).unwrap();
+		let (job_id, _) = manager.add_job(job);
+		let (id, task): (_, WeakMapEntryArc<AllocatedTask>) = manager.allocate().await.unwrap();
+		let scheduler = manager.get_task_scheduler(&job_id).unwrap();
 		let got_task = scheduler
-			.get_task(&task.id)
+			.get_allocated(&id.task)
 			.await
 			.expect("Should have task");
-		assert_eq!(got_task, task)
+		assert!(ptr::eq(got_task.deref(), task.deref()));
 	}
 }
 

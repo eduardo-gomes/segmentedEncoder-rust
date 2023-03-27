@@ -400,7 +400,7 @@ mod test {
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 
 		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
-		let task_id = state.manager.read().await.allocate().await.unwrap().id;
+		let task_id = state.manager.read().await.allocate().await.unwrap().0.task;
 
 		let body = Body::from(MKV_SAMPLE.as_slice());
 		let request = Request::builder()
@@ -420,7 +420,7 @@ mod test {
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 
 		let _job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
-		let task_id = state.manager.read().await.allocate().await.unwrap().id;
+		let task_id = state.manager.read().await.allocate().await.unwrap().0.task;
 		let invalid_job_id = Uuid::new_v4();
 
 		let body = Body::from(MKV_SAMPLE.as_slice());

@@ -31,7 +31,7 @@ pub(crate) struct JobSegments {
 	pub(crate) tasks: Vec<TaskInfo>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)] //Derive debug for temporary log
 pub(crate) struct TaskInfo {
 	pub(crate) input: Source,
 	pub(crate) parameters: JobParams,

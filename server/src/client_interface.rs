@@ -10,7 +10,7 @@ use uuid::Uuid;
 pub(crate) use grpc_service::auth_interceptor::ServiceWithAuth;
 pub(crate) use grpc_service::ServiceLock;
 
-use crate::jobs::Task;
+use crate::jobs::manager::{AllocatedTask, TaskId, WeakMapEntryArc};
 use crate::State;
 
 type ClientEntry = Arc<()>;
@@ -66,7 +66,10 @@ impl Service {
 		(id, arc)
 	}
 
-	pub(crate) fn request_task(&self) -> Result<impl Future<Output = Option<Task>>, &'static str> {
+	pub(crate) fn request_task(
+		&self,
+	) -> Result<impl Future<Output = Option<(TaskId, WeakMapEntryArc<AllocatedTask>)>>, &'static str>
+	{
 		//The future owns the upgraded arc, write may be locked outside the ServiceLock
 		self.state
 			.upgrade()

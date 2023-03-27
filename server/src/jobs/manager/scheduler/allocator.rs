@@ -4,6 +4,7 @@
 //! When the weakly referenced object gets dropped, the associated entry in the map is removed.
 
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
@@ -11,21 +12,24 @@ use futures::executor::block_on;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+#[derive(Debug)]
 struct WeakMapEntry<T> {
 	value: T,
 	id: Uuid,
 	map: Weak<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
 }
 
-pub struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
-
 impl<T> Drop for WeakMapEntry<T> {
 	fn drop(&mut self) {
+		eprintln!("Dropping map entry with id: {}", &self.id);
 		if let Some(map) = self.map.upgrade() {
 			block_on(async { map.write().await.remove(&self.id) });
 		}
 	}
 }
+
+#[derive(Debug)]
+pub struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
 
 impl<T> Deref for WeakMapEntryArc<T> {
 	type Target = T;
@@ -35,6 +39,7 @@ impl<T> Deref for WeakMapEntryArc<T> {
 	}
 }
 
+#[derive(Debug)]
 pub struct WeakUuidMap<T> {
 	map: Arc<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
 }

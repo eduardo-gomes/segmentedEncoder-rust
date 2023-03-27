@@ -15,12 +15,15 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::jobs::manager::scheduler::allocator::{WeakMapEntryArc, WeakUuidMap};
+pub(crate) use allocator::WeakMapEntryArc;
+
+use crate::jobs::manager::scheduler::allocator::WeakUuidMap;
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 
 mod allocator;
 
+#[derive(Debug)] //Derive debug for temporary log
 struct ScheduledTaskInfo {
 	allocated: AtomicBool,
 	task: TaskInfo,
@@ -39,12 +42,14 @@ impl ScheduledTaskInfo {
 	}
 }
 
+#[derive(Debug)] //Derive debug for temporary log
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	tasks: Vec<Arc<ScheduledTaskInfo>>,
 	allocated: WeakUuidMap<AllocatedTask>,
 }
 
+#[derive(Debug)] //Derive debug for temporary log
 ///Marks an allocated task
 ///
 /// This object keeps the task allocated until it is dropped.
@@ -54,7 +59,7 @@ pub struct AllocatedTask {
 }
 
 impl AllocatedTask {
-	fn as_task(&self) -> &TaskInfo {
+	pub(crate) fn as_task(&self) -> &TaskInfo {
 		&self.scheduled.task
 	}
 }
@@ -113,6 +118,9 @@ impl JobScheduler {
 
 	pub async fn allocated_count(&self) -> usize {
 		self.allocated.len().await
+	}
+	pub fn get_job(&self) -> &Arc<Job> {
+		&self.job
 	}
 }
 
