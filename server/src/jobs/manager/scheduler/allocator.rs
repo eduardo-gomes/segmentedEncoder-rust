@@ -12,11 +12,39 @@ use futures::executor::block_on;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-#[derive(Debug)]
 struct WeakMapEntry<T> {
 	value: T,
 	id: Uuid,
 	map: Weak<RwLock<HashMap<Uuid, Weak<WeakMapEntry<T>>>>>,
+}
+mod debug {
+	use std::fmt::{Debug, Formatter};
+
+	use crate::jobs::manager::scheduler::allocator::WeakMapEntry;
+	use crate::jobs::manager::scheduler::WeakMapEntryArc;
+
+	impl<T> Debug for WeakMapEntry<T>
+	where
+		T: Debug,
+	{
+		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+			f.debug_struct("WeakMapEntry")
+				.field("id", &self.id)
+				.field("value", &self.value)
+				.finish()
+		}
+	}
+
+	impl<T> Debug for WeakMapEntryArc<T>
+	where
+		T: Debug,
+	{
+		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+			f.write_str("WeakMapEntryArc: ")?;
+			self.0.fmt(f)?;
+			f.write_str("\n")
+		}
+	}
 }
 
 impl<T> Drop for WeakMapEntry<T> {
@@ -28,7 +56,6 @@ impl<T> Drop for WeakMapEntry<T> {
 	}
 }
 
-#[derive(Debug)]
 pub struct WeakMapEntryArc<T>(Arc<WeakMapEntry<T>>);
 
 impl<T> Clone for WeakMapEntryArc<T> {

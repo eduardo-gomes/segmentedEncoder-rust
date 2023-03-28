@@ -14,9 +14,17 @@ pub(crate) use grpc_service::ServiceLock;
 use crate::jobs::manager::{AllocatedTaskRef, TaskId};
 use crate::State;
 
-#[derive(Debug)]
 pub struct Client {
 	allocated: RwLock<Vec<AllocatedTaskRef>>,
+}
+
+impl Debug for Client {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let allocated_read = futures::executor::block_on(self.allocated.read()).clone();
+		f.debug_struct("Client")
+			.field("allocated", &allocated_read)
+			.finish()
+	}
 }
 
 impl Client {
