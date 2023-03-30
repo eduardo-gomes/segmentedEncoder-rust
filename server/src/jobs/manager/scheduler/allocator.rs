@@ -51,7 +51,7 @@ impl<T> Drop for WeakMapEntry<T> {
 	fn drop(&mut self) {
 		eprintln!("Dropping map entry with id: {}", &self.id);
 		if let Some(map) = self.map.upgrade() {
-			block_on(async { map.write().await.remove(&self.id) });
+			block_on(map.write()).remove(&self.id);
 		}
 	}
 }
