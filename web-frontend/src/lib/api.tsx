@@ -27,6 +27,28 @@ export const ApiContext = createContext<ApiContextType>({
 	set_url: () => undefined
 } as ApiContextType);
 
+function get_version(url: Accessor<URL>) {
+	async function version_parser(response: Response): Promise<string> {
+		const res = await response.text();
+		const prefix = "SegmentedEncoder server";
+		if (!res.includes(prefix)) throw new Error("Invalid server", {cause: `response is (${res})`});
+		return res.substring(res.indexOf("v", prefix.length));
+	}
+
+	//Setup request cancellation
+	const controller = new AbortController();
+	onCleanup(() => controller.abort());
+	const signal = controller.signal
+
+	//Starting to check version
+	const path = get_path_on_api(new URL(url()), "/version");
+	console.log("Checking version of api at", path.href);
+	const request = new Request(path.href, {signal});
+
+
+	return fetch(request).then(version_parser);
+}
+
 /**
  * Receives a signal to the server URL an creates a derivated signal
  * that gets the server version
@@ -35,50 +57,16 @@ export const ApiContext = createContext<ApiContextType>({
  */
 function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 	const [version, setVersion] = createSignal<string | undefined>(undefined);
-
-	async function version_parser(response: Response): Promise<string> {
-		const res = await response.text();
-		const prefix = "SegmentedEncoder server";
-		if (!res.includes(prefix)) throw new Error("Invalid server", {cause: `response is (${res})`});
-		return res.substring(res.indexOf("v", prefix.length));
-	}
+	const [repeat, setRepeat] = createSignal(undefined, {equals: false});
 
 	createEffect(() => {
-		setVersion(undefined);
-		const path = get_path_on_api(new URL(url()), "/version");
-		console.log("Checking version of api at", path.href);
-
-		const controller = new AbortController();
-		onCleanup(() => controller.abort());
-		const signal = controller.signal
-		const request = new Request(path.href, {signal});
-		let cancelTimeout: () => void = () => null;
-		onCleanup(() => cancelTimeout());
-
-		function fetch_reject(err: unknown): Promise<Response> {
-			console.warn("Failed to fetch version:", err);
-			if (err instanceof DOMException && err.name === "AbortError")
-				return Promise.reject(err);
-			else //Some kind of network error, retry
-				return new Promise((resolve, reject) => {
-					const timeout = setTimeout(resolve, 5000);
-					cancelTimeout = () => {
-						clearTimeout(timeout);
-						reject("Timeout cancelled");
-					};
-				})
-					.then(() => fetch(request).catch(fetch_reject));
-		}
-
-		fetch(request)
-			.catch(fetch_reject)
-			.then((res) =>
-				version_parser(res)
-					.then(setVersion)
-					.catch((err) =>
-						console.error("Is not segmentedEncoder server", err)
-					)
-			);
+		repeat();
+		let timeout = 60000;
+		get_version(url).catch((err) => {
+			console.warn("Failed to get version:", err);
+			//Smaller timeout on error
+			timeout = 5000;
+		}).then(setVersion).finally(() => setTimeout(setRepeat, timeout));
 	});
 	createEffect((initial) => {
 		if (version() || !initial)
