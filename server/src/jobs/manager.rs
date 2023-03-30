@@ -84,6 +84,9 @@ impl JobManager {
 			.map(|scheduler| scheduler.get_job())
 			.cloned()
 	}
+	pub(crate) async fn get_job_task(&self, job: &Uuid, task: &Uuid) -> Option<AllocatedTaskRef> {
+		self.map.get(job)?.get_allocated(task).await
+	}
 
 	///Retuns the new job id, and the job scheduler for this job
 	pub(crate) fn add_job(&mut self, job: Job) -> (Uuid, Arc<JobScheduler>) {
@@ -174,6 +177,28 @@ mod test {
 		let job2 = manager.get_job(&uuid).unwrap();
 		assert!(
 			ptr::eq(job.get_job().deref(), job2.deref()),
+			"Should be reference to same object"
+		);
+	}
+
+	#[tokio::test]
+	async fn get_job_task_nonexistent_uuid_none() {
+		let manager = make_job_manager();
+		let uuid = Uuid::new_v4();
+		let job = manager.get_job_task(&uuid, &uuid).await;
+		assert!(job.is_none());
+	}
+
+	#[tokio::test]
+	async fn get_reference_to_task_from_uuid() {
+		let mut manager = make_job_manager();
+		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
+
+		manager.add_job(job);
+		let (id, allocated) = manager.allocate().await.expect("Should allocate");
+		let task = manager.get_job_task(&id.job, &id.task).await.unwrap();
+		assert!(
+			ptr::eq(task.deref(), allocated.deref()),
 			"Should be reference to same object"
 		);
 	}
