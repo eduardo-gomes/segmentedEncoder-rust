@@ -14,7 +14,7 @@ pub(crate) use scheduler::AllocatedTaskRef;
 pub(crate) use scheduler::JobScheduler;
 
 use crate::jobs::{Job, JobParams, Source};
-use crate::storage::{stream, Storage};
+use crate::storage::Storage;
 
 mod scheduler;
 
@@ -31,18 +31,14 @@ pub(crate) trait JobManagerUtils {
 
 #[async_trait]
 impl JobManagerUtils for JobManagerLock {
+	//TODO: store the file before calling create_job
 	async fn create_job(
 		&self,
 		body: Body,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<JobScheduler>)> {
-		let (mut file, id) = {
-			let read = self.read().await;
-			let res = read.storage.create_file();
-			res.await?
-		};
-		stream::body_to_file(body, &mut file).await?;
-		let job = Job::new(Source::File(id), params);
+		let file_ref = Storage::body_to_file(self, body).await?;
+		let job = Job::new(Source::File(file_ref), params);
 
 		Ok(self.write().await.add_job(job))
 	}

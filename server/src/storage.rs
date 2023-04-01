@@ -113,7 +113,7 @@ pub mod stream {
 	use crate::jobs::manager::JobManagerLock;
 	use crate::storage::{FileRef, Storage};
 
-	pub(crate) async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
+	async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
 		use futures::StreamExt;
 		let body = body.map(|res| {
 			res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
