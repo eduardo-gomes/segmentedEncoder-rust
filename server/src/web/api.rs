@@ -132,19 +132,24 @@ async fn task_output(
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
 	state: Extension<Arc<State>>,
 ) -> Response<Body> {
-	let found_job = state
-		.manager
-		.read()
-		.await
-		.get_job_task(&job_id, &task_id)
-		.await
-		.ok_or("Task not found");
-	if let Err(reason) = found_job {
-		return Response::builder()
-			.status(StatusCode::NOT_FOUND)
-			.body(Body::from(reason))
-			.unwrap();
-	}
+	let _found_job = {
+		let res = state
+			.manager
+			.read()
+			.await
+			.get_job_task(&job_id, &task_id)
+			.await
+			.ok_or("Task not found");
+		match res {
+			Err(reason) => {
+				return Response::builder()
+					.status(StatusCode::NOT_FOUND)
+					.body(Body::from(reason))
+					.unwrap();
+			}
+			Ok(job) => job,
+		}
+	};
 	Response::builder()
 		.status(StatusCode::METHOD_NOT_ALLOWED)
 		.body(Body::from("not yet implemented"))
