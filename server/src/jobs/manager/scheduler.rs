@@ -13,6 +13,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use tokio::sync::{OnceCell, SetError};
 use uuid::Uuid;
 
 pub(crate) use allocator::WeakMapEntryArc;
@@ -20,24 +21,26 @@ pub(crate) use allocator::WeakMapEntryArc;
 use crate::jobs::manager::scheduler::allocator::WeakUuidMap;
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
+use crate::storage::FileRef;
 
 mod allocator;
 
 #[derive(Debug)] //Derive debug for temporary log
 struct ScheduledTaskInfo {
-	allocated: AtomicBool,
+	available: AtomicBool,
 	task: TaskInfo,
+	output: OnceCell<FileRef>,
 }
 
 impl ScheduledTaskInfo {
 	///Check if task is available, and return an [AllocatedTask] tracking this task allocation
 	fn allocate(self: &Arc<Self>) -> Option<AllocatedTask> {
-		let allocated = self.allocated.swap(true, Ordering::AcqRel);
-		match allocated {
-			false => Some(AllocatedTask {
+		let available = self.available.swap(false, Ordering::AcqRel);
+		match available {
+			true => Some(AllocatedTask {
 				scheduled: self.clone(),
 			}),
-			true => None,
+			false => None,
 		}
 	}
 }
@@ -49,7 +52,7 @@ pub(crate) struct JobScheduler {
 	allocated: WeakUuidMap<AllocatedTask>,
 }
 
-/// Reference coutnting pointer to [AllocatedTask] inside a [WeakUuidMap]
+/// Reference counting pointer to [AllocatedTask] inside a [WeakUuidMap]
 pub type AllocatedTaskRef = WeakMapEntryArc<AllocatedTask>;
 
 #[derive(Debug)] //Derive debug for temporary log
@@ -65,11 +68,22 @@ impl AllocatedTask {
 	pub(crate) fn as_task(&self) -> &TaskInfo {
 		&self.scheduled.task
 	}
+	pub(crate) fn set_output(&self, output: FileRef) -> Result<(), FileRef> {
+		self.scheduled.output.set(output).map_err(|err| match err {
+			SetError::AlreadyInitializedError(e) => e,
+			SetError::InitializingError(e) => e,
+		})
+	}
+	pub(crate) fn get_output(&self) -> Option<&FileRef> {
+		self.scheduled.output.get()
+	}
 }
 
 impl Drop for AllocatedTask {
 	fn drop(&mut self) {
-		self.scheduled.allocated.store(false, Ordering::Release);
+		if !self.scheduled.output.initialized() {
+			self.scheduled.available.store(true, Ordering::Release);
+		}
 	}
 }
 
@@ -80,8 +94,9 @@ impl JobScheduler {
 			.into_iter()
 			.map(|info| {
 				ScheduledTaskInfo {
-					allocated: false.into(),
+					available: true.into(),
 					task: info,
+					output: Default::default(),
 				}
 				.into()
 			})
@@ -133,6 +148,7 @@ mod test {
 
 	use crate::jobs::manager::scheduler::JobScheduler;
 	use crate::jobs::Job;
+	use crate::storage::FileRef;
 
 	#[tokio::test]
 	async fn do_not_segment_job_allocate_return_some() {
@@ -226,12 +242,71 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn droping_allocated_decrements_allocated_count() {
+	async fn dropping_allocated_decrements_allocated_count() {
 		let job = Job::fake().into();
 		let scheduler = JobScheduler::new(job);
 		let allocated = scheduler.allocate().await.expect("Should allocate");
 		assert_eq!(scheduler.allocated_count().await, 1);
 		drop(allocated);
 		assert_eq!(scheduler.allocated_count().await, 0);
+	}
+
+	#[tokio::test]
+	async fn store_output_for_allocated() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (_id, task) = scheduler.allocate().await.expect("Should allocate");
+
+		let output = FileRef::fake();
+
+		assert!(
+			task.set_output(output).is_ok(),
+			"Should store, no concurrency"
+		);
+	}
+
+	#[tokio::test]
+	async fn get_output_before_set_returns_none() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (_id, task) = scheduler.allocate().await.expect("Should allocate");
+		assert!(task.get_output().is_none());
+	}
+
+	#[tokio::test]
+	async fn get_output_after_set() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (_id, task) = scheduler.allocate().await.expect("Should allocate");
+		let file_ref = FileRef::fake();
+		task.set_output(file_ref.clone())
+			.expect("Should store, no concurrency");
+		let got = task.get_output().expect("Should be available after set");
+		assert_eq!(got, &file_ref);
+	}
+
+	#[tokio::test]
+	async fn store_output_only_works_one_time() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (_id, task) = scheduler.allocate().await.expect("Should allocate");
+		task.set_output(FileRef::fake())
+			.expect("Should store, no concurrency");
+		let result = task.set_output(FileRef::fake());
+		assert!(result.is_err(), "Should not store again");
+	}
+
+	#[tokio::test]
+	async fn drop_after_store_do_not_make_available() {
+		let job = Job::fake().into();
+		let scheduler = JobScheduler::new(job);
+		let (_id, task) = scheduler.allocate().await.expect("Should allocate");
+		task.set_output(FileRef::fake())
+			.expect("Should store, no concurrency");
+		drop(task);
+		assert!(
+			scheduler.allocate().await.is_none(),
+			"Should not allocate again"
+		);
 	}
 }
