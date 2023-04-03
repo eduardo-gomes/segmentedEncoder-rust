@@ -26,7 +26,11 @@ use crate::storage::FileRef;
 mod allocator;
 
 #[derive(Debug)] //Derive debug for temporary log
+///A ScheduledTask
+///
+///Allows to allocate the task, holds the [TaskInfo], and stores the output
 struct ScheduledTaskInfo {
+	///Atomic flag used to mark allocation and if it is available to be allocated
 	available: AtomicBool,
 	task: TaskInfo,
 	output: OnceCell<FileRef>,
@@ -68,6 +72,7 @@ impl AllocatedTask {
 	pub(crate) fn as_task(&self) -> &TaskInfo {
 		&self.scheduled.task
 	}
+	///Set the task output, only works once. After the output is set it will always fail
 	pub(crate) fn set_output(&self, output: FileRef) -> Result<(), FileRef> {
 		self.scheduled.output.set(output).map_err(|err| match err {
 			SetError::AlreadyInitializedError(e) => e,
@@ -218,7 +223,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn do_not_segment_job_allocatd_has_same_job_parameters() {
+	async fn do_not_segment_job_allocated_has_same_job_parameters() {
 		let job: Arc<_> = Job::fake().into();
 		let scheduler = JobScheduler::new(job.clone());
 		let (_, allocated) = scheduler.allocate().await.expect("Should be available");
