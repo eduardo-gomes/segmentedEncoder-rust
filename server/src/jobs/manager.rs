@@ -119,8 +119,9 @@ impl JobManager {
 		}
 	}
 
+	#[cfg(test)]
 	pub(crate) fn get_task_scheduler(&self, job_id: &Uuid) -> Option<&Arc<JobScheduler>> {
-		self.map.get(job_id).map(|scheduler| scheduler)
+		self.map.get(job_id)
 	}
 }
 

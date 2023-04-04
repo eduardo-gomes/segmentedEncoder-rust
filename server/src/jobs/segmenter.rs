@@ -11,9 +11,9 @@ pub(crate) enum Segmenter {
 }
 
 impl Segmenter {
-	/// Will generate TaskInfos and SubJobs.
+	/// Will generate [TaskInfo]s and SubJobs.
 	///
-	/// TaskInfo can be turned into a [Task](super::Task), and SubJob into a [Job]
+	/// TaskInfo can be sent to a client, and SubJob can be turned into a [Job]
 	pub fn segment(job: &Job) -> JobSegments {
 		match job.segmenter {
 			Segmenter::DoNotSegment => {
@@ -31,6 +31,9 @@ pub(crate) struct JobSegments {
 	pub(crate) tasks: Vec<TaskInfo>,
 }
 
+///Struct containing all data used by client to execute a task.
+///
+///It is able to tell the input and output files
 #[derive(Clone, Debug)] //Derive debug for temporary log
 pub(crate) struct TaskInfo {
 	pub(crate) input: Source,

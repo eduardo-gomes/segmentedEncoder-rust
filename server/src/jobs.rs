@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 pub(crate) use segmenter::Segmenter;
 
 use crate::storage::FileRef;
@@ -61,18 +59,6 @@ impl Job {
 			segmenter: Segmenter::DoNotSegment,
 		}
 	}
-}
-
-///Struct containing all data used by client to execute a task.
-///
-///It is able to tell the input and output files
-#[derive(Debug, Clone)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub struct Task {
-	pub job_id: Uuid,
-	pub id: Uuid,
-	pub input_path: String,
-	pub parameters: JobParams,
 }
 
 #[cfg(test)]
