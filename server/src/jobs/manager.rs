@@ -138,20 +138,16 @@ mod test {
 	use crate::storage::FileRef;
 	use crate::{Storage, WEBM_SAMPLE};
 
-	fn make_job_manager() -> JobManager {
-		JobManager::new()
-	}
-
 	#[test]
 	fn new_job_manager_has_0_jobs() {
-		let manager = make_job_manager();
+		let manager = JobManager::new();
 
 		assert_eq!(manager.job_count(), 0);
 	}
 
 	#[test]
 	fn get_job_nonexistent_uuid_none() {
-		let manager = make_job_manager();
+		let manager = JobManager::new();
 		let uuid = Uuid::new_v4();
 		let job = manager.get_job(&uuid);
 		assert!(job.is_none());
@@ -159,7 +155,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_reference_to_job_from_uuid() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 
 		let (uuid, job) = manager.add_job(job);
@@ -172,7 +168,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_job_task_nonexistent_uuid_none() {
-		let manager = make_job_manager();
+		let manager = JobManager::new();
 		let uuid = Uuid::new_v4();
 		let job = manager.get_job_task(&uuid, &uuid).await;
 		assert!(job.is_none());
@@ -180,7 +176,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_reference_to_task_from_uuid() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 
 		manager.add_job(job);
@@ -194,7 +190,7 @@ mod test {
 
 	#[test]
 	fn new_manager_has_1_job_after_enqueue() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
@@ -203,7 +199,7 @@ mod test {
 
 	#[test]
 	fn status_turns_into_string_with_job_id() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		let (uuid, _) = manager.add_job(job);
 
@@ -215,16 +211,18 @@ mod test {
 		)
 	}
 
+	async fn webm_sample_file(storage: &Storage) -> std::io::Result<FileRef> {
+		let (mut file, file_ref) = storage.create_file().await?;
+		file.write_all(WEBM_SAMPLE.as_slice()).await?;
+		Ok(file_ref)
+	}
+
 	#[tokio::test]
 	async fn create_job() {
 		let storage = Storage::new().unwrap();
-		let file_ref = {
-			let (mut file, file_ref) = storage.create_file().await.unwrap();
-			file.write_all(WEBM_SAMPLE.as_slice()).await.unwrap();
-			file_ref
-		};
+		let file_ref = webm_sample_file(&storage).await.unwrap();
 		//Using rwlock because it will only lock for part of the function
-		let manager = RwLock::new(make_job_manager());
+		let manager = RwLock::new(JobManager::new());
 
 		let (uuid, job) = manager
 			.create_job(Source::File(file_ref), JobParams::sample_params())
@@ -237,13 +235,9 @@ mod test {
 	#[tokio::test]
 	async fn create_job_check_source() {
 		let storage = Storage::new().unwrap();
-		let file_ref = {
-			let (mut file, file_ref) = storage.create_file().await.unwrap();
-			file.write_all(WEBM_SAMPLE.as_slice()).await.unwrap();
-			file_ref
-		};
+		let file_ref = webm_sample_file(&storage).await.unwrap();
 		//Using rwlock because it will only lock for part of the function
-		let manager = RwLock::new(make_job_manager());
+		let manager = RwLock::new(JobManager::new());
 
 		let (_uuid, job) = manager
 			.create_job(Source::File(file_ref), JobParams::sample_params())
@@ -261,14 +255,14 @@ mod test {
 
 	#[tokio::test]
 	async fn allocate_task_without_job_returns_none() {
-		let manager = make_job_manager();
+		let manager = JobManager::new();
 		let task = manager.allocate().await;
 		assert!(task.is_none());
 	}
 
 	#[tokio::test]
 	async fn allocate_task_with_do_not_segment_job_returns_task() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
@@ -278,7 +272,7 @@ mod test {
 
 	#[tokio::test]
 	async fn allocated_task_has_type_allocated_task() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
@@ -288,7 +282,7 @@ mod test {
 
 	#[tokio::test]
 	async fn allocated_task_has_job_and_task_ids() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
@@ -308,7 +302,7 @@ mod test {
 
 	#[tokio::test]
 	async fn allocate_task_twice_with_one_do_not_segment_job_returns_one_time() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		manager.add_job(job);
 
@@ -319,7 +313,7 @@ mod test {
 
 	#[tokio::test]
 	async fn allocate_task_twice_with_two_do_not_segment_job_returns_twice() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		manager.add_job(Job::new(
 			Source::File(FileRef::fake()),
 			JobParams::sample_params(),
@@ -336,7 +330,7 @@ mod test {
 
 	#[tokio::test]
 	async fn get_task_scheduler_get_task_give_the_same_task() {
-		let mut manager = make_job_manager();
+		let mut manager = JobManager::new();
 		let job = Job::new(Source::File(FileRef::fake()), JobParams::sample_params());
 		let (job_id, _) = manager.add_job(job);
 		let (id, task): (_, AllocatedTaskRef) = manager.allocate().await.unwrap();
