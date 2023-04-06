@@ -17,14 +17,19 @@ pub mod web;
 
 struct State {
 	manager: RwLock<JobManager>,
+	storage: Storage,
 	grpc: Arc<ServiceLock>,
 }
 
 impl State {
-	fn new(manager: JobManagerLock, grpc: ServiceLock) -> Arc<Self> {
+	fn new(manager: JobManagerLock, grpc: ServiceLock, storage: Storage) -> Arc<Self> {
 		Arc::new_cyclic(|weak| {
 			let grpc = Arc::new(grpc.with_state(weak.clone()));
-			Self { manager, grpc }
+			Self {
+				manager,
+				storage,
+				grpc,
+			}
 		})
 	}
 }
@@ -34,10 +39,10 @@ impl State {
 pub fn make_multiplexed_service(
 ) -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
 	let storage = Storage::new().unwrap();
-	let manager_lock = RwLock::new(JobManager::new(storage));
+	let manager_lock = RwLock::new(JobManager::new());
 	use crate::client_interface::Service;
 	let service_lock = Service::new().into_lock();
-	let state = State::new(manager_lock, service_lock);
+	let state = State::new(manager_lock, service_lock, storage);
 	let grpc_service = state.grpc.clone().with_auth();
 
 	let web_router = web::make_service(state);

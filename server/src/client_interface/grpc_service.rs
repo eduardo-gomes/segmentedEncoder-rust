@@ -313,8 +313,8 @@ mod test {
 	fn new_state() -> Arc<State> {
 		use crate::jobs::manager::JobManager;
 		use crate::storage::Storage;
-		let manager = JobManager::new(Storage::new().unwrap()).into();
-		State::new(manager, Service::new().into_lock())
+		let manager = JobManager::new().into();
+		State::new(manager, Service::new().into_lock(), Storage::new().unwrap())
 	}
 
 	async fn create_sample_job(state: &Arc<State>) -> (Uuid, Arc<JobScheduler>) {

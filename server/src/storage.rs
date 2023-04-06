@@ -110,7 +110,6 @@ pub mod stream {
 	use tokio::io::AsyncRead;
 	use tokio_util::io::{ReaderStream, StreamReader};
 
-	use crate::jobs::manager::JobManagerLock;
 	use crate::storage::{FileRef, Storage};
 
 	async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
@@ -128,11 +127,8 @@ pub mod stream {
 
 	impl Storage {
 		///Read the entire [Body] store and returns the [FileRef] to the stored content
-		pub(crate) async fn body_to_file(
-			lock: &JobManagerLock,
-			body: Body,
-		) -> std::io::Result<FileRef> {
-			let (mut file, file_ref) = { lock.read().await.storage.create_file().await? };
+		pub(crate) async fn body_to_file(&self, body: Body) -> std::io::Result<FileRef> {
+			let (mut file, file_ref) = self.create_file().await?;
 			body_to_file(body, &mut file).await?;
 			Ok(file_ref)
 		}
@@ -141,9 +137,7 @@ pub mod stream {
 	#[cfg(test)]
 	mod test {
 		use hyper::Body;
-		use tokio::sync::RwLock;
 
-		use crate::jobs::manager::JobManager;
 		use crate::storage::stream::body_to_file;
 		use crate::{Storage, WEBM_SAMPLE};
 
@@ -170,9 +164,8 @@ pub mod stream {
 		async fn create_file_from_body() -> std::io::Result<()> {
 			let body = Body::from(WEBM_SAMPLE.as_slice());
 
-			let manager = RwLock::new(JobManager::new(Storage::new()?));
-			let file_ref = Storage::body_to_file(&manager, body).await?;
-			let storage = &manager.read().await.storage;
+			let storage = Storage::new()?;
+			let file_ref = storage.body_to_file(body).await?;
 
 			let mut file = storage.get_file(&file_ref).await?;
 			let mut read = Vec::new();

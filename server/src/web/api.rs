@@ -4,13 +4,14 @@ use axum::extract::Path;
 use axum::http::{HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Extension, Router};
+use futures::TryFutureExt;
 use hyper::{Body, Response, StatusCode};
 use uuid::Uuid;
 
-use crate::jobs::manager::{JobManagerLock, JobManagerUtils};
+use crate::jobs::manager::JobManagerUtils;
 use crate::jobs::{JobParams, Source};
 use crate::storage::stream::read_to_stream;
-use crate::storage::FileRef;
+use crate::storage::{FileRef, Storage};
 use crate::State;
 
 fn parse_job(headers: &HeaderMap) -> Result<JobParams, String> {
@@ -48,7 +49,11 @@ async fn job_post(state: Extension<Arc<State>>, req: Request<Body>) -> Response<
 			.unwrap()
 	});
 	let handle_post = |params| async {
-		let job = state.manager.create_job(req.into_body(), params).await;
+		let job = state
+			.storage
+			.body_to_file(req.into_body())
+			.and_then(|file_ref| state.manager.create_job(Source::File(file_ref), params))
+			.await;
 		match job {
 			Ok((uuid, _)) => Response::builder()
 				.status(StatusCode::OK)
@@ -74,8 +79,8 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 	match job {
 		Some(job) => {
 			let source = job.source.clone();
-			async fn send_local(state: &JobManagerLock, file: &FileRef) -> Response<Body> {
-				let file = state.read().await.storage.get_file(file).await;
+			async fn send_local(storage: &Storage, file: &FileRef) -> Response<Body> {
+				let file = storage.get_file(file).await;
 				match file {
 					Ok(file) => Response::builder()
 						.status(StatusCode::OK)
@@ -89,7 +94,7 @@ async fn job_source(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> R
 				}
 			}
 			match source {
-				Source::File(file) => send_local(&state.manager, &file).await,
+				Source::File(file) => send_local(&state.storage, &file).await,
 			}
 		}
 		None => Response::builder()
@@ -185,10 +190,10 @@ mod test {
 			use crate::jobs::manager::JobManager;
 			use tokio::sync::RwLock;
 			let storage = Storage::new().unwrap();
-			let manager_lock = RwLock::new(JobManager::new(storage));
+			let manager_lock = RwLock::new(JobManager::new());
 			let service_lock = crate::client_interface::Service::new().into_lock();
 
-			State::new(manager_lock, service_lock)
+			State::new(manager_lock, service_lock, storage)
 		};
 		(web::make_service(state.clone()), state)
 	}

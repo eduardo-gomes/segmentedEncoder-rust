@@ -204,12 +204,11 @@ mod test {
 
 	#[tokio::test]
 	async fn request_task_without_any_available_returns_none() {
-		let manager_lock = {
-			let manager = JobManager::new(Storage::new().unwrap());
-			RwLock::new(manager)
-		};
+		let storage = Storage::new().unwrap();
+		let manager_lock = RwLock::new(JobManager::new());
+
 		let service = Service::new().into_lock();
-		let state = State::new(manager_lock, service);
+		let state = State::new(manager_lock, service, storage);
 		let service = state.grpc.clone();
 		let client_id = service.write().await.register_client().0;
 		let task = service.read().await.request_task(&client_id).unwrap().await;
@@ -218,8 +217,9 @@ mod test {
 
 	#[tokio::test]
 	async fn request_task_returns_some_after_create_job() {
+		let storage = Storage::new().unwrap();
 		let manager_lock = {
-			let mut manager = JobManager::new(Storage::new().unwrap());
+			let mut manager = JobManager::new();
 			manager.add_job(Job::new(
 				Source::File(FileRef::fake()),
 				JobParams::sample_params(),
@@ -228,7 +228,7 @@ mod test {
 		};
 
 		let service = Service::new().into_lock();
-		let state = State::new(manager_lock, service);
+		let state = State::new(manager_lock, service, storage);
 		let service = state.grpc.clone();
 		let client_id = service.write().await.register_client().0;
 		let task = service.read().await.request_task(&client_id).unwrap().await;
@@ -237,8 +237,9 @@ mod test {
 
 	#[tokio::test]
 	async fn requested_task_is_stored_on_client_state() {
+		let storage = Storage::new().unwrap();
 		let manager_lock = {
-			let mut manager = JobManager::new(Storage::new().unwrap());
+			let mut manager = JobManager::new();
 			manager.add_job(Job::new(
 				Source::File(FileRef::fake()),
 				JobParams::sample_params(),
@@ -247,7 +248,7 @@ mod test {
 		};
 
 		let service = Service::new().into_lock();
-		let state = State::new(manager_lock, service);
+		let state = State::new(manager_lock, service, storage);
 		let service = state.grpc.clone();
 
 		let (id, client) = service.write().await.register_client();

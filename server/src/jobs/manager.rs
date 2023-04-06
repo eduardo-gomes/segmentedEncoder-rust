@@ -6,7 +6,6 @@ use std::io;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use hyper::Body;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -14,7 +13,6 @@ pub(crate) use scheduler::AllocatedTaskRef;
 pub(crate) use scheduler::JobScheduler;
 
 use crate::jobs::{Job, JobParams, Source};
-use crate::storage::Storage;
 
 mod scheduler;
 
@@ -24,21 +22,19 @@ pub(crate) type JobManagerLock = RwLock<JobManager>;
 pub(crate) trait JobManagerUtils {
 	async fn create_job(
 		&self,
-		body: Body,
+		source: Source,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<JobScheduler>)>;
 }
 
 #[async_trait]
 impl JobManagerUtils for JobManagerLock {
-	//TODO: store the file before calling create_job
 	async fn create_job(
 		&self,
-		body: Body,
+		source: Source,
 		params: JobParams,
 	) -> io::Result<(Uuid, Arc<JobScheduler>)> {
-		let file_ref = Storage::body_to_file(self, body).await?;
-		let job = Job::new(Source::File(file_ref), params);
+		let job = Job::new(source, params);
 
 		Ok(self.write().await.add_job(job))
 	}
@@ -46,7 +42,6 @@ impl JobManagerUtils for JobManagerLock {
 
 pub(crate) struct JobManager {
 	map: HashMap<Uuid, Arc<JobScheduler>>,
-	pub storage: Storage,
 }
 
 impl Debug for JobManager {
@@ -118,10 +113,9 @@ impl JobManager {
 		None
 	}
 
-	pub fn new(storage: Storage) -> Self {
+	pub fn new() -> Self {
 		JobManager {
 			map: Default::default(),
-			storage,
 		}
 	}
 
@@ -135,8 +129,7 @@ mod test {
 	use std::ops::Deref;
 	use std::ptr;
 
-	use hyper::Body;
-	use tokio::io::AsyncReadExt;
+	use tokio::io::{AsyncReadExt, AsyncWriteExt};
 	use tokio::sync::RwLock;
 	use uuid::Uuid;
 
@@ -146,7 +139,7 @@ mod test {
 	use crate::{Storage, WEBM_SAMPLE};
 
 	fn make_job_manager() -> JobManager {
-		JobManager::new(Storage::new().unwrap())
+		JobManager::new()
 	}
 
 	#[test]
@@ -224,12 +217,17 @@ mod test {
 
 	#[tokio::test]
 	async fn create_job() {
-		let body = Body::from(WEBM_SAMPLE.as_slice());
+		let storage = Storage::new().unwrap();
+		let file_ref = {
+			let (mut file, file_ref) = storage.create_file().await.unwrap();
+			file.write_all(WEBM_SAMPLE.as_slice()).await.unwrap();
+			file_ref
+		};
 		//Using rwlock because it will only lock for part of the function
 		let manager = RwLock::new(make_job_manager());
 
 		let (uuid, job) = manager
-			.create_job(body, JobParams::sample_params())
+			.create_job(Source::File(file_ref), JobParams::sample_params())
 			.await
 			.unwrap();
 		let job2 = manager.read().await.get_job(&uuid).unwrap();
@@ -238,17 +236,22 @@ mod test {
 
 	#[tokio::test]
 	async fn create_job_check_source() {
-		let body = Body::from(WEBM_SAMPLE.as_slice());
+		let storage = Storage::new().unwrap();
+		let file_ref = {
+			let (mut file, file_ref) = storage.create_file().await.unwrap();
+			file.write_all(WEBM_SAMPLE.as_slice()).await.unwrap();
+			file_ref
+		};
 		//Using rwlock because it will only lock for part of the function
 		let manager = RwLock::new(make_job_manager());
 
 		let (_uuid, job) = manager
-			.create_job(body, JobParams::sample_params())
+			.create_job(Source::File(file_ref), JobParams::sample_params())
 			.await
 			.unwrap();
 		let job = job.get_job();
 		let Source::File(uuid) = job.source.clone();
-		let mut file = manager.read().await.storage.get_file(&uuid).await.unwrap();
+		let mut file = storage.get_file(&uuid).await.unwrap();
 
 		let mut content = Vec::new();
 		file.read_to_end(&mut content).await.unwrap();
