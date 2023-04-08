@@ -26,7 +26,7 @@ function TabBar(props: { children: NonEmptyArray<TabElement> }) {
 
 	return (
 		<>
-			<div class={"tabs"}>
+			<div class="tabs">
 				<For each={c()}>
 					{(tab) =>
 						<A href={tab.title}>
@@ -35,7 +35,7 @@ function TabBar(props: { children: NonEmptyArray<TabElement> }) {
 				</For>
 			</div>
 			<Routes>
-				<Route path={"/"} element={c()[0].component}/>
+				<Route path="/" element={c()[0].component}/>
 				<For each={c()}>
 					{(tab) =>
 						<Route path={tab.title} element={tab.component}/>}
