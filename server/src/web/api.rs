@@ -136,6 +136,7 @@ pub(crate) fn make_router(state: Arc<State>) -> Router<(), Body> {
 async fn task_output(
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
 	state: Extension<Arc<State>>,
+	req: Request<Body>,
 ) -> Response<Body> {
 	let _found_job = {
 		let res = state
@@ -155,9 +156,35 @@ async fn task_output(
 			Ok(job) => job,
 		}
 	};
+	fn already_stored() -> Response<Body> {
+		Response::builder()
+			.status(StatusCode::GONE)
+			.body(Body::from("Task already stored"))
+			.unwrap()
+	}
+	fn error() -> Response<Body> {
+		Response::builder()
+			.status(StatusCode::INTERNAL_SERVER_ERROR)
+			.body(Body::from("Failed to store task"))
+			.unwrap()
+	}
+	{
+		//Save to file, and_then set task output
+		match state
+			.storage
+			.body_to_file(req.into_body())
+			.await
+			.map_err(|_| error()) //Internal server error
+			.and_then(|file| _found_job.set_output(file).map_err(|_| already_stored()))
+		{
+			Ok(()) => (),
+			Err(res) => return res,
+		}
+	};
+
 	Response::builder()
-		.status(StatusCode::METHOD_NOT_ALLOWED)
-		.body(Body::from("not yet implemented"))
+		.status(StatusCode::NO_CONTENT)
+		.body(Body::empty())
 		.unwrap()
 }
 
@@ -179,6 +206,7 @@ mod test {
 	use hyper::header::CONTENT_TYPE;
 	use hyper::service::Service;
 	use hyper::{http, Body, HeaderMap, Method, Request, StatusCode};
+	use tokio::io::AsyncReadExt;
 	use tower::util::ServiceExt;
 	use uuid::Uuid;
 
@@ -408,14 +436,15 @@ mod test {
 	}
 
 	#[tokio::test]
-	#[ignore = "not yet implemented"]
 	async fn post_task_output() -> Result<(), Box<dyn Error>> {
 		let (mut service, state) = make_service();
 		let mut headers = HeaderMap::new();
 		headers.insert("video_encoder", "libx264".parse().unwrap());
 
-		let job_id = post_job_ang_get_uuid(&mut service, &headers).await?;
-		let task_id = state.manager.read().await.allocate().await.unwrap().0.task;
+		post_job_ang_get_uuid(&mut service, &headers).await?;
+		let (id, _task) = state.manager.read().await.allocate().await.unwrap();
+		let job_id = id.job;
+		let task_id = id.task;
 
 		let body = Body::from(MKV_SAMPLE.as_slice());
 		let request = Request::builder()
@@ -425,6 +454,36 @@ mod test {
 			.unwrap();
 		let response = service.oneshot(request).await.unwrap();
 		assert!(response.status().is_success());
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn post_task_check_output_is_stored() -> Result<(), Box<dyn Error>> {
+		let (mut service, state) = make_service();
+		let mut headers = HeaderMap::new();
+		headers.insert("video_encoder", "libx264".parse().unwrap());
+
+		post_job_ang_get_uuid(&mut service, &headers).await?;
+		let (id, task) = state.manager.read().await.allocate().await.unwrap();
+		let job_id = id.job;
+		let task_id = id.task;
+
+		let body = Body::from(MKV_SAMPLE.as_slice());
+		let request = Request::builder()
+			.uri(format!("/api/jobs/{job_id}/tasks/{task_id}/output"))
+			.method(Method::POST)
+			.body(body)
+			.unwrap();
+		let response = service.oneshot(request).await.unwrap();
+		assert!(response.status().is_success());
+		let out = task.get_output().expect("Output should be stored");
+		let content = {
+			let mut file = state.storage.get_file(out).await?;
+			let mut buf = Vec::new();
+			file.read_to_end(&mut buf).await?;
+			buf
+		};
+		assert_eq!(content.as_slice(), MKV_SAMPLE.as_slice());
 		Ok(())
 	}
 
