@@ -15,11 +15,11 @@ axum = "0.6.2"
 tempfile = "3"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 grpc-proto = { path = "../grpc-proto" }
-tonic = { version = "0.8.2", default-features = false }
+tonic = { version = "0.9.1", default-features = false }
 multiplex-tonic-hyper = "0.1.0"
 tower = "0.4.13"
-tower-http = { version = "0.3.5", features = ["cors"] }
+tower-http = { version = "0.4.0", features = ["cors"] }
 
 [dev-dependencies]
-tonic = "0.8.2"
+tonic = "0.9.1"
 reqwest = { version = "0.11.12", default-features = false }
