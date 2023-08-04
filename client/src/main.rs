@@ -4,7 +4,7 @@ use std::str::FromStr;
 use tonic::codegen::http::uri::PathAndQuery;
 use tonic::codegen::InterceptedService;
 use tonic::transport::{Channel, Endpoint, Uri};
-use tonic::{Request, Status};
+use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 use grpc_proto::proto::segmented_encoder_client::SegmentedEncoderClient;
@@ -22,9 +22,17 @@ async fn main() {
 		let mut authenticated = connect(&url).await;
 		let task = authenticated.request_task(Empty {}).await;
 		let task = dbg!(task).expect("Did not get a task!");
-		let command = task_to_command(&url, task.get_ref()).unwrap();
-		println!("Command: {:?}", command);
+		task_runner(&url, task).await;
 	}
+}
+
+async fn task_runner(url: &Uri, task: Response<Task>) {
+	let command = task_to_command(url, task.get_ref()).unwrap();
+	println!("Running command: {:?}", command);
+	let mut command = tokio::process::Command::from(command);
+	let status = command.status().await.expect("failed to execute process");
+	println!("process finished with: {status}");
+	assert!(status.success(), "Command should run successfully");
 }
 
 fn task_to_command(url: &Uri, task: &Task) -> Result<Command, Box<dyn std::error::Error>> {
