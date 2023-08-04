@@ -50,6 +50,14 @@ impl Storage {
 		let path = path.join(uuid.as_simple().to_string());
 		path
 	}
+
+	#[cfg(feature = "web-debug")]
+	pub(crate) fn list_files_sync(&self) -> io::Result<Vec<String>> {
+		let dir = std::fs::read_dir(&self.dir)?;
+		let list = dir.filter_map(|entry| entry.ok().map(|entry| entry.file_name()));
+		let string = list.map(|os_string| os_string.to_string_lossy().to_string());
+		Ok(string.collect())
+	}
 }
 
 impl Storage {
@@ -101,6 +109,25 @@ mod test {
 
 		assert_eq!(wrote, data.len());
 		assert_eq!(content, data, "Should have the data we wrote before!");
+	}
+
+	#[tokio::test]
+	#[cfg(feature = "web-debug")]
+	async fn list_all_files() {
+		let storage = Storage::new().unwrap();
+
+		let list = storage
+			.list_files_sync()
+			.expect("Should be able to list directory");
+		assert!(list.is_empty(), "New storage is empty");
+
+		let (_, file) = storage.create_file().await.unwrap();
+
+		let list = storage.list_files_sync().unwrap();
+		assert_eq!(list.len(), 1, "Storage Should have one file");
+
+		let file_name = Uuid::parse_str(list.first().unwrap()).unwrap();
+		assert_eq!(file.id, file_name, "Should list the new file");
 	}
 }
 

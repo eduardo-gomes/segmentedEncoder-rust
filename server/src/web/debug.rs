@@ -12,7 +12,8 @@ use crate::State;
 
 impl Debug for Storage {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		f.write_str("Unimplemented")
+		let result = self.list_files_sync();
+		f.debug_struct("Storage").field("files", &result).finish()
 	}
 }
 
@@ -25,9 +26,9 @@ impl Debug for ServiceLock {
 impl Debug for State {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("State")
-			.field("Manager", &self.manager)
-			.field("gRPC", &self.grpc)
-			.field("Storage", &self.storage)
+			.field("manager", &self.manager)
+			.field("grpc", &self.grpc)
+			.field("storage", &self.storage)
 			.finish()
 	}
 }
