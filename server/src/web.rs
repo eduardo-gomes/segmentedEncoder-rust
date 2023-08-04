@@ -30,3 +30,5 @@ pub(super) fn make_service(state: Arc<State>) -> Router {
 }
 
 mod api;
+#[cfg(feature = "web-debug")]
+mod debug;

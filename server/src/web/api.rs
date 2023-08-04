@@ -119,11 +119,19 @@ async fn job_info(Path(job_id): Path<Uuid>, state: Extension<Arc<State>>) -> Res
 	}
 }
 
+/// Add the `/debug` endpoint if enabled by `web-debug` feature
+fn with_web_debug(router: Router) -> Router {
+	#[cfg(feature = "web-debug")]
+	return router.route("/debug", get(crate::web::debug::web_debug));
+	#[cfg(not(feature = "web-debug"))]
+	return router;
+}
+
 pub(crate) fn make_router(state: Arc<State>) -> Router<(), Body> {
 	async fn version() -> String {
 		format!("SegmentedEncoder server v{}\n", env!("CARGO_PKG_VERSION"))
 	}
-	Router::new()
+	with_web_debug(Router::new())
 		.route("/status", get(get_status))
 		.route("/jobs", post(job_post))
 		.route("/jobs/:job_id/source", get(job_source))
