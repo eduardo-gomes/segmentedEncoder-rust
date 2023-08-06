@@ -19,6 +19,8 @@ impl Debug for Storage {
 
 impl Debug for ServiceLock {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		let msg = "Debug (used by web-debug) is not implemented for ServiceLock";
+		dbg!(msg);
 		f.write_str("Unimplemented")
 	}
 }
