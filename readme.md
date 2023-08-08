@@ -15,3 +15,20 @@ Also, we could provide an API with a web interface to manage the server.
 
 This application depends on `protoc` to compile.
 You can use the `protobuf-compiler` package on Debian or similar for your system or manually install and add to PATH
+
+## Client interface
+
+The client will access a gRPC interface to schedule tasks and report status.
+
+### Interface methods
+
+- registerClient(RegistrationRequest) returns (RegistrationResponse)
+- getWorkerRegistration(Empty) returns (RegistrationResponse)
+- requestTask(Empty) returns (Task)
+
+## HTTP client interface
+
+This interface will be used to download input files, and upload output
+
+- /api/jobs/{job_id}/tasks/{task_id}/input/{num}
+- /api/jobs/{job_id}/tasks/{task_id}/output
