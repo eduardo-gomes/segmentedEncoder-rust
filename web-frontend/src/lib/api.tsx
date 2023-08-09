@@ -1,6 +1,6 @@
-import type { Accessor, ParentProps, Setter, } from "solid-js";
-import { createContext, createEffect, createSignal, onCleanup } from "solid-js";
-import { router_extract_server_url } from "./router_util";
+import type {Accessor, ParentProps, Setter,} from "solid-js";
+import {createContext, createEffect, createSignal, onCleanup} from "solid-js";
+import {router_extract_server_url} from "./router_util";
 
 function get_path_on_api(url: URL, path: string) {
 	url.pathname += path;
@@ -27,7 +27,7 @@ export const ApiContext = createContext<ApiContextType>({
 	set_url: () => undefined
 } as ApiContextType);
 
-function get_version(url: Accessor<URL>) {
+async function get_version(url: Accessor<URL>) {
 	async function version_parser(response: Response): Promise<string> {
 		const res = await response.text();
 		const prefix = "SegmentedEncoder server";
@@ -46,11 +46,12 @@ function get_version(url: Accessor<URL>) {
 	const request = new Request(path.href, {signal});
 
 
-	return fetch(request).then(version_parser);
+	const response = await fetch(request);
+	return version_parser(response);
 }
 
 /**
- * Receives a signal to the server URL an creates a derivated signal
+ * Receives a signal to the server URL an creates a new signal
  * that gets the server version
  * @param url server url signal
  * @returns Accessor<string | undefined>
