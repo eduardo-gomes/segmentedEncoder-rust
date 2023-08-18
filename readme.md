@@ -32,3 +32,11 @@ This interface will be used to download input files, and upload output
 
 - /api/jobs/{job_id}/tasks/{task_id}/input/{num}
 - /api/jobs/{job_id}/tasks/{task_id}/output
+
+## Worker interaction
+
+The worker, after authentication, will contact the server through a few methods.
+First, it will request a task, then it will start the task using the HTTP endpoint to get the input. And while the task
+is running, the worker will send status updates periodically, and inform the server after the task is successfully
+finished. Another HTTP endpoint will be used to send the task output to the server, and the task will only be finished
+after the output is transferred and the worker tell the server.
