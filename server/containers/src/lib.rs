@@ -22,6 +22,11 @@ impl AtomicTimestamp {
 		let val = self.0.load(Ordering::Acquire);
 		Duration::from_secs(val)
 	}
+
+	fn set_to_now(&self) {
+		let now = timestamp_now().as_secs();
+		self.0.store(now, Ordering::Release);
+	}
 }
 
 struct TimedMapEntry<Value>(AtomicTimestamp, Value);
@@ -49,6 +54,7 @@ where
 		self.map.is_empty()
 	}
 
+	/// Insert new element into map, and set its timestamp to current time
 	pub fn insert(&mut self, key: Key, value: Val) {
 		let now = AtomicTimestamp::now();
 		self.map.insert(key, TimedMapEntry(now, value));
@@ -65,10 +71,12 @@ where
 		Key: Borrow<Q>,
 		Q: Hash + Eq + ?Sized,
 	{
-		self.map.get(key).map(|entry| &entry.1)
+		self.map.get(key).map(|entry| {
+			entry.0.set_to_now();
+			&entry.1
+		})
 	}
 
-	//This function has seconds precision
 	pub(crate) fn timeout(&mut self, duration: Duration) {
 		let expired = timestamp_now() - duration;
 		self.map.retain(|_, entry| entry.0.load() >= expired)
@@ -151,5 +159,23 @@ mod test {
 		map.timeout(timeout);
 
 		assert!(map.is_empty(), "Timeout should remove after the sleep")
+	}
+
+	#[test]
+	fn new_timed_map_timeout_after_get_should_not_remove() {
+		let mut map = TimedMap::new();
+		let key = "KEY";
+		let value = "Value";
+		map.insert(key, value);
+
+		let timeout = std::time::Duration::from_secs(1);
+		sleep(timeout);
+		map.get(key).expect("Should get");
+		map.timeout(timeout);
+
+		assert!(
+			!map.is_empty(),
+			"Timeout should not remove because the get updates the timestamp"
+		)
 	}
 }
