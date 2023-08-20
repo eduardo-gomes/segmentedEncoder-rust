@@ -1,10 +1,30 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::ops::Sub;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
-struct TimedMapEntry<Value>(AtomicU64, Value);
+struct AtomicTimestamp(AtomicU64);
+
+fn timestamp_now() -> Duration {
+	SystemTime::now()
+		.duration_since(SystemTime::UNIX_EPOCH)
+		.unwrap_or(Default::default())
+}
+
+impl AtomicTimestamp {
+	fn now() -> Self {
+		let now = timestamp_now().as_secs();
+		Self(AtomicU64::from(now))
+	}
+	fn load(&self) -> Duration {
+		let val = self.0.load(Ordering::Acquire);
+		Duration::from_secs(val)
+	}
+}
+
+struct TimedMapEntry<Value>(AtomicTimestamp, Value);
 
 /// A map that let you remove entries after some time without updates.
 /// This struct wont remove elements automatically, but only when requested
@@ -30,7 +50,7 @@ where
 	}
 
 	pub fn insert(&mut self, key: Key, value: Val) {
-		let now = AtomicU64::from(Self::now_secs());
+		let now = AtomicTimestamp::now();
 		self.map.insert(key, TimedMapEntry(now, value));
 	}
 	pub fn remove<Q>(&mut self, key: &Q)
@@ -48,20 +68,10 @@ where
 		self.map.get(key).map(|entry| &entry.1)
 	}
 
-	fn now_secs() -> u64 {
-		let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-		now.map(|duration| duration.as_secs()) //Will error if system time is set before unix epoch
-			.unwrap_or(Default::default())
-	}
-
 	//This function has seconds precision
 	pub(crate) fn timeout(&mut self, duration: Duration) {
-		fn timestamp_from_entry(val: &AtomicU64) -> u64 {
-			val.load(Ordering::Acquire)
-		}
-		let expired = Self::now_secs();
-		self.map
-			.retain(|_, entry| timestamp_from_entry(&entry.0) >= expired)
+		let expired = timestamp_now() - duration;
+		self.map.retain(|_, entry| entry.0.load() >= expired)
 	}
 }
 
