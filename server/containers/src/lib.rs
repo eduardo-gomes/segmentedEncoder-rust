@@ -2,10 +2,11 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Sub;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
-struct AtomicTimestamp(AtomicU64);
+/// Type to store [Duration] atomically. May be slightly of because due to concurrency
+struct AtomicTimestamp(AtomicU64, AtomicU32);
 
 fn timestamp_now() -> Duration {
 	SystemTime::now()
@@ -14,18 +15,31 @@ fn timestamp_now() -> Duration {
 }
 
 impl AtomicTimestamp {
+	fn duration_to_u64u32(val: &Duration) -> (u64, u32) {
+		(val.as_secs(), val.subsec_nanos())
+	}
+	fn u64u32_to_duration(secs: u64, nanos: u32) -> Duration {
+		Duration::new(secs, nanos)
+	}
 	fn now() -> Self {
-		let now = timestamp_now().as_secs();
-		Self(AtomicU64::from(now))
+		let now = timestamp_now();
+		let (secs, nanos) = Self::duration_to_u64u32(&now);
+		Self(AtomicU64::from(secs), AtomicU32::from(nanos))
 	}
 	fn load(&self) -> Duration {
-		let val = self.0.load(Ordering::Acquire);
-		Duration::from_secs(val)
+		let secs = self.0.load(Ordering::Acquire);
+		let nanos = self.1.load(Ordering::Acquire);
+		Self::u64u32_to_duration(secs, nanos)
+	}
+
+	fn store(&self, duration: &Duration) {
+		let (secs, nanos) = Self::duration_to_u64u32(duration);
+		self.0.store(secs, Ordering::Release);
+		self.1.store(nanos, Ordering::Release);
 	}
 
 	fn set_to_now(&self) {
-		let now = timestamp_now().as_secs();
-		self.0.store(now, Ordering::Release);
+		self.store(&timestamp_now());
 	}
 }
 
@@ -86,8 +100,11 @@ where
 #[cfg(test)]
 mod test {
 	use std::thread::sleep;
+	use std::time::Duration;
 
 	use crate::TimedMap;
+
+	const TEST_TIMEOUT: Duration = Duration::from_millis(10);
 
 	#[test]
 	fn new_timed_map_is_empty() {
@@ -141,7 +158,7 @@ mod test {
 		let value = "Value";
 		map.insert(key, value);
 
-		let timeout = std::time::Duration::from_secs(1);
+		let timeout = TEST_TIMEOUT;
 		map.timeout(timeout);
 
 		assert!(!map.is_empty())
@@ -154,7 +171,7 @@ mod test {
 		let value = "Value";
 		map.insert(key, value);
 
-		let timeout = std::time::Duration::from_secs(1);
+		let timeout = TEST_TIMEOUT;
 		sleep(timeout);
 		map.timeout(timeout);
 
@@ -168,7 +185,7 @@ mod test {
 		let value = "Value";
 		map.insert(key, value);
 
-		let timeout = std::time::Duration::from_secs(1);
+		let timeout = TEST_TIMEOUT;
 		sleep(timeout);
 		map.get(key).expect("Should get");
 		map.timeout(timeout);
