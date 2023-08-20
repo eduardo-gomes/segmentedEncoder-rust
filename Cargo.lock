@@ -172,6 +172,9 @@ dependencies = [
 [[package]]
 name = "containers"
 version = "0.1.0"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "either"

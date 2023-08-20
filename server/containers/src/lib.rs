@@ -1,9 +1,10 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::ops::Sub;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
+
+mod weak_map;
 
 /// Type to store [Duration] atomically. May be slightly of because due to concurrency
 struct AtomicTimestamp(AtomicU64, AtomicU32);
