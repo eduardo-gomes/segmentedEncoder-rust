@@ -3,9 +3,8 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Deref;
-use std::sync::{Arc, Weak};
-
-use tokio::sync::RwLock;
+use std::sync::RwLock;
+use std::sync::{Arc, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 /// [WeakMap] entry, when this object is destructed, it removes itself from the map
 struct WeakMapEntry<Key, V>
@@ -14,7 +13,7 @@ where
 {
 	value: V,
 	id: Key,
-	map: Weak<RwLock<HashMap<Key, Weak<Self>>>>,
+	map: Weak<WeakMap<Key, V>>,
 }
 
 mod debug {
@@ -58,11 +57,10 @@ where
 {
 	fn drop(&mut self) {
 		if let Some(map) = self.map.upgrade() {
-			tokio::task::block_in_place(move || {
-				tokio::runtime::Handle::current()
-					.block_on(map.write())
-					.remove(&self.id)
-			});
+			map.map
+				.write()
+				.unwrap_or_else(|err| err.into_inner())
+				.remove(&self.id);
 		}
 	}
 }
@@ -96,40 +94,43 @@ pub struct WeakMap<Key, V>
 where
 	Key: Clone + Eq + Hash,
 {
-	map: Arc<RwLock<HashMap<Key, Weak<WeakMapEntry<Key, V>>>>>,
+	map: RwLock<HashMap<Key, Weak<WeakMapEntry<Key, V>>>>,
 }
 
 impl<Key, V> WeakMap<Key, V>
 where
 	Key: Clone + Eq + Hash,
 {
-	pub fn new() -> Self {
-		Self {
+	pub fn new() -> Arc<Self> {
+		Arc::new(Self {
 			map: Default::default(),
-		}
+		})
+	}
+
+	fn sync_read(&self) -> RwLockReadGuard<'_, HashMap<Key, Weak<WeakMapEntry<Key, V>>>> {
+		self.map.read().unwrap_or_else(|err| err.into_inner())
+	}
+	fn sync_write(&self) -> RwLockWriteGuard<'_, HashMap<Key, Weak<WeakMapEntry<Key, V>>>> {
+		self.map.write().unwrap_or_else(|err| err.into_inner())
 	}
 	pub async fn len(&self) -> usize {
-		self.map.read().await.len()
+		self.sync_read().len()
 	}
 	pub async fn is_empty(&self) -> bool {
-		self.map.read().await.is_empty()
+		self.sync_read().is_empty()
 	}
-	pub async fn insert(&self, key: Key, value: V) -> (Key, WeakMapEntryArc<Key, V>) {
+	pub async fn insert(self: &Arc<Self>, key: Key, value: V) -> (Key, WeakMapEntryArc<Key, V>) {
 		let entry = Arc::new(WeakMapEntry {
 			value,
-			map: Arc::downgrade(&self.map),
+			map: Arc::downgrade(self),
 			id: key.clone(),
 		});
-		self.map
-			.write()
-			.await
+		self.sync_write()
 			.insert(key.clone(), Arc::downgrade(&entry));
 		(key, WeakMapEntryArc(entry))
 	}
 	pub async fn get(&self, id: &Key) -> Option<WeakMapEntryArc<Key, V>> {
-		self.map
-			.read()
-			.await
+		self.sync_read()
 			.get(id)
 			.and_then(|weak| weak.upgrade())
 			.map(WeakMapEntryArc)
@@ -150,7 +151,7 @@ mod test {
 		assert!(weak_map.is_empty().await);
 	}
 
-	#[tokio::test(flavor = "multi_thread")]
+	#[tokio::test]
 	async fn weak_map_insert_arc_returns_reference() {
 		let weak_map = WeakMap::<u64, _>::new();
 		let value = 123456789;
@@ -158,7 +159,7 @@ mod test {
 		assert_eq!(arc.deref(), &value);
 	}
 
-	#[tokio::test(flavor = "multi_thread")]
+	#[tokio::test]
 	async fn weak_map_after_insert_is_not_empty() {
 		let weak_map = WeakMap::<u64, ()>::new();
 		let (_, _arc) = weak_map.insert(123, ()).await;
@@ -175,7 +176,7 @@ mod test {
 		assert!(got.is_none());
 	}
 
-	#[tokio::test(flavor = "multi_thread")]
+	#[tokio::test]
 	async fn weak_map_get_arc_from_id() {
 		let weak_map = WeakMap::<u64, ()>::new();
 		let (id, arc) = weak_map.insert(123, ()).await;
@@ -184,8 +185,8 @@ mod test {
 		assert!(ptr::eq(&*got, &*arc));
 	}
 
-	#[tokio::test(flavor = "multi_thread")]
-	async fn weak_map_after_droping_arc_is_empty() {
+	#[tokio::test]
+	async fn weak_map_after_dropping_arc_is_empty() {
 		let weak_map = WeakMap::<u64, ()>::new();
 		let (_, arc) = weak_map.insert(123, ()).await;
 		drop(arc);
