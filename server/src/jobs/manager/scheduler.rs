@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 pub(crate) use allocator::WeakMapEntryArc;
 
-use crate::jobs::manager::scheduler::allocator::WeakUuidMap;
+use crate::jobs::manager::scheduler::allocator::{WeakUuidMap, WeakUuidMapRandomKey};
 use crate::jobs::segmenter::TaskInfo;
 use crate::jobs::{Job, Segmenter};
 use crate::storage::FileRef;
@@ -53,7 +53,7 @@ impl ScheduledTaskInfo {
 pub(crate) struct JobScheduler {
 	job: Arc<Job>,
 	tasks: Vec<Arc<ScheduledTaskInfo>>,
-	allocated: WeakUuidMap<AllocatedTask>,
+	allocated: Arc<WeakUuidMap<AllocatedTask>>,
 }
 
 /// Reference counting pointer to [AllocatedTask] inside a [WeakUuidMap]
@@ -123,7 +123,7 @@ impl JobScheduler {
 		match allocated {
 			None => None,
 			Some(allocated) => {
-				let (id, arc) = self.allocated.insert(allocated).await;
+				let (id, arc) = self.allocated.insert_random_key(allocated).await;
 				Some((id, arc))
 			}
 		}

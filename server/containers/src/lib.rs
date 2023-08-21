@@ -4,6 +4,8 @@ use std::hash::Hash;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
+pub use weak_map::{WeakMap, WeakMapEntryArc};
+
 mod weak_map;
 
 /// Type to store [Duration] atomically. May be slightly of because due to concurrency
