@@ -74,12 +74,14 @@ where
 		let now = AtomicTimestamp::now();
 		self.map.insert(key, TimedMapEntry(now, value));
 	}
-	pub fn remove<Q>(&mut self, key: &Q)
+
+	/// Removes the key from the map, and returns its value.
+	pub fn remove<Q>(&mut self, key: &Q) -> Option<Val>
 	where
 		Key: Borrow<Q>,
 		Q: Hash + Eq + ?Sized,
 	{
-		self.map.remove(key);
+		self.map.remove(key).map(|val| val.1)
 	}
 
 	/// Returns a reference to the stored element, and update it's timestamp to now.
@@ -143,6 +145,29 @@ mod test {
 		map.insert(key.to_string(), value.to_string());
 		map.remove(key);
 		assert!(map.is_empty(), "Element should be removed")
+	}
+
+	#[test]
+	fn new_timed_map_remove_returns_none_it_not_found() {
+		let mut map = TimedMap::new();
+		let key = "KEY";
+		let value = "Value";
+		map.insert(key.to_string(), value.to_string());
+		let removed = map.remove("Other key");
+		assert!(
+			removed.is_none(),
+			"Should return none if element was not found"
+		);
+	}
+
+	#[test]
+	fn new_timed_map_remove_returns_the_removed_value() {
+		let mut map = TimedMap::new();
+		let key = "KEY";
+		let value = "Value";
+		map.insert(key.to_string(), value.to_string());
+		let removed = map.remove(key).expect("Should remove the value");
+		assert_eq!(removed, value);
 	}
 
 	#[test]
