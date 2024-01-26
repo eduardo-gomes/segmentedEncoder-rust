@@ -82,7 +82,7 @@ impl SegmentedEncoder for ServiceLock {
 					job_id: id.job.as_ref().to_vec(),
 					task_id: id.task.as_ref().to_vec(),
 				}),
-				input_path: format!("/api/jobs/{}/source", id.job),
+				input_path: format!("/api/jobs/{}/source", id.job), //TODO: replace with task(/api/jobs/{id}/task/{id}/input/0) to use TaskInfo input to get this
 				v_codec: params.video_encoder.unwrap_or_default(),
 				v_params: params.video_args.unwrap_or_default(),
 				a_codec: params.audio_encoder.unwrap_or_default(),

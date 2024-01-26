@@ -68,7 +68,6 @@ workspace {
 
 		container se "diagram2" {
 			include *
-			autolayout lr
 		}
 
 		component api "diagram3" {

@@ -112,6 +112,9 @@ impl Service {
 	}
 }
 
+//TODO: discard task after 5 min (configurable, use a few seconds for test) of inactivity
+//TODO: also make client send keepalive for task
+
 #[cfg(test)]
 mod test {
 	use std::sync::Arc;
