@@ -25,7 +25,15 @@ workspace {
 					statusUpdater = component "Status update" "Track job progress"
 				}
 			}
-			worker = softwareSystem "Worker"
+
+			worker = softwareSystem "Worker" {
+				ffmpeg = container "FFmpeg"
+				client = container "Worker Client" {
+					runner = component "Job runner" "Requests and execute jobs"
+					reporter = component "Status Reporter"
+				}
+
+			}
 		}
 
 		user -> spa "Send files and get results from"
@@ -44,9 +52,12 @@ workspace {
 		statusUpdater -> jobDb "Write status to"
 		statusUpdater -> authDb "Read from"
 
-		worker -> jobAlocator "Get jobs from"
-		worker -> statusUpdater "Send updates to"
-		worker -> fileApi "Get and send files to"
+		# Worker relationships
+		runner -> jobAlocator "Get jobs from"
+		runner -> ffmpeg "Runs jobs with"
+		reporter -> ffmpeg "Track status from"
+		reporter -> statusUpdater "Send updates to"
+		ffmpeg -> fileApi "Get and send files to"
 	}
 
 	views {
@@ -64,7 +75,18 @@ workspace {
 			include *
 			autolayout lr
 		}
+
 		component rpc "diagram4" {
+			include *
+			autolayout lr
+		}
+
+		container worker "diagram5" {
+			include *
+			autolayout lr
+		}
+
+		component client "diagram6" {
 			include *
 			autolayout lr
 		}
