@@ -1,11 +1,11 @@
 workspace {
 	model {
 		user = person User
-		group "SegmentedEncoder" {
-			se = softwareSystem "Server" {
-				spa = container "Single Page Application" {
-					tags "Web App"
-				}
+		se = softwareSystem "SegmentedEncoder" {
+			spa = container "Single Page Application" {
+				tags "Web App"
+			}
+			group "Server" {
 				api = container "Rest API" {
 					authApi = component "Auth" "Check auth"
 					jobApi = component "Job API" "Manage jobs"
@@ -17,22 +17,20 @@ workspace {
 				jobDb = container "Job Database" "Store job information" {
 					tags "Database"
 				}
-				fs = container "File system" "Stores files to process and results" {
-					tags "File System"
-				}
 				rpc = container "gRPC API" {
 					jobAlocator = component "Job allocator" "Get available jobs and set the required permisions for the client"
 					statusUpdater = component "Status update" "Track job progress"
 				}
 			}
-
-			worker = softwareSystem "Worker" {
+			fs = container "File system" "Stores files to process and results" {
+				tags "File System"
+			}
+			group "Worker" {
 				ffmpeg = container "FFmpeg"
 				client = container "Worker Client" {
 					runner = component "Job runner" "Requests and execute jobs"
 					reporter = component "Status Reporter"
 				}
-
 			}
 		}
 
@@ -68,6 +66,7 @@ workspace {
 
 		container se "diagram2" {
 			include *
+			autolayout lr
 		}
 
 		component api "diagram3" {
@@ -80,14 +79,8 @@ workspace {
 			autolayout lr
 		}
 
-		container worker "diagram5" {
+		component client "diagram5" {
 			include *
-			autolayout lr
-		}
-
-		component client "diagram6" {
-			include *
-			autolayout lr
 		}
 
 		styles {
