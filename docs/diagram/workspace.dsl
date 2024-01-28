@@ -35,8 +35,8 @@ workspace {
 		}
 
 		user -> spa "Send files and get results from"
-		spa -> api "Makes API calls to"
-		spa -> jobApi "Send job to"
+		spa -> api "Makes API calls to" "HTTP"
+		spa -> jobApi "Send job to" "HTTP"
 
 		authApi -> authDb "Reads from"
 		jobApi -> authApi "Verify"
@@ -51,11 +51,11 @@ workspace {
 		statusUpdater -> authDb "Read from"
 
 		# Worker relationships
-		runner -> jobAlocator "Get jobs from"
+		runner -> jobAlocator "Get jobs from" "gRPC"
 		runner -> ffmpeg "Runs jobs with"
 		reporter -> ffmpeg "Track status from"
 		reporter -> statusUpdater "Send updates to"
-		ffmpeg -> fileApi "Get and send files to"
+		ffmpeg -> fileApi "Get and send files to" "HTTP"
 	}
 
 	views {
