@@ -1,5 +1,5 @@
 [workspace]
-members = ["grpc-proto", "server", "server/containers", "client"]
+members = ["grpc-proto", "server", "server/containers", "server/auth_module", "client"]
 resolver = "2"
 
 [profile.release-lto]
