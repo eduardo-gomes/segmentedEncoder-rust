@@ -1,912 +1,722 @@
 {
-  "id": 1,
-  "name": "Name",
-  "description": "Description",
-  "lastModifiedDate": "2024-01-27T23:13:07Z",
-  "lastModifiedAgent": "structurizr-javascript",
-  "properties": {
-    "structurizr.dsl": "d29ya3NwYWNlIHsKCW1vZGVsIHsKCQl1c2VyID0gcGVyc29uIFVzZXIKCQlzZSA9IHNvZnR3YXJlU3lzdGVtICJTZWdtZW50ZWRFbmNvZGVyIiB7CgkJCXNwYSA9IGNvbnRhaW5lciAiU2luZ2xlIFBhZ2UgQXBwbGljYXRpb24iIHsKCQkJCXRhZ3MgIldlYiBBcHAiCgkJCX0KCQkJZ3JvdXAgIlNlcnZlciIgewoJCQkJYXBpID0gY29udGFpbmVyICJSZXN0IEFQSSIgewoJCQkJCWF1dGhBcGkgPSBjb21wb25lbnQgIkF1dGgiICJDaGVjayBhdXRoIgoJCQkJCWpvYkFwaSA9IGNvbXBvbmVudCAiSm9iIEFQSSIgIk1hbmFnZSBqb2JzIgoJCQkJCWZpbGVBcGkgPSBjb21wb25lbnQgIkZpbGUgQVBJIiAiU3RvcmUgYW5kIHJldHJpdmUgZmlsZXMiCgkJCQl9CgkJCQlhdXRoRGIgPSBjb250YWluZXIgIkF1dGggRGF0YWJhc2UiICJTdG9yZSBhdXRoZW50aWNhdGlvbiBkYXRhIiB7CgkJCQkJdGFncyAiRGF0YWJhc2UiCgkJCQl9CgkJCQlqb2JEYiA9IGNvbnRhaW5lciAiSm9iIERhdGFiYXNlIiAiU3RvcmUgam9iIGluZm9ybWF0aW9uIiB7CgkJCQkJdGFncyAiRGF0YWJhc2UiCgkJCQl9CgkJCQlycGMgPSBjb250YWluZXIgImdSUEMgQVBJIiB7CgkJCQkJam9iQWxvY2F0b3IgPSBjb21wb25lbnQgIkpvYiBhbGxvY2F0b3IiICJHZXQgYXZhaWxhYmxlIGpvYnMgYW5kIHNldCB0aGUgcmVxdWlyZWQgcGVybWlzaW9ucyBmb3IgdGhlIGNsaWVudCIKCQkJCQlzdGF0dXNVcGRhdGVyID0gY29tcG9uZW50ICJTdGF0dXMgdXBkYXRlIiAiVHJhY2sgam9iIHByb2dyZXNzIgoJCQkJfQoJCQl9CgkJCWZzID0gY29udGFpbmVyICJGaWxlIHN5c3RlbSIgIlN0b3JlcyBmaWxlcyB0byBwcm9jZXNzIGFuZCByZXN1bHRzIiB7CgkJCQl0YWdzICJGaWxlIFN5c3RlbSIKCQkJfQoJCQlncm91cCAiV29ya2VyIiB7CgkJCQlmZm1wZWcgPSBjb250YWluZXIgIkZGbXBlZyIKCQkJCWNsaWVudCA9IGNvbnRhaW5lciAiV29ya2VyIENsaWVudCIgewoJCQkJCXJ1bm5lciA9IGNvbXBvbmVudCAiSm9iIHJ1bm5lciIgIlJlcXVlc3RzIGFuZCBleGVjdXRlIGpvYnMiCgkJCQkJcmVwb3J0ZXIgPSBjb21wb25lbnQgIlN0YXR1cyBSZXBvcnRlciIKCQkJCX0KCQkJfQoJCX0KCgkJdXNlciAtPiBzcGEgIlNlbmQgZmlsZXMgYW5kIGdldCByZXN1bHRzIGZyb20iCgkJc3BhIC0+IGFwaSAiTWFrZXMgQVBJIGNhbGxzIHRvIgoJCXNwYSAtPiBqb2JBcGkgIlNlbmQgam9iIHRvIgoKCQlhdXRoQXBpIC0+IGF1dGhEYiAiUmVhZHMgZnJvbSIKCQlqb2JBcGkgLT4gYXV0aEFwaSAiVmVyaWZ5IgoJCWpvYkFwaSAtPiBmcyAiU2VuZCBzb3VyY2UgZmlsZSB0byIKCQlqb2JBcGkgLT4gam9iRGIgIlJlYWQgYW5kIHdyaXRlIHRvIgoJCWZpbGVBcGkgLT4gYXV0aEFwaSAiVmVyaWZ5IgoJCWZpbGVBcGkgLT4gZnMgIlJlYWQgYW5kIHdyaXRlIHRvIgoKCQlqb2JBbG9jYXRvciAtPiBqb2JEYiAiUmVhZCBhbmQgd3JpdGUgdG8iCgkJam9iQWxvY2F0b3IgLT4gYXV0aERiICJSZWFkIGFuZCB3cml0ZSB0byIKCQlzdGF0dXNVcGRhdGVyIC0+IGpvYkRiICJXcml0ZSBzdGF0dXMgdG8iCgkJc3RhdHVzVXBkYXRlciAtPiBhdXRoRGIgIlJlYWQgZnJvbSIKCgkJIyBXb3JrZXIgcmVsYXRpb25zaGlwcwoJCXJ1bm5lciAtPiBqb2JBbG9jYXRvciAiR2V0IGpvYnMgZnJvbSIKCQlydW5uZXIgLT4gZmZtcGVnICJSdW5zIGpvYnMgd2l0aCIKCQlyZXBvcnRlciAtPiBmZm1wZWcgIlRyYWNrIHN0YXR1cyBmcm9tIgoJCXJlcG9ydGVyIC0+IHN0YXR1c1VwZGF0ZXIgIlNlbmQgdXBkYXRlcyB0byIKCQlmZm1wZWcgLT4gZmlsZUFwaSAiR2V0IGFuZCBzZW5kIGZpbGVzIHRvIgoJfQoKCXZpZXdzIHsKCQlzeXN0ZW1Db250ZXh0IHNlICJkaWFncmFtMSIgewoJCQlpbmNsdWRlICoKCQkJYXV0b2xheW91dCBscgoJCX0KCgkJY29udGFpbmVyIHNlICJkaWFncmFtMiIgewoJCQlpbmNsdWRlICoKCQkJYXV0b2xheW91dCBscgoJCX0KCgkJY29tcG9uZW50IGFwaSAiZGlhZ3JhbTMiIHsKCQkJaW5jbHVkZSAqCgkJCWF1dG9sYXlvdXQgbHIKCQl9CgoJCWNvbXBvbmVudCBycGMgImRpYWdyYW00IiB7CgkJCWluY2x1ZGUgKgoJCQlhdXRvbGF5b3V0IGxyCgkJfQoKCQljb21wb25lbnQgY2xpZW50ICJkaWFncmFtNSIgewoJCQlpbmNsdWRlICoKCQl9CgoJCXN0eWxlcyB7CgkJCWVsZW1lbnQgIlBlcnNvbiIgewoJCQkJYmFja2dyb3VuZCAjMDg0MjdiCgkJCQljb2xvciB3aGl0ZQoJCQkJc2hhcGUgUGVyc29uCgkJCX0KCgkJCWVsZW1lbnQgIlNvZnR3YXJlIFN5c3RlbSIgewoJCQkJYmFja2dyb3VuZCAjMTE2OGJkCgkJCQljb2xvciB3aGl0ZQoJCQl9CgoJCQllbGVtZW50ICJDb250YWluZXIiIHsKCQkJCWJhY2tncm91bmQgIzQzOGRkNQoJCQkJY29sb3Igd2hpdGUKCQkJfQoKCQkJZWxlbWVudCAiQ29tcG9uZW50IiB7CgkJCQliYWNrZ3JvdW5kICM4NWJiZjAKCQkJCWNvbG9yIGJsYWNrCgkJCX0KCgkJCWVsZW1lbnQgIkZpbGUgU3lzdGVtIiB7CgkJCQlzaGFwZSBGb2xkZXIKCQkJfQoKCQkJZWxlbWVudCAiRGF0YWJhc2UiIHsKCQkJCXNoYXBlIEN5bGluZGVyCgkJCX0KCgkJCWVsZW1lbnQgIldlYiBBcHAiIHsKCQkJCXNoYXBlIFdlYkJyb3dzZXIKCQkJfQoJCX0KCX0KfQo="
+  "id" : 1,
+  "name" : "Name",
+  "description" : "Description",
+  "lastModifiedDate" : "2024-01-29T00:08:26Z",
+  "lastModifiedAgent" : "structurizr-javascript",
+  "properties" : {
+    "structurizr.dsl" : "d29ya3NwYWNlIHsKCW1vZGVsIHsKCQl1c2VyID0gcGVyc29uIFVzZXIKCQlzZSA9IHNvZnR3YXJlU3lzdGVtICJTZWdtZW50ZWRFbmNvZGVyIiB7CgkJCXNwYSA9IGNvbnRhaW5lciAiU2luZ2xlIFBhZ2UgQXBwbGljYXRpb24iIHsKCQkJCXRhZ3MgIldlYiBBcHAiCgkJCX0KCQkJZ3JvdXAgIlNlcnZlciIgewoJCQkJYXBpID0gY29udGFpbmVyICJSZXN0IEFQSSIgewoJCQkJCWF1dGhBcGkgPSBjb21wb25lbnQgIkF1dGgiICJDaGVjayBhdXRoIgoJCQkJCWpvYkFwaSA9IGNvbXBvbmVudCAiSm9iIEFQSSIgIk1hbmFnZSBqb2JzIgoJCQkJCWZpbGVBcGkgPSBjb21wb25lbnQgIkZpbGUgQVBJIiAiU3RvcmUgYW5kIHJldHJpdmUgZmlsZXMiCgkJCQl9CgkJCQlhdXRoRGIgPSBjb250YWluZXIgIkF1dGggRGF0YWJhc2UiICJTdG9yZSBhdXRoZW50aWNhdGlvbiBkYXRhIiB7CgkJCQkJdGFncyAiRGF0YWJhc2UiCgkJCQl9CgkJCQlqb2JEYiA9IGNvbnRhaW5lciAiSm9iIERhdGFiYXNlIiAiU3RvcmUgam9iIGluZm9ybWF0aW9uIiB7CgkJCQkJdGFncyAiRGF0YWJhc2UiCgkJCQl9CgkJCQlycGMgPSBjb250YWluZXIgImdSUEMgQVBJIiB7CgkJCQkJam9iQWxvY2F0b3IgPSBjb21wb25lbnQgIkpvYiBhbGxvY2F0b3IiICJHZXQgYXZhaWxhYmxlIGpvYnMgYW5kIHNldCB0aGUgcmVxdWlyZWQgcGVybWlzaW9ucyBmb3IgdGhlIGNsaWVudCIKCQkJCQlzdGF0dXNVcGRhdGVyID0gY29tcG9uZW50ICJTdGF0dXMgdXBkYXRlIiAiVHJhY2sgam9iIHByb2dyZXNzIgoJCQkJfQoJCQl9CgkJCWZzID0gY29udGFpbmVyICJGaWxlIHN5c3RlbSIgIlN0b3JlcyBmaWxlcyB0byBwcm9jZXNzIGFuZCByZXN1bHRzIiB7CgkJCQl0YWdzICJGaWxlIFN5c3RlbSIKCQkJfQoJCQlncm91cCAiV29ya2VyIiB7CgkJCQlmZm1wZWcgPSBjb250YWluZXIgIkZGbXBlZyIKCQkJCWNsaWVudCA9IGNvbnRhaW5lciAiV29ya2VyIENsaWVudCIgewoJCQkJCXJ1bm5lciA9IGNvbXBvbmVudCAiSm9iIHJ1bm5lciIgIlJlcXVlc3RzIGFuZCBleGVjdXRlIGpvYnMiCgkJCQkJcmVwb3J0ZXIgPSBjb21wb25lbnQgIlN0YXR1cyBSZXBvcnRlciIKCQkJCX0KCQkJfQoJCX0KCgkJdXNlciAtPiBzcGEgIlNlbmQgZmlsZXMgYW5kIGdldCByZXN1bHRzIGZyb20iCgkJc3BhIC0+IGFwaSAiTWFrZXMgQVBJIGNhbGxzIHRvIiAiSFRUUCIKCQlzcGEgLT4gam9iQXBpICJTZW5kIGpvYiB0byIgIkhUVFAiCgoJCWF1dGhBcGkgLT4gYXV0aERiICJSZWFkcyBmcm9tIgoJCWpvYkFwaSAtPiBhdXRoQXBpICJWZXJpZnkiCgkJam9iQXBpIC0+IGZzICJTZW5kIHNvdXJjZSBmaWxlIHRvIgoJCWpvYkFwaSAtPiBqb2JEYiAiUmVhZCBhbmQgd3JpdGUgdG8iCgkJZmlsZUFwaSAtPiBhdXRoQXBpICJWZXJpZnkiCgkJZmlsZUFwaSAtPiBmcyAiUmVhZCBhbmQgd3JpdGUgdG8iCgoJCWpvYkFsb2NhdG9yIC0+IGpvYkRiICJSZWFkIGFuZCB3cml0ZSB0byIKCQlqb2JBbG9jYXRvciAtPiBhdXRoRGIgIlJlYWQgYW5kIHdyaXRlIHRvIgoJCXN0YXR1c1VwZGF0ZXIgLT4gam9iRGIgIldyaXRlIHN0YXR1cyB0byIKCQlzdGF0dXNVcGRhdGVyIC0+IGF1dGhEYiAiUmVhZCBmcm9tIgoKCQkjIFdvcmtlciByZWxhdGlvbnNoaXBzCgkJcnVubmVyIC0+IGpvYkFsb2NhdG9yICJHZXQgam9icyBmcm9tIiAiZ1JQQyIKCQlydW5uZXIgLT4gZmZtcGVnICJSdW5zIGpvYnMgd2l0aCIKCQlyZXBvcnRlciAtPiBmZm1wZWcgIlRyYWNrIHN0YXR1cyBmcm9tIgoJCXJlcG9ydGVyIC0+IHN0YXR1c1VwZGF0ZXIgIlNlbmQgdXBkYXRlcyB0byIKCQlmZm1wZWcgLT4gZmlsZUFwaSAiR2V0IGFuZCBzZW5kIGZpbGVzIHRvIiAiSFRUUCIKCX0KCgl2aWV3cyB7CgkJc3lzdGVtQ29udGV4dCBzZSAiZGlhZ3JhbTEiIHsKCQkJaW5jbHVkZSAqCgkJCWF1dG9sYXlvdXQgbHIKCQl9CgoJCWNvbnRhaW5lciBzZSAiZGlhZ3JhbTIiIHsKCQkJaW5jbHVkZSAqCgkJCWF1dG9sYXlvdXQgbHIKCQl9CgoJCWNvbXBvbmVudCBhcGkgImRpYWdyYW0zIiB7CgkJCWluY2x1ZGUgKgoJCQlhdXRvbGF5b3V0IGxyCgkJfQoKCQljb21wb25lbnQgcnBjICJkaWFncmFtNCIgewoJCQlpbmNsdWRlICoKCQkJYXV0b2xheW91dCBscgoJCX0KCgkJY29tcG9uZW50IGNsaWVudCAiZGlhZ3JhbTUiIHsKCQkJaW5jbHVkZSAqCgkJfQoKCQlzdHlsZXMgewoJCQllbGVtZW50ICJQZXJzb24iIHsKCQkJCWJhY2tncm91bmQgIzA4NDI3YgoJCQkJY29sb3Igd2hpdGUKCQkJCXNoYXBlIFBlcnNvbgoJCQl9CgoJCQllbGVtZW50ICJTb2Z0d2FyZSBTeXN0ZW0iIHsKCQkJCWJhY2tncm91bmQgIzExNjhiZAoJCQkJY29sb3Igd2hpdGUKCQkJfQoKCQkJZWxlbWVudCAiQ29udGFpbmVyIiB7CgkJCQliYWNrZ3JvdW5kICM0MzhkZDUKCQkJCWNvbG9yIHdoaXRlCgkJCX0KCgkJCWVsZW1lbnQgIkNvbXBvbmVudCIgewoJCQkJYmFja2dyb3VuZCAjODViYmYwCgkJCQljb2xvciBibGFjawoJCQl9CgoJCQllbGVtZW50ICJGaWxlIFN5c3RlbSIgewoJCQkJc2hhcGUgRm9sZGVyCgkJCX0KCgkJCWVsZW1lbnQgIkRhdGFiYXNlIiB7CgkJCQlzaGFwZSBDeWxpbmRlcgoJCQl9CgoJCQllbGVtZW50ICJXZWIgQXBwIiB7CgkJCQlzaGFwZSBXZWJCcm93c2VyCgkJCX0KCQl9Cgl9Cn0K"
   },
-  "configuration": {},
-  "model": {
-    "people": [
-      {
-        "id": "1",
-        "tags": "Element,Person",
-        "properties": {
-          "structurizr.dsl.identifier": "user"
+  "configuration" : { },
+  "model" : {
+    "people" : [ {
+      "id" : "1",
+      "tags" : "Element,Person",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "name" : "User",
+      "relationships" : [ {
+        "id" : "19",
+        "sourceId" : "1",
+        "destinationId" : "2",
+        "description" : "Send files and get results from",
+        "linkedRelationshipId" : "18"
+      }, {
+        "id" : "18",
+        "tags" : "Relationship",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ffe17c7c-0c1f-481f-9574-b9e1453ad54f"
         },
-        "name": "User",
-        "relationships": [
-          {
-            "id": "18",
-            "tags": "Relationship",
-            "properties": {
-              "structurizr.dsl.identifier": "88d5ab3f-2b3b-4a47-acca-afd643bbab62"
-            },
-            "sourceId": "1",
-            "destinationId": "3",
-            "description": "Send files and get results from"
-          },
-          {
-            "id": "19",
-            "sourceId": "1",
-            "destinationId": "2",
-            "description": "Send files and get results from",
-            "linkedRelationshipId": "18"
-          }
-        ],
-        "location": "Unspecified"
-      }
-    ],
-    "softwareSystems": [
-      {
-        "id": "2",
-        "tags": "Element,Software System",
-        "properties": {
-          "structurizr.dsl.identifier": "se"
+        "sourceId" : "1",
+        "destinationId" : "3",
+        "description" : "Send files and get results from"
+      } ],
+      "location" : "Unspecified"
+    } ],
+    "softwareSystems" : [ {
+      "id" : "2",
+      "tags" : "Element,Software System",
+      "properties" : {
+        "structurizr.dsl.identifier" : "se"
+      },
+      "name" : "SegmentedEncoder",
+      "location" : "Unspecified",
+      "containers" : [ {
+        "id" : "10",
+        "tags" : "Element,Container",
+        "properties" : {
+          "structurizr.dsl.identifier" : "rpc"
         },
-        "name": "SegmentedEncoder",
-        "location": "Unspecified",
-        "containers": [
-          {
-            "id": "13",
-            "tags": "Element,Container,File System",
-            "properties": {
-              "structurizr.dsl.identifier": "fs"
-            },
-            "name": "File system",
-            "description": "Stores files to process and results",
-            "documentation": {}
+        "name" : "gRPC API",
+        "relationships" : [ {
+          "id" : "34",
+          "sourceId" : "10",
+          "destinationId" : "8",
+          "description" : "Read and write to",
+          "linkedRelationshipId" : "33"
+        }, {
+          "id" : "32",
+          "sourceId" : "10",
+          "destinationId" : "9",
+          "description" : "Read and write to",
+          "linkedRelationshipId" : "31"
+        } ],
+        "group" : "Server",
+        "components" : [ {
+          "id" : "12",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "statusupdater"
           },
-          {
-            "id": "9",
-            "tags": "Element,Container,Database",
-            "properties": {
-              "structurizr.dsl.identifier": "jobdb"
+          "name" : "Status update",
+          "description" : "Track job progress",
+          "relationships" : [ {
+            "id" : "36",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "e9fe3fe2-4d02-498d-ac57-36aec1d5fbf5"
             },
-            "name": "Job Database",
-            "description": "Store job information",
-            "group": "Server",
-            "documentation": {}
+            "sourceId" : "12",
+            "destinationId" : "8",
+            "description" : "Read from"
+          }, {
+            "id" : "35",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "41761308-a069-4c92-98ca-6ef139a35ad7"
+            },
+            "sourceId" : "12",
+            "destinationId" : "9",
+            "description" : "Write status to"
+          } ],
+          "documentation" : { }
+        }, {
+          "id" : "11",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "jobalocator"
           },
-          {
-            "id": "8",
-            "tags": "Element,Container,Database",
-            "properties": {
-              "structurizr.dsl.identifier": "authdb"
+          "name" : "Job allocator",
+          "description" : "Get available jobs and set the required permisions for the client",
+          "relationships" : [ {
+            "id" : "31",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "2f11eecb-5e38-4873-8596-c3f6d86ff7c2"
             },
-            "name": "Auth Database",
-            "description": "Store authentication data",
-            "group": "Server",
-            "documentation": {}
+            "sourceId" : "11",
+            "destinationId" : "9",
+            "description" : "Read and write to"
+          }, {
+            "id" : "33",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "ba5da9e8-4844-41d7-a4a7-210b28487733"
+            },
+            "sourceId" : "11",
+            "destinationId" : "8",
+            "description" : "Read and write to"
+          } ],
+          "documentation" : { }
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "9",
+        "tags" : "Element,Container,Database",
+        "properties" : {
+          "structurizr.dsl.identifier" : "jobdb"
+        },
+        "name" : "Job Database",
+        "description" : "Store job information",
+        "group" : "Server",
+        "documentation" : { }
+      }, {
+        "id" : "8",
+        "tags" : "Element,Container,Database",
+        "properties" : {
+          "structurizr.dsl.identifier" : "authdb"
+        },
+        "name" : "Auth Database",
+        "description" : "Store authentication data",
+        "group" : "Server",
+        "documentation" : { }
+      }, {
+        "id" : "3",
+        "tags" : "Element,Container,Web App",
+        "properties" : {
+          "structurizr.dsl.identifier" : "spa"
+        },
+        "name" : "Single Page Application",
+        "relationships" : [ {
+          "id" : "20",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "2b7fe4d7-05a6-4a28-8bc1-051c684ab261"
           },
-          {
-            "id": "14",
-            "tags": "Element,Container",
-            "properties": {
-              "structurizr.dsl.identifier": "ffmpeg"
-            },
-            "name": "FFmpeg",
-            "relationships": [
-              {
-                "id": "47",
-                "tags": "Relationship",
-                "properties": {
-                  "structurizr.dsl.identifier": "993c2126-9b1d-4dd5-8034-bf4e148151f9"
-                },
-                "sourceId": "14",
-                "destinationId": "7",
-                "description": "Get and send files to"
-              },
-              {
-                "id": "48",
-                "sourceId": "14",
-                "destinationId": "4",
-                "description": "Get and send files to",
-                "linkedRelationshipId": "47"
-              }
-            ],
-            "group": "Worker",
-            "documentation": {}
+          "sourceId" : "3",
+          "destinationId" : "4",
+          "description" : "Makes API calls to",
+          "technology" : "HTTP"
+        }, {
+          "id" : "21",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "8f16d1c2-470d-4b0f-b2df-0ca76d2fd753"
           },
-          {
-            "id": "10",
-            "tags": "Element,Container",
-            "properties": {
-              "structurizr.dsl.identifier": "rpc"
-            },
-            "name": "gRPC API",
-            "relationships": [
-              {
-                "id": "34",
-                "sourceId": "10",
-                "destinationId": "8",
-                "description": "Read and write to",
-                "linkedRelationshipId": "33"
-              },
-              {
-                "id": "32",
-                "sourceId": "10",
-                "destinationId": "9",
-                "description": "Read and write to",
-                "linkedRelationshipId": "31"
-              }
-            ],
-            "group": "Server",
-            "components": [
-              {
-                "id": "12",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "statusupdater"
-                },
-                "name": "Status update",
-                "description": "Track job progress",
-                "relationships": [
-                  {
-                    "id": "36",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "8269854e-3670-4a73-86e2-7f9c8e405d8c"
-                    },
-                    "sourceId": "12",
-                    "destinationId": "8",
-                    "description": "Read from"
-                  },
-                  {
-                    "id": "35",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "ffc618f8-19eb-4cf2-a90b-51087ff4ad72"
-                    },
-                    "sourceId": "12",
-                    "destinationId": "9",
-                    "description": "Write status to"
-                  }
-                ],
-                "documentation": {}
-              },
-              {
-                "id": "11",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "jobalocator"
-                },
-                "name": "Job allocator",
-                "description": "Get available jobs and set the required permisions for the client",
-                "relationships": [
-                  {
-                    "id": "31",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "12be860a-e474-4e5b-9f53-1418ecf8b8a7"
-                    },
-                    "sourceId": "11",
-                    "destinationId": "9",
-                    "description": "Read and write to"
-                  },
-                  {
-                    "id": "33",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "072d8cf0-1a24-4515-a142-7e5fa3a43dad"
-                    },
-                    "sourceId": "11",
-                    "destinationId": "8",
-                    "description": "Read and write to"
-                  }
-                ],
-                "documentation": {}
-              }
-            ],
-            "documentation": {}
+          "sourceId" : "3",
+          "destinationId" : "6",
+          "description" : "Send job to",
+          "technology" : "HTTP"
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "14",
+        "tags" : "Element,Container",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ffmpeg"
+        },
+        "name" : "FFmpeg",
+        "relationships" : [ {
+          "id" : "48",
+          "sourceId" : "14",
+          "destinationId" : "4",
+          "description" : "Get and send files to",
+          "technology" : "HTTP",
+          "linkedRelationshipId" : "47"
+        }, {
+          "id" : "47",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "542db89b-c3cb-40c3-82fd-82007271f472"
           },
-          {
-            "id": "4",
-            "tags": "Element,Container",
-            "properties": {
-              "structurizr.dsl.identifier": "api"
-            },
-            "name": "Rest API",
-            "relationships": [
-              {
-                "id": "26",
-                "sourceId": "4",
-                "destinationId": "13",
-                "description": "Send source file to",
-                "linkedRelationshipId": "25"
-              },
-              {
-                "id": "23",
-                "sourceId": "4",
-                "destinationId": "8",
-                "description": "Reads from",
-                "linkedRelationshipId": "22"
-              },
-              {
-                "id": "28",
-                "sourceId": "4",
-                "destinationId": "9",
-                "description": "Read and write to",
-                "linkedRelationshipId": "27"
-              }
-            ],
-            "group": "Server",
-            "components": [
-              {
-                "id": "5",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "authapi"
-                },
-                "name": "Auth",
-                "description": "Check auth",
-                "relationships": [
-                  {
-                    "id": "22",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "08544c1c-5662-4577-8f3f-979240e86708"
-                    },
-                    "sourceId": "5",
-                    "destinationId": "8",
-                    "description": "Reads from"
-                  }
-                ],
-                "documentation": {}
-              },
-              {
-                "id": "7",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "fileapi"
-                },
-                "name": "File API",
-                "description": "Store and retrive files",
-                "relationships": [
-                  {
-                    "id": "29",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "8c9c2ddc-9d3e-4c94-988c-2fd1120a9a67"
-                    },
-                    "sourceId": "7",
-                    "destinationId": "5",
-                    "description": "Verify"
-                  },
-                  {
-                    "id": "30",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "8ea1925c-2849-4784-83d2-8f0b1e89df1f"
-                    },
-                    "sourceId": "7",
-                    "destinationId": "13",
-                    "description": "Read and write to"
-                  }
-                ],
-                "documentation": {}
-              },
-              {
-                "id": "6",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "jobapi"
-                },
-                "name": "Job API",
-                "description": "Manage jobs",
-                "relationships": [
-                  {
-                    "id": "25",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "cee03a3e-0eba-49af-b36e-3a5e3fd74bb1"
-                    },
-                    "sourceId": "6",
-                    "destinationId": "13",
-                    "description": "Send source file to"
-                  },
-                  {
-                    "id": "27",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "eaf5c728-64e2-4a1b-9265-5763e00ddfeb"
-                    },
-                    "sourceId": "6",
-                    "destinationId": "9",
-                    "description": "Read and write to"
-                  },
-                  {
-                    "id": "24",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "ce9ccac6-c3de-4c0a-bb28-d4371a082d01"
-                    },
-                    "sourceId": "6",
-                    "destinationId": "5",
-                    "description": "Verify"
-                  }
-                ],
-                "documentation": {}
-              }
-            ],
-            "documentation": {}
+          "sourceId" : "14",
+          "destinationId" : "7",
+          "description" : "Get and send files to",
+          "technology" : "HTTP"
+        } ],
+        "group" : "Worker",
+        "documentation" : { }
+      }, {
+        "id" : "15",
+        "tags" : "Element,Container",
+        "properties" : {
+          "structurizr.dsl.identifier" : "client"
+        },
+        "name" : "Worker Client",
+        "relationships" : [ {
+          "id" : "46",
+          "sourceId" : "15",
+          "destinationId" : "12",
+          "description" : "Send updates to",
+          "linkedRelationshipId" : "44"
+        }, {
+          "id" : "39",
+          "sourceId" : "15",
+          "destinationId" : "11",
+          "description" : "Get jobs from",
+          "technology" : "gRPC",
+          "linkedRelationshipId" : "37"
+        }, {
+          "id" : "40",
+          "sourceId" : "15",
+          "destinationId" : "10",
+          "description" : "Get jobs from",
+          "technology" : "gRPC",
+          "linkedRelationshipId" : "37"
+        }, {
+          "id" : "42",
+          "sourceId" : "15",
+          "destinationId" : "14",
+          "description" : "Runs jobs with",
+          "linkedRelationshipId" : "41"
+        } ],
+        "group" : "Worker",
+        "components" : [ {
+          "id" : "16",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "runner"
           },
-          {
-            "id": "3",
-            "tags": "Element,Container,Web App",
-            "properties": {
-              "structurizr.dsl.identifier": "spa"
+          "name" : "Job runner",
+          "description" : "Requests and execute jobs",
+          "relationships" : [ {
+            "id" : "38",
+            "sourceId" : "16",
+            "destinationId" : "10",
+            "description" : "Get jobs from",
+            "technology" : "gRPC",
+            "linkedRelationshipId" : "37"
+          }, {
+            "id" : "41",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "a9c17c18-8a56-40ee-b0bf-6b590ceaac0c"
             },
-            "name": "Single Page Application",
-            "relationships": [
-              {
-                "id": "21",
-                "tags": "Relationship",
-                "properties": {
-                  "structurizr.dsl.identifier": "44d332fd-fc07-49dd-8226-73d9513e900b"
-                },
-                "sourceId": "3",
-                "destinationId": "6",
-                "description": "Send job to"
-              },
-              {
-                "id": "20",
-                "tags": "Relationship",
-                "properties": {
-                  "structurizr.dsl.identifier": "e1c2748d-8527-449f-81ce-e1a3028e780b"
-                },
-                "sourceId": "3",
-                "destinationId": "4",
-                "description": "Makes API calls to"
-              }
-            ],
-            "documentation": {}
+            "sourceId" : "16",
+            "destinationId" : "14",
+            "description" : "Runs jobs with"
+          }, {
+            "id" : "37",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "13cf9b3c-6264-4f11-92a8-daec902d0b32"
+            },
+            "sourceId" : "16",
+            "destinationId" : "11",
+            "description" : "Get jobs from",
+            "technology" : "gRPC"
+          } ],
+          "documentation" : { }
+        }, {
+          "id" : "17",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "reporter"
           },
-          {
-            "id": "15",
-            "tags": "Element,Container",
-            "properties": {
-              "structurizr.dsl.identifier": "client"
+          "name" : "Status Reporter",
+          "relationships" : [ {
+            "id" : "43",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "e4017e05-ad14-4350-a45a-803256b21cf3"
             },
-            "name": "Worker Client",
-            "relationships": [
-              {
-                "id": "42",
-                "sourceId": "15",
-                "destinationId": "14",
-                "description": "Runs jobs with",
-                "linkedRelationshipId": "41"
-              },
-              {
-                "id": "46",
-                "sourceId": "15",
-                "destinationId": "12",
-                "description": "Send updates to",
-                "linkedRelationshipId": "44"
-              },
-              {
-                "id": "40",
-                "sourceId": "15",
-                "destinationId": "10",
-                "description": "Get jobs from",
-                "linkedRelationshipId": "37"
-              },
-              {
-                "id": "39",
-                "sourceId": "15",
-                "destinationId": "11",
-                "description": "Get jobs from",
-                "linkedRelationshipId": "37"
-              }
-            ],
-            "group": "Worker",
-            "components": [
-              {
-                "id": "17",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "reporter"
-                },
-                "name": "Status Reporter",
-                "relationships": [
-                  {
-                    "id": "44",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "1e95b7f0-f573-4294-832d-a20be33c5cf4"
-                    },
-                    "sourceId": "17",
-                    "destinationId": "12",
-                    "description": "Send updates to"
-                  },
-                  {
-                    "id": "43",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "a030c616-a580-4ba4-996c-58617d10c1a3"
-                    },
-                    "sourceId": "17",
-                    "destinationId": "14",
-                    "description": "Track status from"
-                  },
-                  {
-                    "id": "45",
-                    "sourceId": "17",
-                    "destinationId": "10",
-                    "description": "Send updates to",
-                    "linkedRelationshipId": "44"
-                  }
-                ],
-                "documentation": {}
-              },
-              {
-                "id": "16",
-                "tags": "Element,Component",
-                "properties": {
-                  "structurizr.dsl.identifier": "runner"
-                },
-                "name": "Job runner",
-                "description": "Requests and execute jobs",
-                "relationships": [
-                  {
-                    "id": "37",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "7aaeea0f-db7e-4339-ab5f-41b8f89d0d1b"
-                    },
-                    "sourceId": "16",
-                    "destinationId": "11",
-                    "description": "Get jobs from"
-                  },
-                  {
-                    "id": "38",
-                    "sourceId": "16",
-                    "destinationId": "10",
-                    "description": "Get jobs from",
-                    "linkedRelationshipId": "37"
-                  },
-                  {
-                    "id": "41",
-                    "tags": "Relationship",
-                    "properties": {
-                      "structurizr.dsl.identifier": "b9f0def3-110e-4062-8f26-60159200f3fc"
-                    },
-                    "sourceId": "16",
-                    "destinationId": "14",
-                    "description": "Runs jobs with"
-                  }
-                ],
-                "documentation": {}
-              }
-            ],
-            "documentation": {}
-          }
-        ],
-        "documentation": {}
-      }
-    ]
+            "sourceId" : "17",
+            "destinationId" : "14",
+            "description" : "Track status from"
+          }, {
+            "id" : "44",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "5ef1f9e2-b0da-41b2-96cd-290dca8eb0d1"
+            },
+            "sourceId" : "17",
+            "destinationId" : "12",
+            "description" : "Send updates to"
+          }, {
+            "id" : "45",
+            "sourceId" : "17",
+            "destinationId" : "10",
+            "description" : "Send updates to",
+            "linkedRelationshipId" : "44"
+          } ],
+          "documentation" : { }
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "4",
+        "tags" : "Element,Container",
+        "properties" : {
+          "structurizr.dsl.identifier" : "api"
+        },
+        "name" : "Rest API",
+        "relationships" : [ {
+          "id" : "26",
+          "sourceId" : "4",
+          "destinationId" : "13",
+          "description" : "Send source file to",
+          "linkedRelationshipId" : "25"
+        }, {
+          "id" : "28",
+          "sourceId" : "4",
+          "destinationId" : "9",
+          "description" : "Read and write to",
+          "linkedRelationshipId" : "27"
+        }, {
+          "id" : "23",
+          "sourceId" : "4",
+          "destinationId" : "8",
+          "description" : "Reads from",
+          "linkedRelationshipId" : "22"
+        } ],
+        "group" : "Server",
+        "components" : [ {
+          "id" : "6",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "jobapi"
+          },
+          "name" : "Job API",
+          "description" : "Manage jobs",
+          "relationships" : [ {
+            "id" : "27",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "efd70557-4f2e-4de9-a3ca-cc2c58521924"
+            },
+            "sourceId" : "6",
+            "destinationId" : "9",
+            "description" : "Read and write to"
+          }, {
+            "id" : "24",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "891122d0-c4ed-4a29-be1d-43cdb5d8a5fe"
+            },
+            "sourceId" : "6",
+            "destinationId" : "5",
+            "description" : "Verify"
+          }, {
+            "id" : "25",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "e20720d8-4e96-484e-a2b3-3f9b845f6ee3"
+            },
+            "sourceId" : "6",
+            "destinationId" : "13",
+            "description" : "Send source file to"
+          } ],
+          "documentation" : { }
+        }, {
+          "id" : "7",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "fileapi"
+          },
+          "name" : "File API",
+          "description" : "Store and retrive files",
+          "relationships" : [ {
+            "id" : "29",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "7834dd7b-6176-4aa9-bc0c-85499d9080be"
+            },
+            "sourceId" : "7",
+            "destinationId" : "5",
+            "description" : "Verify"
+          }, {
+            "id" : "30",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "b27052d4-c01d-40ad-be19-8ad6e43f63fb"
+            },
+            "sourceId" : "7",
+            "destinationId" : "13",
+            "description" : "Read and write to"
+          } ],
+          "documentation" : { }
+        }, {
+          "id" : "5",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "authapi"
+          },
+          "name" : "Auth",
+          "description" : "Check auth",
+          "relationships" : [ {
+            "id" : "22",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "3d44ab85-a80e-4804-afe0-13c87bf186af"
+            },
+            "sourceId" : "5",
+            "destinationId" : "8",
+            "description" : "Reads from"
+          } ],
+          "documentation" : { }
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "13",
+        "tags" : "Element,Container,File System",
+        "properties" : {
+          "structurizr.dsl.identifier" : "fs"
+        },
+        "name" : "File system",
+        "description" : "Stores files to process and results",
+        "documentation" : { }
+      } ],
+      "documentation" : { }
+    } ]
   },
-  "documentation": {},
-  "views": {
-    "systemContextViews": [
-      {
-        "key": "diagram1",
-        "order": 1,
-        "softwareSystemId": "2",
-        "dimensions": {
-          "width": 1550,
-          "height": 800
-        },
-        "automaticLayout": {
-          "implementation": "Graphviz",
-          "rankDirection": "LeftRight",
-          "rankSeparation": 300,
-          "nodeSeparation": 300,
-          "edgeSeparation": 0,
-          "vertices": false,
-          "applied": true
-        },
-        "enterpriseBoundaryVisible": true,
-        "elements": [
-          {
-            "id": "1",
-            "x": 200,
-            "y": 199
-          },
-          {
-            "id": "2",
-            "x": 900,
-            "y": 249
-          }
-        ],
-        "relationships": [
-          {
-            "id": "19"
-          }
-        ]
-      }
-    ],
-    "containerViews": [
-      {
-        "key": "diagram2",
-        "order": 2,
-        "softwareSystemId": "2",
-        "dimensions": {
-          "width": 3180,
-          "height": 2674
-        },
-        "automaticLayout": {
-          "implementation": "Graphviz",
-          "rankDirection": "LeftRight",
-          "rankSeparation": 300,
-          "nodeSeparation": 300,
-          "edgeSeparation": 0,
-          "vertices": false,
-          "applied": true
-        },
-        "externalSoftwareSystemBoundariesVisible": true,
-        "elements": [
-          {
-            "id": "1",
-            "x": 264,
-            "y": 199
-          },
-          {
-            "id": "13",
-            "x": 2489,
-            "y": 808
-          },
-          {
-            "id": "3",
-            "x": 989,
-            "y": 883
-          },
-          {
-            "id": "14",
-            "x": 989,
-            "y": 1862
-          },
-          {
-            "id": "15",
-            "x": 239,
-            "y": 1862
-          },
-          {
-            "id": "4",
-            "x": 1739,
-            "y": 1408
-          },
-          {
-            "id": "8",
-            "x": 2489,
-            "y": 2008
-          },
-          {
-            "id": "9",
-            "x": 2489,
-            "y": 1408
-          },
-          {
-            "id": "10",
-            "x": 1739,
-            "y": 2008
-          }
-        ],
-        "relationships": [
-          {
-            "id": "18"
-          },
-          {
-            "id": "28"
-          },
-          {
-            "id": "26"
-          },
-          {
-            "id": "40",
-            "vertices": [
-              {
-                "x": 989,
-                "y": 1712
-              },
-              {
-                "x": 1543,
-                "y": 1712
-              },
-              {
-                "x": 1635,
-                "y": 1858
-              }
-            ]
-          },
-          {
-            "id": "34"
-          },
-          {
-            "id": "42"
-          },
-          {
-            "id": "23"
-          },
-          {
-            "id": "32"
-          },
-          {
-            "id": "20"
-          },
-          {
-            "id": "48",
-            "vertices": [
-              {
-                "x": 1543,
-                "y": 1845
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    "componentViews": [
-      {
-        "key": "diagram5",
-        "order": 5,
-        "dimensions": {
-          "width": 1760,
-          "height": 1711
-        },
-        "containerId": "15",
-        "externalContainerBoundariesVisible": true,
-        "elements": [
-          {
-            "id": "14",
-            "x": 1114,
-            "y": 370
-          },
-          {
-            "id": "16",
-            "x": 214,
-            "y": 220
-          },
-          {
-            "id": "17",
-            "x": 214,
-            "y": 1120
-          },
-          {
-            "id": "10",
-            "x": 1114,
-            "y": 970
-          }
-        ],
-        "relationships": [
-          {
-            "id": "41"
-          },
-          {
-            "id": "43"
-          },
-          {
-            "id": "45"
-          },
-          {
-            "id": "38"
-          }
-        ]
+  "documentation" : { },
+  "views" : {
+    "systemContextViews" : [ {
+      "key" : "diagram1",
+      "order" : 1,
+      "softwareSystemId" : "2",
+      "dimensions" : {
+        "width" : 1550,
+        "height" : 800
       },
-      {
-        "key": "diagram4",
-        "order": 4,
-        "dimensions": {
-          "width": 2350,
-          "height": 1411
-        },
-        "automaticLayout": {
-          "implementation": "Graphviz",
-          "rankDirection": "LeftRight",
-          "rankSeparation": 300,
-          "nodeSeparation": 300,
-          "edgeSeparation": 0,
-          "vertices": false,
-          "applied": true
-        },
-        "containerId": "10",
-        "externalContainerBoundariesVisible": true,
-        "elements": [
-          {
-            "id": "11",
-            "x": 949,
-            "y": 219
-          },
-          {
-            "id": "12",
-            "x": 949,
-            "y": 819
-          },
-          {
-            "id": "15",
-            "x": 199,
-            "y": 519
-          },
-          {
-            "id": "8",
-            "x": 1699,
-            "y": 219
-          },
-          {
-            "id": "9",
-            "x": 1699,
-            "y": 819
-          }
-        ],
-        "relationships": [
-          {
-            "id": "36"
-          },
-          {
-            "id": "35"
-          },
-          {
-            "id": "33"
-          },
-          {
-            "id": "31"
-          },
-          {
-            "id": "46"
-          },
-          {
-            "id": "39"
-          }
-        ]
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false,
+        "applied" : true
       },
-      {
-        "key": "diagram3",
-        "order": 3,
-        "dimensions": {
-          "width": 3100,
-          "height": 2428
-        },
-        "automaticLayout": {
-          "implementation": "Graphviz",
-          "rankDirection": "LeftRight",
-          "rankSeparation": 300,
-          "nodeSeparation": 300,
-          "edgeSeparation": 0,
-          "vertices": false,
-          "applied": true
-        },
-        "containerId": "4",
-        "externalContainerBoundariesVisible": true,
-        "elements": [
-          {
-            "id": "13",
-            "x": 1700,
-            "y": 1328
-          },
-          {
-            "id": "14",
-            "x": 200,
-            "y": 220
-          },
-          {
-            "id": "3",
-            "x": 200,
-            "y": 820
-          },
-          {
-            "id": "5",
-            "x": 1700,
-            "y": 474
-          },
-          {
-            "id": "6",
-            "x": 950,
-            "y": 820
-          },
-          {
-            "id": "7",
-            "x": 950,
-            "y": 220
-          },
-          {
-            "id": "8",
-            "x": 2450,
-            "y": 474
-          },
-          {
-            "id": "9",
-            "x": 1700,
-            "y": 1928
-          }
-        ],
-        "relationships": [
-          {
-            "id": "29"
-          },
-          {
-            "id": "27",
-            "vertices": [
-              {
-                "x": 1700,
-                "y": 1778
-              }
-            ]
-          },
-          {
-            "id": "25"
-          },
-          {
-            "id": "24"
-          },
-          {
-            "id": "22"
-          },
-          {
-            "id": "21"
-          },
-          {
-            "id": "30",
-            "vertices": [
-              {
-                "x": 1400,
-                "y": 670
-              },
-              {
-                "x": 1700,
-                "y": 1299
-              }
-            ]
-          },
-          {
-            "id": "47"
-          }
-        ]
-      }
-    ],
-    "configuration": {
-      "branding": {},
-      "styles": {
-        "elements": [
-          {
-            "tag": "Person",
-            "background": "#08427b",
-            "color": "#ffffff",
-            "shape": "Person"
-          },
-          {
-            "tag": "Software System",
-            "background": "#1168bd",
-            "color": "#ffffff"
-          },
-          {
-            "tag": "Container",
-            "background": "#438dd5",
-            "color": "#ffffff"
-          },
-          {
-            "tag": "Component",
-            "background": "#85bbf0",
-            "color": "#000000"
-          },
-          {
-            "tag": "File System",
-            "shape": "Folder"
-          },
-          {
-            "tag": "Database",
-            "shape": "Cylinder"
-          },
-          {
-            "tag": "Web App",
-            "shape": "WebBrowser"
-          }
-        ]
+      "enterpriseBoundaryVisible" : true,
+      "elements" : [ {
+        "id" : "1",
+        "x" : 200,
+        "y" : 200
+      }, {
+        "id" : "2",
+        "x" : 900,
+        "y" : 250
+      } ],
+      "relationships" : [ {
+        "id" : "19"
+      } ]
+    } ],
+    "containerViews" : [ {
+      "key" : "diagram2",
+      "order" : 2,
+      "softwareSystemId" : "2",
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false,
+        "applied" : false
       },
-      "terminology": {},
-      "metadataSymbols": "SquareBrackets",
-      "lastSavedView": "diagram4"
+      "externalSoftwareSystemBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "relationships" : [ {
+        "id" : "18"
+      }, {
+        "id" : "28"
+      }, {
+        "id" : "26"
+      }, {
+        "id" : "40"
+      }, {
+        "id" : "34"
+      }, {
+        "id" : "23"
+      }, {
+        "id" : "42"
+      }, {
+        "id" : "32"
+      }, {
+        "id" : "20"
+      }, {
+        "id" : "48"
+      } ]
+    } ],
+    "componentViews" : [ {
+      "key" : "diagram3",
+      "order" : 3,
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false,
+        "applied" : false
+      },
+      "containerId" : "4",
+      "externalContainerBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "13",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "14",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "relationships" : [ {
+        "id" : "29"
+      }, {
+        "id" : "27"
+      }, {
+        "id" : "25"
+      }, {
+        "id" : "24"
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "21"
+      }, {
+        "id" : "30"
+      }, {
+        "id" : "47"
+      } ]
+    }, {
+      "key" : "diagram5",
+      "order" : 5,
+      "dimensions" : {
+        "width" : 1760,
+        "height" : 1711
+      },
+      "containerId" : "15",
+      "externalContainerBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "14",
+        "x" : 1114,
+        "y" : 370
+      }, {
+        "id" : "16",
+        "x" : 214,
+        "y" : 220
+      }, {
+        "id" : "17",
+        "x" : 214,
+        "y" : 1120
+      }, {
+        "id" : "10",
+        "x" : 1114,
+        "y" : 970
+      } ],
+      "relationships" : [ {
+        "id" : "41"
+      }, {
+        "id" : "43"
+      }, {
+        "id" : "45"
+      }, {
+        "id" : "38"
+      } ]
+    }, {
+      "key" : "diagram4",
+      "order" : 4,
+      "automaticLayout" : {
+        "implementation" : "Graphviz",
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 300,
+        "nodeSeparation" : 300,
+        "edgeSeparation" : 0,
+        "vertices" : false,
+        "applied" : false
+      },
+      "containerId" : "10",
+      "externalContainerBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "15",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "relationships" : [ {
+        "id" : "36"
+      }, {
+        "id" : "35"
+      }, {
+        "id" : "33"
+      }, {
+        "id" : "31"
+      }, {
+        "id" : "46"
+      }, {
+        "id" : "39"
+      } ]
+    } ],
+    "configuration" : {
+      "branding" : { },
+      "styles" : {
+        "elements" : [ {
+          "tag" : "Person",
+          "background" : "#08427b",
+          "color" : "#ffffff",
+          "shape" : "Person"
+        }, {
+          "tag" : "Software System",
+          "background" : "#1168bd",
+          "color" : "#ffffff"
+        }, {
+          "tag" : "Container",
+          "background" : "#438dd5",
+          "color" : "#ffffff"
+        }, {
+          "tag" : "Component",
+          "background" : "#85bbf0",
+          "color" : "#000000"
+        }, {
+          "tag" : "File System",
+          "shape" : "Folder"
+        }, {
+          "tag" : "Database",
+          "shape" : "Cylinder"
+        }, {
+          "tag" : "Web App",
+          "shape" : "WebBrowser"
+        } ]
+      },
+      "terminology" : { },
+      "metadataSymbols" : "SquareBrackets",
+      "lastSavedView" : "diagram1"
     }
   }
 }
