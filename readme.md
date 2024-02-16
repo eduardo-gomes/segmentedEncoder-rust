@@ -40,3 +40,21 @@ First, it will request a task, then it will start the task using the HTTP endpoi
 is running, the worker will send status updates periodically, and inform the server after the task is successfully
 finished. Another HTTP endpoint will be used to send the task output to the server, and the task will only be finished
 after the output is transferred and the worker tell the server.
+
+## task types
+
+Each job may have multiple tasks.
+
+To work as intended, at least 3 kind of tasks are needed.
+
+- Analysis task
+- Transcode task
+- Merge task
+
+### Analysis
+
+This kind of task will get all the information needed to create the necessary transcode tasks.
+
+### Merge
+
+This task will get the output from the other tasks ang generate the final result
