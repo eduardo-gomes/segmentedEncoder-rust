@@ -58,6 +58,8 @@ mod storage;
 
 mod jobs;
 
+mod job_db;
+
 //Sample webm file, to use on tests
 #[cfg(test)]
 pub(crate) const WEBM_SAMPLE: [u8; 185] = [
