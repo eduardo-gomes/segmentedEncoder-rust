@@ -25,7 +25,15 @@ trait JobDb<JOB, TASK> {
 	/// Append task to job and return the task index
 	async fn append_task(&self, job_id: &Uuid, task: TASK) -> Result<usize, std::io::Error>;
 	async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, std::io::Error>;
-	async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, std::io::Error>;
+	async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, std::io::Error> {
+		let task = self
+			.get_tasks(job_id)
+			.await?
+			.into_iter()
+			.skip(task_idx)
+			.next();
+		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
+	}
 }
 
 mod local {
@@ -83,15 +91,6 @@ mod local {
 				.map(|(_, tasks)| tasks)
 				.cloned()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-		}
-
-		async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, Error> {
-			let task = self
-				.lock()
-				.get(job_id)
-				.and_then(|(_, tasks)| tasks.get(task_idx))
-				.cloned();
-			task.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task not found"))
 		}
 	}
 
