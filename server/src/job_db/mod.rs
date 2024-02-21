@@ -8,12 +8,25 @@
 //! - Create job
 //! - Insert task to job
 //! - Allocate task
+//! - Update task status/set as finished
 //!
 //! Secondary operations
 //! - List jobs/tasks
 //! - Delete job
+//! - List allocated jobs
 //! - Restart task
 //! - Timeout task
+//!
+//! Those operations could be implemented with 3 tables
+//! - Jobs:
+//! 	At least job_id
+//! - Tasks:
+//! 	At least job_id and task_number
+//! - TaskInstances:
+//! 	At least job_id, task_number and instance_id
+//! Additionally:
+//! - TaskDependencies
+//! 	job_id, task_number, dependency_task_number
 
 use async_trait::async_trait;
 use uuid::Uuid;
