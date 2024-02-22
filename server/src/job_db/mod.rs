@@ -47,6 +47,8 @@ trait JobDb<JOB, TASK> {
 			.next();
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
+
+	async fn allocate_task(&self) -> Result<Option<Uuid>, std::io::Error>;
 }
 
 mod local {
@@ -61,11 +63,11 @@ mod local {
 
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
-		jobs: Mutex<HashMap<Uuid, (JOB, Vec<TASK>)>>,
+		jobs: Mutex<HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>>,
 	}
 
 	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> LocalJobDb<JOB, TASK> {
-		fn lock(&self) -> MutexGuard<'_, HashMap<Uuid, (JOB, Vec<TASK>)>> {
+		fn lock(&self) -> MutexGuard<'_, HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>> {
 			self.jobs
 				.lock()
 				.unwrap_or_else(|poison| poison.into_inner())
@@ -94,16 +96,34 @@ mod local {
 				Some(tasks) => tasks,
 			};
 			let idx = job.len();
-			job.push(task);
+			job.push((task, None));
 			Ok(idx)
 		}
 
 		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
 			self.lock()
 				.get(job_id)
-				.map(|(_, tasks)| tasks)
-				.cloned()
+				.map(|(_, tasks)| tasks.iter().map(|(task, _)| task).cloned().collect())
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
+		}
+
+		async fn allocate_task(&self) -> Result<Option<Uuid>, Error> {
+			let mut binding = self.lock();
+			let available = binding
+				.values_mut()
+				.flat_map(|(_, jobs)| {
+					jobs.iter_mut()
+						.filter(|(_, allocation)| allocation.is_none())
+				})
+				.next();
+			match available {
+				None => Ok(None),
+				Some(available) => {
+					let id = Uuid::new_v4();
+					available.1 = Some(id);
+					Ok(Some(id))
+				}
+			}
 		}
 	}
 
@@ -196,6 +216,51 @@ mod local {
 				second_task,
 				first_task
 			);
+		}
+
+		#[tokio::test]
+		async fn allocate_task_without_any_available_returns_none() {
+			let manager = LocalJobDb::<String, String>::default();
+			let allocation = manager.allocate_task().await.unwrap();
+			assert!(allocation.is_none())
+		}
+
+		#[tokio::test]
+		async fn allocate_task_returns_task_and_the_run_id() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let _task_idx = manager.append_task(&job_id, task).await.unwrap();
+			let allocation_id: Uuid = manager.allocate_task().await.unwrap().unwrap();
+			assert!(!allocation_id.is_nil())
+		}
+
+		#[tokio::test]
+		async fn allocate_more_than_available_return_none() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			manager.append_task(&job_id, task).await.unwrap();
+			let _allocated = manager.allocate_task().await.unwrap();
+			let none = manager.allocate_task().await.unwrap();
+			assert!(none.is_none())
+		}
+
+		#[tokio::test]
+		async fn allocate_two_tasks() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_1 = "Task 1".to_string();
+			let task_2 = "Task 2".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			manager.append_task(&job_id, task_1).await.unwrap();
+			manager.append_task(&job_id, task_2).await.unwrap();
+			let allocated_1 = manager.allocate_task().await.unwrap();
+			let allocated_2 = manager.allocate_task().await.unwrap();
+			assert!(allocated_1.is_some());
+			assert!(allocated_2.is_some());
 		}
 	}
 }
