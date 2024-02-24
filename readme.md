@@ -41,7 +41,7 @@ is running, the worker will send status updates periodically, and inform the ser
 finished. Another HTTP endpoint will be used to send the task output to the server, and the task will only be finished
 after the output is transferred and the worker tell the server.
 
-## task types
+## Task types
 
 Each job may have multiple tasks.
 

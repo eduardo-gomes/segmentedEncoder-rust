@@ -14,8 +14,8 @@
 //! - List jobs/tasks
 //! - Delete job
 //! - List allocated jobs
-//! - Restart task
-//! - Timeout task
+//! - Cancel task allocation
+//! - Timeout task allocation
 //!
 //! Those operations could be implemented with 3 tables
 //! - Jobs:
