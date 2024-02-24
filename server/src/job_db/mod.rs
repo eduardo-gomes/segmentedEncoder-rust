@@ -28,10 +28,8 @@
 //! - TaskDependencies
 //! 	job_id, task_number, dependency_task_number
 
-use async_trait::async_trait;
 use uuid::Uuid;
 
-#[async_trait]
 trait JobDb<JOB, TASK> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
@@ -56,7 +54,6 @@ mod local {
 	use std::io::{Error, ErrorKind};
 	use std::sync::{Mutex, MutexGuard};
 
-	use async_trait::async_trait;
 	use uuid::Uuid;
 
 	use crate::job_db::JobDb;
@@ -74,7 +71,6 @@ mod local {
 		}
 	}
 
-	#[async_trait]
 	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> JobDb<JOB, TASK>
 		for LocalJobDb<JOB, TASK>
 	{
