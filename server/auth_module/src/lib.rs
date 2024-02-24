@@ -2,7 +2,6 @@
 //!
 //! This module will generate authentication tokens, and store permissions
 
-use async_trait::async_trait;
 use uuid::Uuid;
 
 pub use local::LocalAuthenticator;
@@ -13,7 +12,6 @@ pub enum Error {
 	InvalidCredentials,
 }
 
-#[async_trait]
 pub trait AuthenticationHandler {
 	async fn new_token(&self) -> String;
 	async fn delete_token(&self, token: &str) -> Result<(), Error>;
@@ -27,7 +25,6 @@ mod local {
 	use std::sync::atomic::Ordering;
 	use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
-	use async_trait::async_trait;
 	use uuid::Uuid;
 
 	use crate::Error::InvalidCredentials;
@@ -50,7 +47,6 @@ mod local {
 		}
 	}
 
-	#[async_trait]
 	impl AuthenticationHandler for LocalAuthenticator {
 		async fn new_token(&self) -> String {
 			let id = self.counter.fetch_add(1, Ordering::SeqCst);
