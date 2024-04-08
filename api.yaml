@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: SegmentedEncoder rest api
+  version: 0.0.1
+servers:
+  - description: Local
+    url: http://localhost:8888/api
+components:
+  parameters:
+    job_id:
+      name: job_id
+      required: true
+      in: path
+      schema:
+        type: string
+    task_id:
+      name: task_id
+      required: true
+      in: path
+      schema:
+        type: string
+  schemas:
+    task:
+      type: object
+      properties:
+        job_id:
+          type: string
+        task_id:
+          type: string
+  securitySchemes:
+    auth_token:
+      name: Authorization
+      in: header
+      type: apiKey
+
+paths:
+  /version:
+    description: get server/api version
+    get:
+      responses:
+        200:
+          description: Server version
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: v1.2.3
+  /login:
+    description: Provide credentials to generate a session token
+    post:
+      requestBody:
+        description: credentials
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        200:
+          description: the authentication token for the created session
+          content:
+            text/plain:
+              schema:
+                type: string
+        403:
+          description: Bad credentials
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: Bad credentials
+
+  /job:
+    post:
+      description: Create new job
+      security:
+        - auth_token: [ ]
+      parameters:
+        - name: video_encoder
+          required: true
+          in: header
+          example: libsvtav1
+          schema:
+            type: string
+        - name: video_args
+          in: header
+          example: -preset 4 -crf 27
+          schema:
+            type: string
+        - name: audio_encoder
+          in: header
+          example: libopus
+          schema:
+            type: string
+        - name: audio_args
+          in: header
+          example: -b:a 96k
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          video/*:
+            schema:
+              type: string
+              format: byte
+  /job/{job_id}/info:
+    get:
+      description: Get job info, as well as each task progress
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+  /job/{job_id}/output:
+    get:
+      description: Get the job output (output of the last task)
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+      responses:
+        308:
+          description: Redirect to the task output that is the output of the job
+        404:
+          description: The job is not finished yet
+  #Workers endpoints
+  /allocate_task:
+    get:
+      security:
+        - auth_token: [ ]
+      description: allocate a task to current worker
+      responses:
+        200:
+          description: The allocated task info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task"
+        503:
+          description: Timed out and no task was available, try again later
+          content:
+            text/plain:
+              example: No task available, try again later
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+      tags:
+        - worker
+  /job/{job_id}/task:
+    post:
+      security:
+        - auth_token: [ ]
+      description: Append task to job
+      tags:
+        - worker
+  /job/{job_id}/tasks/{task_id}/input/{num}:
+    get:
+      security:
+        - auth_token: [ ]
+      parameters:
+        - name: num
+          in: path
+          required: true
+          schema:
+            type: number
+          example: 0
+        - $ref: "#/components/parameters/job_id"
+        - $ref: "#/components/parameters/task_id"
+      tags:
+        - worker
+  /job/{job_id}/task/{task_id}/output:
+    put:
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+        - $ref: "#/components/parameters/task_id"
+      tags:
+        - worker
+      requestBody:
+        content:
+          video/x-matroska:
+            schema:
+              type: string
+              format: binary
+          audio/x-matroska:
+            schema:
+              type: string
+              format: binary
+    get:
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+        - $ref: "#/components/parameters/task_id"
+      tags:
+        - worker
+  /job/{job_id}/task/{task_id}/status:
+    post:
+      security:
+        - auth_token: [ ]
+      description: Update task status
+      tags:
+        - worker
