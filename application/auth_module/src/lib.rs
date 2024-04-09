@@ -2,6 +2,8 @@
 //!
 //! This module will generate authentication tokens, and store permissions
 
+use std::future::Future;
+
 use uuid::Uuid;
 
 pub use local::LocalAuthenticator;
@@ -13,11 +15,11 @@ pub enum Error {
 }
 
 pub trait AuthenticationHandler {
-	async fn new_token(&self) -> String;
-	async fn delete_token(&self, token: &str) -> Result<(), Error>;
-	async fn add(&self, token: &str, obj: Uuid) -> Result<(), Error>;
-	async fn remove(&self, token: &str, obj: Uuid) -> Result<bool, Error>;
-	async fn check(&self, token: &str, obj: Uuid) -> Result<bool, Error>;
+	fn new_token(&self) -> impl Future<Output = String> + Send;
+	fn delete_token(&self, token: &str) -> impl Future<Output = Result<(), Error>> + Send;
+	fn add(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<(), Error>> + Send;
+	fn remove(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<bool, Error>> + Send;
+	fn check(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<bool, Error>> + Send;
 }
 
 mod local {
