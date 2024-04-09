@@ -45,16 +45,16 @@ after the output is transferred and the worker tell the server.
 
 Each job may have multiple tasks.
 
-To work as intended, at least 3 kind of tasks are needed.
+To work as intended, at least 2 kind of tasks are needed.
 
-- Analysis task
-- Transcode task
-- Merge task
+- Analysis task (Output is new tasks tasks)
+- Transcode/Merge task (Output is media)
 
 ### Analysis
 
 This kind of task will get all the information needed to create the necessary transcode tasks.
 
-### Merge
+### Transcode/Merge
 
-This task will get the output from the other tasks ang generate the final result
+This task has access to other tasks outputs, and output a file.
+The merge task is the one that generates the job output
