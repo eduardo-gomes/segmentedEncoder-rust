@@ -37,12 +37,7 @@ trait JobDb<JOB, TASK> {
 	async fn append_task(&self, job_id: &Uuid, task: TASK) -> Result<usize, std::io::Error>;
 	async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, std::io::Error>;
 	async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, std::io::Error> {
-		let task = self
-			.get_tasks(job_id)
-			.await?
-			.into_iter()
-			.skip(task_idx)
-			.next();
+		let task = self.get_tasks(job_id).await?.into_iter().nth(task_idx);
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
 
