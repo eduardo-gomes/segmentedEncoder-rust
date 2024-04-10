@@ -20,6 +20,36 @@ components:
       schema:
         type: string
   schemas:
+    task_input:
+      type: array
+      items:
+        type: object
+        properties:
+          input:
+            type: integer
+            required: true
+          start:
+            type: number
+            required: false
+          end:
+            type: number
+            required: false
+      example:
+        - input: 0
+          start: 0
+          end: 2.5
+    codec_params:
+      type: object
+      properties:
+        codec:
+          type: string
+        params:
+          type: array
+          items:
+            type: string
+      example:
+        codec: libaom-av1
+        params: [ -crf, 30 ]
     task:
       type: object
       properties:
@@ -27,6 +57,20 @@ components:
           type: string
         task_id:
           type: string
+        input:
+          $ref: "#/components/schemas/task_input"
+        recipe:
+          oneOf:
+            - $ref: "#/components/schemas/transcode_task"
+            - $ref: "#/components/schemas/merge_task"
+    transcode_task:
+      type: object
+      properties:
+        options:
+          $ref: "#/components/schemas/codec_params"
+    merge_task:
+      type: string
+      description: How to merge the inputs
   securitySchemes:
     auth_token:
       name: Authorization
@@ -103,6 +147,13 @@ paths:
             schema:
               type: string
               format: byte
+      responses:
+        201:
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: string
   /job/{job_id}/info:
     get:
       description: Get job info, as well as each task progress
@@ -110,6 +161,9 @@ paths:
         - auth_token: [ ]
       parameters:
         - $ref: "#/components/parameters/job_id"
+      responses:
+        200:
+          description: Job info/status
   /job/{job_id}/output:
     get:
       description: Get the job output (output of the last task)
@@ -151,8 +205,13 @@ paths:
       security:
         - auth_token: [ ]
       description: Append task to job
+      parameters:
+        - $ref: "#/components/parameters/job_id"
       tags:
         - worker
+      responses:
+        201:
+          description: Created task
   /job/{job_id}/tasks/{task_id}/input/{num}:
     get:
       security:
@@ -168,6 +227,9 @@ paths:
         - $ref: "#/components/parameters/task_id"
       tags:
         - worker
+      responses:
+        200:
+          description: Task input file content
   /job/{job_id}/task/{task_id}/output:
     put:
       security:
@@ -187,6 +249,9 @@ paths:
             schema:
               type: string
               format: binary
+      responses:
+        201:
+          description: Successfully uploaded task output
     get:
       security:
         - auth_token: [ ]
@@ -195,10 +260,21 @@ paths:
         - $ref: "#/components/parameters/task_id"
       tags:
         - worker
+      responses:
+        200:
+          description: Task output
+        404:
+          description: Task output not available
   /job/{job_id}/task/{task_id}/status:
     post:
       security:
         - auth_token: [ ]
       description: Update task status
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+        - $ref: "#/components/parameters/task_id"
       tags:
         - worker
+      responses:
+        200:
+          description: Task status
