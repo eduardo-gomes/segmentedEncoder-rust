@@ -12,4 +12,7 @@ runner = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-uuid = "1.7.0"
+uuid = { version = "1.7.0", features = ["v4"] }
+
+[dev-dependencies]
+tokio = { version = "1.37.0", features = ["macros", "rt"] }

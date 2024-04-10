@@ -51,7 +51,7 @@ mod local {
 
 	use uuid::Uuid;
 
-	use crate::job_db::JobDb;
+	use super::JobDb;
 
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
@@ -124,8 +124,8 @@ mod local {
 
 		use uuid::Uuid;
 
-		use crate::job_db::local::LocalJobDb;
-		use crate::job_db::JobDb;
+		use super::JobDb;
+		use super::LocalJobDb;
 
 		#[tokio::test]
 		async fn get_nonexistent_job_none() {

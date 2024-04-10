@@ -9,6 +9,7 @@ struct JobSource {
 }
 
 struct TaskSource {
+	///Here, the input should be the task id, or 0 for the job source
 	inputs: Vec<Input>,
 	recipe: Recipe,
 }
@@ -50,3 +51,5 @@ trait Manager {
 	///Delete the job removing all tasks, completed or pending
 	fn delete_job(job_id: &Uuid);
 }
+
+mod manager;
