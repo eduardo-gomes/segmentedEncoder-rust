@@ -25,6 +25,7 @@ struct Options {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 enum Recipe {
 	Analysis(),
 	Transcode(Options),
@@ -32,6 +33,7 @@ enum Recipe {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct Input {
 	index: u32,
 	start: Option<f64>,
@@ -39,6 +41,7 @@ struct Input {
 }
 
 ///An allocated task
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct Instance {
 	job_id: Uuid,
 	task_id: Uuid,
