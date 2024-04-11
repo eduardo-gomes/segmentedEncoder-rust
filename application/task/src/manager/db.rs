@@ -46,7 +46,7 @@ trait JobDb<JOB, TASK> {
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
 
-	async fn allocate_task(&self) -> Result<Option<Uuid>, std::io::Error>;
+	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
 	///Mark the task as finished, allowing tasks that depend on this task to run
 	async fn fulfill(&self, job_id: &Uuid, task_idx: usize) -> Result<(), std::io::Error>;
 }
@@ -115,22 +115,25 @@ mod local {
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
 		}
 
-		async fn allocate_task(&self) -> Result<Option<Uuid>, Error> {
+		async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, Error> {
 			let mut binding = self.lock();
 			let available = binding
-				.values_mut()
-				.flat_map(|(_, jobs)| {
-					jobs.iter_mut().filter(|(_, allocation, dependencies)| {
-						allocation.is_none() && dependencies.is_empty()
-					})
+				.iter_mut()
+				.flat_map(|(job_id, (_, tasks))| {
+					tasks
+						.iter_mut()
+						.filter(|(_, allocation, dependencies)| {
+							allocation.is_none() && dependencies.is_empty()
+						})
+						.map(|task| (*job_id, task))
 				})
 				.next();
 			match available {
 				None => Ok(None),
-				Some(available) => {
+				Some((job_id, available)) => {
 					let id = Uuid::new_v4();
 					available.1 = Some(id);
-					Ok(Some(id))
+					Ok(Some((job_id, id)))
 				}
 			}
 		}
@@ -284,13 +287,15 @@ mod local {
 		}
 
 		#[tokio::test]
-		async fn allocate_task_returns_task_and_the_run_id() {
+		async fn allocate_task_returns_job_id_and_run_id() {
 			let manager = LocalJobDb::<String, String>::default();
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
 			let _task_idx = manager.append_task(&job_id, task, &[]).await.unwrap();
-			let allocation_id: Uuid = manager.allocate_task().await.unwrap().unwrap();
+			let (allocated_job_id, allocation_id): (Uuid, Uuid) =
+				manager.allocate_task().await.unwrap().unwrap();
+			assert_eq!(allocated_job_id, job_id);
 			assert!(!allocation_id.is_nil())
 		}
 
