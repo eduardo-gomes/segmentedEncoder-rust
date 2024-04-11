@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
+pub use api::make_router;
+
 use crate::jobs::manager::{JobManager, JobManagerLock};
 use crate::storage::Storage;
 

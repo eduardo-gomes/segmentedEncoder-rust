@@ -195,6 +195,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-server"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1ad46c3ec4e12f4a4b6835e173ba21c25e484c9d02b49770bf006ce5367c036"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "http 1.1.0",
+ "http-body 1.0.0",
+ "http-body-util",
+ "hyper 1.2.0",
+ "hyper-util",
+ "pin-project-lite",
+ "tokio",
+ "tower",
+ "tower-service",
+]
+
+[[package]]
 name = "axum-test"
 version = "14.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1346,6 +1365,7 @@ dependencies = [
  "api",
  "async-trait",
  "axum 0.7.5",
+ "axum-server",
  "axum-test",
  "containers",
  "futures",

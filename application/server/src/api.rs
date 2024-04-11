@@ -3,7 +3,7 @@
 use axum::routing::get;
 use axum::Router;
 
-fn make_router() -> Router {
+pub fn make_router() -> Router {
 	Router::new().route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 }
 
