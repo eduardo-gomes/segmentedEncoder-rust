@@ -11,6 +11,7 @@ struct JobSource {
 }
 
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct TaskSource {
 	///Here, the input should be the task id, or 0 for the job source
 	inputs: Vec<Input>,

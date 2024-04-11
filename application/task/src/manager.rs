@@ -47,7 +47,13 @@ impl<DB: db::JobDb<JobSource, TaskSource>> Manager for JobManager<DB> {
 	}
 
 	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> Result<u32, Error> {
-		todo!()
+		let deps: Vec<_> = task
+			.inputs
+			.iter()
+			.map(|input| input.index)
+			.filter(|zero| *zero != 0)
+			.collect();
+		self.db.append_task(job_id, task, deps.as_slice()).await
 	}
 
 	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Instance, Error> {
@@ -77,7 +83,7 @@ mod test {
 
 	use crate::manager::db::MockJobDb;
 	use crate::manager::{JobManager, Manager};
-	use crate::Recipe::Analysis;
+	use crate::Recipe::{Analysis, Merge};
 	use crate::{Input, Instance, JobSource, Options, TaskSource};
 
 	#[tokio::test]
@@ -148,5 +154,82 @@ mod test {
 		let manager = JobManager { db: mock };
 		let instance = manager.allocate_task().await.unwrap().unwrap();
 		assert_eq!(instance, target_instance);
+	}
+
+	#[tokio::test]
+	async fn add_task_to_job_passes_to_db() {
+		const JOB_ID: Uuid = Uuid::from_u64_pair(1, 1);
+		const IDX: u32 = 0;
+		const INPUT: Input = Input {
+			index: 0,
+			start: None,
+			end: None,
+		};
+		let task: TaskSource = TaskSource {
+			inputs: vec![INPUT],
+			recipe: Analysis(),
+		};
+		let mut mock = MockJobDb::new();
+
+		mock.expect_append_task()
+			.withf(|job_id, task: &TaskSource, deps| {
+				job_id == &JOB_ID && task.inputs[0] == INPUT && deps.is_empty()
+			})
+			.times(1)
+			.returning(|_, _, _| Ok(IDX));
+		let manager = JobManager { db: mock };
+		let idx = manager.add_task_to_job(&JOB_ID, task).await.unwrap();
+		assert_eq!(idx, IDX);
+	}
+
+	#[tokio::test]
+	async fn add_task_specify_dependencies_based_on_inputs() {
+		const JOB_ID: Uuid = Uuid::from_u64_pair(1, 1);
+		const INPUT_1: Input = Input {
+			index: 1,
+			start: None,
+			end: None,
+		};
+		const INPUT_2: Input = Input {
+			index: 2,
+			start: None,
+			end: None,
+		};
+		let task: TaskSource = TaskSource {
+			inputs: vec![INPUT_1, INPUT_2],
+			recipe: Merge(vec![1, 2]),
+		};
+		let mut mock = MockJobDb::new();
+
+		mock.expect_append_task()
+			.withf(|_job_id, _task, deps| deps.contains(&1) && deps.contains(&2))
+			.times(1)
+			.returning(|_, _, _| Ok(3));
+		let manager = JobManager { db: mock };
+		manager.add_task_to_job(&JOB_ID, task).await.unwrap();
+	}
+
+	#[tokio::test]
+	async fn add_task_input_0_has_no_dependencies() {
+		const INPUT: Input = Input {
+			index: 0,
+			start: None,
+			end: None,
+		};
+		let task: TaskSource = TaskSource {
+			inputs: vec![INPUT],
+			recipe: Analysis(),
+		};
+		let mut mock = MockJobDb::new();
+
+		mock.expect_append_task()
+			.withf(|_job_id, _task, deps| deps.is_empty())
+			.times(1)
+			.returning(|_, _, _| Ok(0));
+		let manager = JobManager { db: mock };
+		manager
+			.add_task_to_job(&Uuid::from_u64_pair(1, 1), task)
+			.await
+			.unwrap();
 	}
 }
