@@ -24,20 +24,19 @@ components:
       type: array
       items:
         type: object
+        required:
+          - input
         properties:
           input:
             type: integer
-            required: true
           start:
             type: number
-            required: false
           end:
             type: number
-            required: false
-      example:
-        - input: 0
-          start: 0
-          end: 2.5
+        example:
+          - input: 0
+            start: 0
+            end: 2.5
     codec_params:
       type: object
       properties:
