@@ -30,7 +30,7 @@
 
 use uuid::Uuid;
 
-trait JobDb<JOB, TASK> {
+pub(crate) trait JobDb<JOB, TASK> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
 	/// Append task to job and return the task index
@@ -38,22 +38,26 @@ trait JobDb<JOB, TASK> {
 		&self,
 		job_id: &Uuid,
 		task: TASK,
-		dep: &[usize],
-	) -> Result<usize, std::io::Error>;
+		dep: &[u32],
+	) -> Result<u32, std::io::Error>;
 	async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, std::io::Error>;
-	async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, std::io::Error> {
-		let task = self.get_tasks(job_id).await?.into_iter().nth(task_idx);
+	async fn get_task(&self, job_id: &Uuid, task_idx: u32) -> Result<TASK, std::io::Error> {
+		let task = self
+			.get_tasks(job_id)
+			.await?
+			.into_iter()
+			.nth(task_idx as usize);
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
 	async fn get_allocated_task(
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
-	) -> Result<Option<(TASK, usize)>, std::io::Error>;
+	) -> Result<Option<(TASK, u32)>, std::io::Error>;
 
 	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
 	///Mark the task as finished, allowing tasks that depend on this task to run
-	async fn fulfill(&self, job_id: &Uuid, task_idx: usize) -> Result<(), std::io::Error>;
+	async fn fulfill(&self, job_id: &Uuid, task_idx: u32) -> Result<(), std::io::Error>;
 }
 
 mod local {
@@ -65,7 +69,7 @@ mod local {
 
 	use super::JobDb;
 
-	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, BTreeSet<usize>)>)>;
+	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, BTreeSet<u32>)>)>;
 
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
@@ -94,23 +98,18 @@ mod local {
 			Ok(key)
 		}
 
-		async fn append_task(
-			&self,
-			job_id: &Uuid,
-			task: TASK,
-			dep: &[usize],
-		) -> Result<usize, Error> {
+		async fn append_task(&self, job_id: &Uuid, task: TASK, dep: &[u32]) -> Result<u32, Error> {
 			let mut guard = self.lock();
 			let job = match guard.get_mut(job_id).map(|(_, tasks)| tasks) {
 				None => return Err(Error::new(ErrorKind::NotFound, "Job not found")),
 				Some(tasks) => tasks,
 			};
 			let idx = job.len();
-			if dep.iter().any(|x| x >= &idx) {
+			if dep.iter().any(|x| x >= &(idx as u32)) {
 				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
 			}
 			job.push((task, None, BTreeSet::from_iter(dep.iter().cloned())));
-			Ok(idx)
+			Ok(idx as u32)
 		}
 
 		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
@@ -124,7 +123,7 @@ mod local {
 			&self,
 			job_id: &Uuid,
 			task_id: &Uuid,
-		) -> Result<Option<(TASK, usize)>, Error> {
+		) -> Result<Option<(TASK, u32)>, Error> {
 			let guard = self.lock();
 			let job = guard
 				.get(job_id)
@@ -134,7 +133,7 @@ mod local {
 				.iter()
 				.enumerate()
 				.find(|(i, (_task, id, _))| id.as_ref() == Some(task_id))
-				.map(|(i, (task, _, _))| (task.clone(), i));
+				.map(|(i, (task, _, _))| (task.clone(), i as u32));
 			Ok(task)
 		}
 
@@ -161,17 +160,17 @@ mod local {
 			}
 		}
 
-		async fn fulfill(&self, job_id: &Uuid, task_idx: usize) -> Result<(), Error> {
+		async fn fulfill(&self, job_id: &Uuid, task_idx: u32) -> Result<(), Error> {
 			let mut binding = self.lock();
 			let job = binding
 				.get_mut(job_id)
 				.map(|job| {
-					let found_task = job.1.len() > task_idx;
+					let found_task = job.1.len() > task_idx as usize;
 					found_task.then_some(job)
 				})
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task_not_found"))?;
-			for (_, _, deps) in job.1.iter_mut().skip(task_idx) {
+			for (_, _, deps) in job.1.iter_mut().skip(task_idx as usize) {
 				deps.remove(&task_idx);
 			}
 			Ok(())
