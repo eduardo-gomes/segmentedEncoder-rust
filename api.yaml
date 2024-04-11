@@ -90,13 +90,13 @@ paths:
               example: v1.2.3
   /login:
     description: Provide credentials to generate a session token
-    post:
-      requestBody:
-        description: credentials
-        content:
-          text/plain:
-            schema:
-              type: string
+    get:
+      parameters:
+        - name: credentials
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         200:
           description: the authentication token for the created session
