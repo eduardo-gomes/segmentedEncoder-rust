@@ -45,6 +45,11 @@ trait JobDb<JOB, TASK> {
 		let task = self.get_tasks(job_id).await?.into_iter().nth(task_idx);
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
+	async fn get_allocated_task(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+	) -> Result<Option<TASK>, std::io::Error>;
 
 	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
 	///Mark the task as finished, allowing tasks that depend on this task to run
@@ -113,6 +118,24 @@ mod local {
 				.get(job_id)
 				.map(|(_, tasks)| tasks.iter().map(|(task, _, _)| task).cloned().collect())
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
+		}
+
+		async fn get_allocated_task(
+			&self,
+			job_id: &Uuid,
+			task_id: &Uuid,
+		) -> Result<Option<TASK>, Error> {
+			let guard = self.lock();
+			let job = guard
+				.get(job_id)
+				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))?;
+			let task = job
+				.1
+				.iter()
+				.find(|(_task, id, _)| id.as_ref() == Some(task_id))
+				.map(|(task, _, _)| task)
+				.cloned();
+			Ok(task)
 		}
 
 		async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, Error> {
@@ -401,6 +424,41 @@ mod local {
 			manager.fulfill(&job_id, idx).await.unwrap();
 			let allocated_2 = manager.allocate_task().await.unwrap();
 			assert!(allocated_2.is_some());
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_with_bad_job_fails() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task: Result<_, _> = manager.get_allocated_task(&Uuid::nil(), &Uuid::nil()).await;
+			assert!(task.is_err());
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_with_bad_task_id_none() {
+			let manager = LocalJobDb::<String, String>::default();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task: Option<_> = manager
+				.get_allocated_task(&job_id, &Uuid::nil())
+				.await
+				.unwrap();
+			assert!(task.is_none());
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_by_uuid() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let _task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let (job_id, task_id) = manager.allocate_task().await.unwrap().unwrap();
+			let task = manager.get_allocated_task(&job_id, &task_id).await.unwrap();
+			assert!(task.is_some());
+			assert_eq!(task.unwrap(), task_src);
 		}
 	}
 }
