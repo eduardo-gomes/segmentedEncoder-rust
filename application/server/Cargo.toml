@@ -26,6 +26,7 @@ tonic = { version = "0.9.1", default-features = false }
 multiplex-tonic-hyper = "0.1.0"
 tower = "0.4.13"
 tower-http = { version = "0.4.0", features = ["cors"] }
+task = { path = "../task" }
 
 [dev-dependencies]
 tonic = "0.9.1"
