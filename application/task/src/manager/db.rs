@@ -61,7 +61,7 @@ pub(crate) trait JobDb<JOB, TASK> {
 	async fn fulfill(&self, job_id: &Uuid, task_idx: u32) -> Result<(), std::io::Error>;
 }
 
-mod local {
+pub(crate) mod local {
 	use std::collections::{BTreeSet, HashMap};
 	use std::io::{Error, ErrorKind};
 	use std::sync::{Mutex, MutexGuard};

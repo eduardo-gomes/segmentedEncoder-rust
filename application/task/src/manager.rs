@@ -1,8 +1,8 @@
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use uuid::Uuid;
 
-use crate::{Instance, JobSource, TaskSource};
+use crate::{Instance, JobSource, Status, TaskSource};
 
 mod db;
 
@@ -12,7 +12,12 @@ trait Manager {
 	async fn allocate_task(&self) -> Result<Option<Instance>, Error>;
 	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> Result<u32, Error>;
 	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error>;
-	async fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
+	async fn update_task_status(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		status: Status,
+	) -> Result<(), Error>;
 	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
 	///Cancel this task execution, will be available for allocation
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
@@ -68,8 +73,25 @@ impl<DB: db::JobDb<JobSource, TaskSource>> Manager for JobManager<DB> {
 			})
 	}
 
-	async fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
-		todo!()
+	async fn update_task_status(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		status: Status,
+	) -> Result<(), Error> {
+		if let Status::Finished = status {
+			match self
+				.db
+				.get_allocated_task(job_id, task_id)
+				.await?
+				.map(|(_, idx)| idx)
+			{
+				Some(idx) => self.db.fulfill(job_id, idx).await,
+				None => Err(Error::new(ErrorKind::NotFound, "Task not found")),
+			}
+		} else {
+			Err(Error::new(ErrorKind::NotFound, "Task not found"))
+		}
 	}
 
 	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
@@ -92,7 +114,7 @@ mod test {
 	use crate::manager::db::{JobDb, MockJobDb};
 	use crate::manager::{JobManager, Manager};
 	use crate::Recipe::{Analysis, Merge};
-	use crate::{Input, Instance, JobSource, Options, TaskSource};
+	use crate::{Input, Instance, JobSource, Options, Status, TaskSource};
 
 	#[tokio::test]
 	async fn create_job_uses_db_and_returns_uuid() {
@@ -294,5 +316,31 @@ mod test {
 			.await
 			.unwrap();
 		assert!(none.is_none());
+	}
+
+	#[tokio::test]
+	async fn update_status_to_finished_fulfill() {
+		let mut db = MockJobDb::new();
+		const IDX: u32 = 1;
+		const JOB: Uuid = Uuid::from_u64_pair(1, 1);
+		const TASK: Uuid = Uuid::from_u64_pair(1, 2);
+		db.expect_get_allocated_task().returning(|_job, _task| {
+			Ok(Some((
+				TaskSource {
+					inputs: vec![],
+					recipe: Analysis(),
+				},
+				IDX,
+			)))
+		});
+		db.expect_fulfill()
+			.withf(|job, idx| job == &JOB && idx == &IDX)
+			.times(1)
+			.returning(|_, _| Ok(()));
+		let manager = JobManager { db };
+		let res = manager
+			.update_task_status(&JOB, &TASK, Status::Finished)
+			.await;
+		assert!(res.is_ok());
 	}
 }

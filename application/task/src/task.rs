@@ -34,6 +34,12 @@ enum Recipe {
 }
 
 #[derive(Clone)]
+enum Status {
+	Finished,
+	Running,
+}
+
+#[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 struct Input {
 	index: u32,
