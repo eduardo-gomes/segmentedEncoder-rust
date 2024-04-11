@@ -53,13 +53,15 @@ mod local {
 
 	use super::JobDb;
 
+	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>;
+
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
-		jobs: Mutex<HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>>,
+		jobs: Mutex<LocalMap<JOB, TASK>>,
 	}
 
 	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> LocalJobDb<JOB, TASK> {
-		fn lock(&self) -> MutexGuard<'_, HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>> {
+		fn lock(&self) -> MutexGuard<'_, LocalMap<JOB, TASK>> {
 			self.jobs
 				.lock()
 				.unwrap_or_else(|poison| poison.into_inner())
