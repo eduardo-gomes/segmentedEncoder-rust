@@ -30,6 +30,7 @@
 
 use uuid::Uuid;
 
+#[cfg_attr(test, mockall::automock)]
 pub(crate) trait JobDb<JOB, TASK> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;

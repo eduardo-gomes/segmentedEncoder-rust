@@ -3,28 +3,35 @@
 
 use uuid::Uuid;
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct JobSource {
 	input_id: Uuid,
 	video_options: Options,
 }
 
+#[derive(Clone)]
 struct TaskSource {
 	///Here, the input should be the task id, or 0 for the job source
 	inputs: Vec<Input>,
 	recipe: Recipe,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct Options {
 	codec: String,
 	params: Vec<String>,
 }
 
+#[derive(Clone)]
 enum Recipe {
 	Analysis(),
 	Transcode(Options),
 	Merge(Vec<u32>),
 }
 
+#[derive(Clone)]
 struct Input {
 	index: u32,
 	start: Option<f64>,
