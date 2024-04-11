@@ -58,7 +58,7 @@ mod local {
 
 	use super::JobDb;
 
-	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>)>)>;
+	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, Vec<usize>)>)>;
 
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
@@ -102,14 +102,14 @@ mod local {
 			if dep.iter().any(|x| x >= &idx) {
 				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
 			}
-			job.push((task, None));
+			job.push((task, None, Vec::from(dep)));
 			Ok(idx)
 		}
 
 		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
 			self.lock()
 				.get(job_id)
-				.map(|(_, tasks)| tasks.iter().map(|(task, _)| task).cloned().collect())
+				.map(|(_, tasks)| tasks.iter().map(|(task, _, _)| task).cloned().collect())
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
 		}
 
@@ -118,8 +118,9 @@ mod local {
 			let available = binding
 				.values_mut()
 				.flat_map(|(_, jobs)| {
-					jobs.iter_mut()
-						.filter(|(_, allocation)| allocation.is_none())
+					jobs.iter_mut().filter(|(_, allocation, dependencies)| {
+						allocation.is_none() && dependencies.is_empty()
+					})
 				})
 				.next();
 			match available {
@@ -198,6 +199,7 @@ mod local {
 			let task_idx = manager.append_task(&job_id, task, &[1000]).await;
 			assert!(task_idx.is_err());
 		}
+
 		#[tokio::test]
 		async fn add_task_with_previous_as_dependency() {
 			let manager = LocalJobDb::<String, String>::default();
@@ -299,6 +301,24 @@ mod local {
 			let allocated_2 = manager.allocate_task().await.unwrap();
 			assert!(allocated_1.is_some());
 			assert!(allocated_2.is_some());
+		}
+
+		#[tokio::test]
+		async fn allocate_tasks_before_dependency_fulfill_returns_none() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_1 = "Task 1".to_string();
+			let task_2 = "Task 2".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let idx = manager.append_task(&job_id, task_1, &[]).await.unwrap();
+			manager.append_task(&job_id, task_2, &[idx]).await.unwrap();
+			manager
+				.allocate_task()
+				.await
+				.unwrap()
+				.expect("Should allocate first");
+			let allocated_2 = manager.allocate_task().await.unwrap();
+			assert!(allocated_2.is_none());
 		}
 	}
 }
