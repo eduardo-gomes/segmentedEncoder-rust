@@ -47,10 +47,12 @@ trait JobDb<JOB, TASK> {
 	}
 
 	async fn allocate_task(&self) -> Result<Option<Uuid>, std::io::Error>;
+	///Mark the task as finished, allowing tasks that depend on this task to run
+	async fn fulfill(&self, job_id: &Uuid, task_idx: usize) -> Result<(), std::io::Error>;
 }
 
 mod local {
-	use std::collections::HashMap;
+	use std::collections::{BTreeSet, HashMap};
 	use std::io::{Error, ErrorKind};
 	use std::sync::{Mutex, MutexGuard};
 
@@ -58,7 +60,7 @@ mod local {
 
 	use super::JobDb;
 
-	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, Vec<usize>)>)>;
+	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, BTreeSet<usize>)>)>;
 
 	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
@@ -102,7 +104,7 @@ mod local {
 			if dep.iter().any(|x| x >= &idx) {
 				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
 			}
-			job.push((task, None, Vec::from(dep)));
+			job.push((task, None, BTreeSet::from_iter(dep.iter().cloned())));
 			Ok(idx)
 		}
 
@@ -131,6 +133,22 @@ mod local {
 					Ok(Some(id))
 				}
 			}
+		}
+
+		async fn fulfill(&self, job_id: &Uuid, task_idx: usize) -> Result<(), Error> {
+			let mut binding = self.lock();
+			let job = binding
+				.get_mut(job_id)
+				.map(|job| {
+					let found_task = job.1.len() > task_idx;
+					found_task.then_some(job)
+				})
+				.unwrap_or_default()
+				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task_not_found"))?;
+			for (_, _, deps) in job.1.iter_mut().skip(task_idx) {
+				deps.remove(&task_idx);
+			}
+			Ok(())
 		}
 	}
 
@@ -319,6 +337,65 @@ mod local {
 				.expect("Should allocate first");
 			let allocated_2 = manager.allocate_task().await.unwrap();
 			assert!(allocated_2.is_none());
+		}
+
+		#[tokio::test]
+		async fn allocate_tasks_after_dependency_fulfill() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_1 = "Task 1".to_string();
+			let task_2 = "Task 2".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let idx = manager.append_task(&job_id, task_1, &[]).await.unwrap();
+			manager.append_task(&job_id, task_2, &[idx]).await.unwrap();
+			manager
+				.allocate_task()
+				.await
+				.unwrap()
+				.expect("Should allocate first");
+			manager.fulfill(&job_id, idx).await.unwrap();
+			let allocated_2 = manager.allocate_task().await.unwrap();
+			assert!(allocated_2.is_some());
+		}
+
+		#[tokio::test]
+		async fn fulfill_invalid_task_error() {
+			let manager = LocalJobDb::<String, String>::default();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let res = manager.fulfill(&job_id, 0).await;
+			assert!(res.is_err());
+		}
+
+		#[tokio::test]
+		async fn fulfill_success() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_1 = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let idx = manager.append_task(&job_id, task_1, &[]).await.unwrap();
+			// let task_id = manager.allocate_task().await.unwrap().unwrap();
+			let res = manager.fulfill(&job_id, idx).await;
+			assert!(res.is_ok());
+		}
+
+		#[tokio::test]
+		async fn can_allocate_tasks_after_dependency_fulfill() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_1 = "Task 1".to_string();
+			let task_2 = "Task 2".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let idx = manager.append_task(&job_id, task_1, &[]).await.unwrap();
+			let _idx2 = manager.append_task(&job_id, task_2, &[idx]).await.unwrap();
+			manager
+				.allocate_task()
+				.await
+				.unwrap()
+				.expect("Should allocate first");
+			manager.fulfill(&job_id, idx).await.unwrap();
+			let allocated_2 = manager.allocate_task().await.unwrap();
+			assert!(allocated_2.is_some());
 		}
 	}
 }
