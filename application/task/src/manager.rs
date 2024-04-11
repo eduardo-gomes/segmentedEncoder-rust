@@ -31,11 +31,16 @@ trait Manager {
 	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error>;
 }
 
-struct JobManager<DB: db::JobDb<JobSource, TaskSource, Uuid>> {
+#[derive(Clone)]
+struct TaskState {
+	output: Option<Uuid>,
+}
+
+struct JobManager<DB: db::JobDb<JobSource, TaskSource, TaskState>> {
 	db: DB,
 }
 
-impl<DB: db::JobDb<JobSource, TaskSource, Uuid>> Manager for JobManager<DB> {
+impl<DB: db::JobDb<JobSource, TaskSource, TaskState>> Manager for JobManager<DB> {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error> {
 		self.db.create_job(job).await
 	}
@@ -112,11 +117,23 @@ impl<DB: db::JobDb<JobSource, TaskSource, Uuid>> Manager for JobManager<DB> {
 			.await?
 			.map(|(_, idx)| idx)
 			.unwrap_or(u32::MAX /*NOT FOUND*/);
-		self.db.set_task_status(job_id, idx, output).await
+		self.db
+			.set_task_status(
+				job_id,
+				idx,
+				TaskState {
+					output: Some(output),
+				},
+			)
+			.await
 	}
 
 	async fn get_task_output(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<Uuid>, Error> {
-		self.db.get_task_status(job_id, task_idx).await
+		Ok(self
+			.db
+			.get_task_status(job_id, task_idx)
+			.await?
+			.and_then(|status| status.output))
 	}
 
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
