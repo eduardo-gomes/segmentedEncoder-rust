@@ -25,11 +25,11 @@ trait Manager {
 	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error>;
 }
 
-struct JobManager<DB: db::JobDb<JobSource, TaskSource>> {
+struct JobManager<DB: db::JobDb<JobSource, TaskSource, ()>> {
 	db: DB,
 }
 
-impl<DB: db::JobDb<JobSource, TaskSource>> Manager for JobManager<DB> {
+impl<DB: db::JobDb<JobSource, TaskSource, ()>> Manager for JobManager<DB> {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error> {
 		self.db.create_job(job).await
 	}

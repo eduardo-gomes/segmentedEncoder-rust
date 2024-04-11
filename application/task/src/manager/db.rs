@@ -31,7 +31,7 @@
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
-pub(crate) trait JobDb<JOB, TASK> {
+pub(crate) trait JobDb<JOB, TASK, STATUS> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
 	/// Append task to job and return the task index
@@ -63,7 +63,13 @@ pub(crate) trait JobDb<JOB, TASK> {
 		&self,
 		job_id: &Uuid,
 		task_idx: u32,
-	) -> Result<Option<()>, std::io::Error>;
+	) -> Result<Option<STATUS>, std::io::Error>;
+	async fn set_task_status(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+		status: STATUS,
+	) -> Result<(), std::io::Error>;
 }
 
 pub(crate) mod local {
@@ -75,13 +81,25 @@ pub(crate) mod local {
 
 	use super::JobDb;
 
-	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, BTreeSet<u32>)>)>;
+	type LocalMap<JOB, TASK, STATUS> = HashMap<
+		Uuid,
+		(
+			JOB,
+			Vec<(TASK, Option<Uuid>, BTreeSet<u32>, Option<STATUS>)>,
+		),
+	>;
 
-	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
-		jobs: Mutex<LocalMap<JOB, TASK>>,
+	pub struct LocalJobDb<
+		JOB: Sync + Send + Clone,
+		TASK: Sync + Send + Clone,
+		STATUS: Sync + Send + Clone,
+	> {
+		jobs: Mutex<LocalMap<JOB, TASK, STATUS>>,
 	}
 
-	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> Default for LocalJobDb<JOB, TASK> {
+	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone, STATUS: Sync + Send + Clone> Default
+		for LocalJobDb<JOB, TASK, STATUS>
+	{
 		fn default() -> Self {
 			Self {
 				jobs: Mutex::new(Default::default()),
@@ -89,16 +107,18 @@ pub(crate) mod local {
 		}
 	}
 
-	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> LocalJobDb<JOB, TASK> {
-		fn lock(&self) -> MutexGuard<'_, LocalMap<JOB, TASK>> {
+	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone, STATUS: Sync + Send + Clone>
+		LocalJobDb<JOB, TASK, STATUS>
+	{
+		fn lock(&self) -> MutexGuard<'_, LocalMap<JOB, TASK, STATUS>> {
 			self.jobs
 				.lock()
 				.unwrap_or_else(|poison| poison.into_inner())
 		}
 	}
 
-	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> JobDb<JOB, TASK>
-		for LocalJobDb<JOB, TASK>
+	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone, STATUS: Sync + Send + Clone>
+		JobDb<JOB, TASK, STATUS> for LocalJobDb<JOB, TASK, STATUS>
 	{
 		async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, Error> {
 			let job = self.lock().get(id).map(|(job, _)| job).cloned();
@@ -121,14 +141,14 @@ pub(crate) mod local {
 			if dep.iter().any(|x| x >= &(idx as u32)) {
 				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
 			}
-			job.push((task, None, BTreeSet::from_iter(dep.iter().cloned())));
+			job.push((task, None, BTreeSet::from_iter(dep.iter().cloned()), None));
 			Ok(idx as u32)
 		}
 
 		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
 			self.lock()
 				.get(job_id)
-				.map(|(_, tasks)| tasks.iter().map(|(task, _, _)| task).cloned().collect())
+				.map(|(_, tasks)| tasks.iter().map(|(task, _, _, _)| task).cloned().collect())
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
 		}
 
@@ -145,8 +165,8 @@ pub(crate) mod local {
 				.1
 				.iter()
 				.enumerate()
-				.find(|(i, (_task, id, _))| id.as_ref() == Some(task_id))
-				.map(|(i, (task, _, _))| (task.clone(), i as u32));
+				.find(|(i, (_task, id, _, _))| id.as_ref() == Some(task_id))
+				.map(|(i, (task, _, _, _))| (task.clone(), i as u32));
 			Ok(task)
 		}
 
@@ -157,7 +177,7 @@ pub(crate) mod local {
 				.flat_map(|(job_id, (_, tasks))| {
 					tasks
 						.iter_mut()
-						.filter(|(_, allocation, dependencies)| {
+						.filter(|(_, allocation, dependencies, _)| {
 							allocation.is_none() && dependencies.is_empty()
 						})
 						.map(|task| (*job_id, task))
@@ -183,20 +203,40 @@ pub(crate) mod local {
 				})
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task_not_found"))?;
-			for (_, _, deps) in job.1.iter_mut().skip(task_idx as usize) {
+			for (_, _, deps, _) in job.1.iter_mut().skip(task_idx as usize) {
 				deps.remove(&task_idx);
 			}
 			Ok(())
 		}
 
-		async fn get_task_status(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<()>, Error> {
+		async fn get_task_status(
+			&self,
+			job_id: &Uuid,
+			task_idx: u32,
+		) -> Result<Option<STATUS>, Error> {
 			let binding = self.lock();
 			binding
 				.get(job_id)
 				.map(|(_, tasks)| tasks.get(task_idx as usize))
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-				.and(Ok(None))
+				.map(|(_, _, _, status)| status)
+				.cloned()
+		}
+
+		async fn set_task_status(
+			&self,
+			job_id: &Uuid,
+			task_idx: u32,
+			status: STATUS,
+		) -> Result<(), Error> {
+			let mut binding = self.lock();
+			binding
+				.get_mut(job_id)
+				.map(|(_, tasks)| tasks.get_mut(task_idx as usize))
+				.unwrap_or_default()
+				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
+				.map(|(_, _, _, prev_status)| *prev_status = Some(status))
 		}
 	}
 
@@ -211,14 +251,14 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_nonexistent_job_none() {
-			let manager = LocalJobDb::<(), ()>::default();
+			let manager = LocalJobDb::<(), (), ()>::default();
 			let res = manager.get_job(&Uuid::from_u64_pair(1, 1)).await.unwrap();
 			assert!(res.is_none())
 		}
 
 		#[tokio::test]
 		async fn get_job_after_create() {
-			let manager = LocalJobDb::<String, ()>::default();
+			let manager = LocalJobDb::<String, (), ()>::default();
 			let job = "Job 1".to_string();
 			let id = manager.create_job(job.clone()).await.unwrap();
 			let res = manager.get_job(&id).await.unwrap().unwrap();
@@ -227,7 +267,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_task_to_nonexistent_job_error() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let first_task = manager
 				.append_task(&Uuid::from_u64_pair(1, 2), task, &[])
@@ -237,14 +277,14 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_task_nonexistent_job_error() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let res = manager.get_task(&Uuid::from_u64_pair(1, 2), 0).await;
 			assert_eq!(res.unwrap_err().kind(), ErrorKind::NotFound)
 		}
 
 		#[tokio::test]
 		async fn add_get_task_by_id() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job.clone()).await.unwrap();
@@ -258,7 +298,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_task_with_dependency_that_does_not_exist_fails() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job.clone()).await.unwrap();
@@ -268,7 +308,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_task_with_previous_as_dependency() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let task2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
@@ -280,7 +320,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_get_all_tasks_nonexistent_job() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let error = manager
 				.get_tasks(&Uuid::from_u64_pair(1, 3))
 				.await
@@ -290,7 +330,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_get_all_tasks_of_job() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let job = "Job 1".to_string();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
@@ -309,7 +349,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn add_task_to_job_returns_sequencial_id() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let job = "Job 1".to_string();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
@@ -326,14 +366,14 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn allocate_task_without_any_available_returns_none() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let allocation = manager.allocate_task().await.unwrap();
 			assert!(allocation.is_none())
 		}
 
 		#[tokio::test]
 		async fn allocate_task_returns_job_id_and_run_id() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -346,7 +386,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn allocate_more_than_available_return_none() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -358,7 +398,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn allocate_two_tasks() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
@@ -373,7 +413,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn allocate_tasks_before_dependency_fulfill_returns_none() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
@@ -391,7 +431,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn allocate_tasks_after_dependency_fulfill() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
@@ -410,7 +450,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn fulfill_invalid_task_error() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
 			let res = manager.fulfill(&job_id, 0).await;
@@ -419,7 +459,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn fulfill_success() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_1 = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -431,7 +471,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn can_allocate_tasks_after_dependency_fulfill() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
@@ -450,14 +490,14 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_allocated_task_with_bad_job_fails() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task: Result<_, _> = manager.get_allocated_task(&Uuid::nil(), &Uuid::nil()).await;
 			assert!(task.is_err());
 		}
 
 		#[tokio::test]
 		async fn get_allocated_task_with_bad_task_id_none() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
 			let task: Option<_> = manager
@@ -469,7 +509,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_allocated_task_by_uuid() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_src = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -485,7 +525,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_allocated_task_returns_task_idx() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_src = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -504,7 +544,7 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_task_status_before_set_returns_none() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_src = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -518,14 +558,14 @@ pub(crate) mod local {
 
 		#[tokio::test]
 		async fn get_task_status_bad_job_error() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let status = manager.get_task_status(&Uuid::nil(), 0).await;
 			assert!(status.is_err());
 		}
 
 		#[tokio::test]
 		async fn get_task_status_bad_task_error() {
-			let manager = LocalJobDb::<String, String>::default();
+			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_src = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
@@ -535,6 +575,64 @@ pub(crate) mod local {
 				.unwrap();
 			let status = manager.get_task_status(&job_id, task_idx + 10).await;
 			assert!(status.is_err());
+		}
+
+		#[tokio::test]
+		async fn set_task_status_before_set_ok() {
+			let manager = LocalJobDb::<String, String, ()>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let status = manager.set_task_status(&job_id, task_idx, ()).await;
+			assert!(status.is_ok());
+		}
+
+		#[tokio::test]
+		async fn set_task_status_bad_job_error() {
+			let manager = LocalJobDb::<String, String, ()>::default();
+			let status = manager.set_task_status(&Uuid::nil(), 0, ()).await;
+			assert!(status.is_err());
+		}
+
+		#[tokio::test]
+		async fn set_task_status_bad_task_error() {
+			let manager = LocalJobDb::<String, String, ()>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let status = manager.set_task_status(&job_id, task_idx + 10, ()).await;
+			assert!(status.is_err());
+		}
+
+		#[tokio::test]
+		async fn get_task_status_after_set_equals() {
+			let manager = LocalJobDb::<String, String, String>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let status = "Task state".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			manager
+				.set_task_status(&job_id, task_idx, status.clone())
+				.await
+				.unwrap();
+			let got = manager
+				.get_task_status(&job_id, task_idx)
+				.await
+				.unwrap()
+				.unwrap();
+			assert_eq!(got, status);
 		}
 	}
 }
