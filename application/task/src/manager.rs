@@ -8,18 +8,16 @@ mod db;
 
 ///Interface used by the server to manage jobs and tasks
 trait Manager {
-	async fn create_job(&self, job: JobSource) -> Result<Uuid, std::io::Error>;
-	async fn allocate_task(&self) -> Result<Option<Instance>, std::io::Error>;
-	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource)
-		-> Result<u32, std::io::Error>;
-	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Instance, std::io::Error>;
-	async fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid)
-		-> Result<(), std::io::Error>;
-	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), std::io::Error>;
+	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error>;
+	async fn allocate_task(&self) -> Result<Option<Instance>, Error>;
+	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> Result<u32, Error>;
+	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error>;
+	async fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
+	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
 	///Cancel this task execution, will be available for allocation
-	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), std::io::Error>;
+	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
 	///Delete the job removing all tasks, completed or pending
-	async fn delete_job(&self, job_id: &Uuid) -> Result<(), std::io::Error>;
+	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error>;
 }
 
 struct JobManager<DB: db::JobDb<JobSource, TaskSource>> {
@@ -56,8 +54,18 @@ impl<DB: db::JobDb<JobSource, TaskSource>> Manager for JobManager<DB> {
 		self.db.append_task(job_id, task, deps.as_slice()).await
 	}
 
-	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Instance, Error> {
-		todo!()
+	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error> {
+		self.db
+			.get_allocated_task(job_id, task_id)
+			.await
+			.map(|opt| {
+				opt.map(|(task, _)| Instance {
+					job_id: *job_id,
+					task_id: *task_id,
+					inputs: task.inputs,
+					recipe: task.recipe,
+				})
+			})
 	}
 
 	async fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
@@ -81,7 +89,7 @@ impl<DB: db::JobDb<JobSource, TaskSource>> Manager for JobManager<DB> {
 mod test {
 	use uuid::Uuid;
 
-	use crate::manager::db::MockJobDb;
+	use crate::manager::db::{JobDb, MockJobDb};
 	use crate::manager::{JobManager, Manager};
 	use crate::Recipe::{Analysis, Merge};
 	use crate::{Input, Instance, JobSource, Options, TaskSource};
@@ -231,5 +239,60 @@ mod test {
 			.add_task_to_job(&Uuid::from_u64_pair(1, 1), task)
 			.await
 			.unwrap();
+	}
+
+	#[tokio::test]
+	async fn get_task_returns_equals_the_allocated_task() {
+		const INPUT: Input = Input {
+			index: 0,
+			start: None,
+			end: None,
+		};
+		let task: TaskSource = TaskSource {
+			inputs: vec![INPUT],
+			recipe: Analysis(),
+		};
+
+		let db = super::db::local::LocalJobDb::default();
+		let job_id = db
+			.create_job(JobSource {
+				input_id: Uuid::from_u64_pair(1, 1),
+				video_options: Options {
+					codec: "libx264".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		db.append_task(&job_id, task, &[]).await.unwrap();
+		let manager = JobManager { db };
+		let instance = manager.allocate_task().await.unwrap().unwrap();
+		let got = manager
+			.get_task(&job_id, &instance.task_id)
+			.await
+			.unwrap()
+			.unwrap();
+		assert_eq!(got, instance);
+	}
+
+	#[tokio::test]
+	async fn get_task_unknown_task_returns_none() {
+		let db = super::db::local::LocalJobDb::default();
+		let job_id = db
+			.create_job(JobSource {
+				input_id: Uuid::from_u64_pair(1, 1),
+				video_options: Options {
+					codec: "libx264".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let manager = JobManager { db };
+		let none = manager
+			.get_task(&job_id, &Uuid::from_u64_pair(1, 2))
+			.await
+			.unwrap();
+		assert!(none.is_none());
 	}
 }

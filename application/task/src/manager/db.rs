@@ -72,9 +72,16 @@ mod local {
 
 	type LocalMap<JOB, TASK> = HashMap<Uuid, (JOB, Vec<(TASK, Option<Uuid>, BTreeSet<u32>)>)>;
 
-	#[derive(Default)]
 	pub struct LocalJobDb<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> {
 		jobs: Mutex<LocalMap<JOB, TASK>>,
+	}
+
+	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> Default for LocalJobDb<JOB, TASK> {
+		fn default() -> Self {
+			Self {
+				jobs: Mutex::new(Default::default()),
+			}
+		}
 	}
 
 	impl<JOB: Sync + Send + Clone, TASK: Sync + Send + Clone> LocalJobDb<JOB, TASK> {
