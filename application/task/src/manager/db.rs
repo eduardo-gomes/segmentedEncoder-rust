@@ -49,7 +49,7 @@ trait JobDb<JOB, TASK> {
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
-	) -> Result<Option<TASK>, std::io::Error>;
+	) -> Result<Option<(TASK, usize)>, std::io::Error>;
 
 	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
 	///Mark the task as finished, allowing tasks that depend on this task to run
@@ -124,7 +124,7 @@ mod local {
 			&self,
 			job_id: &Uuid,
 			task_id: &Uuid,
-		) -> Result<Option<TASK>, Error> {
+		) -> Result<Option<(TASK, usize)>, Error> {
 			let guard = self.lock();
 			let job = guard
 				.get(job_id)
@@ -132,9 +132,9 @@ mod local {
 			let task = job
 				.1
 				.iter()
-				.find(|(_task, id, _)| id.as_ref() == Some(task_id))
-				.map(|(task, _, _)| task)
-				.cloned();
+				.enumerate()
+				.find(|(i, (_task, id, _))| id.as_ref() == Some(task_id))
+				.map(|(i, (task, _, _))| (task.clone(), i));
 			Ok(task)
 		}
 
@@ -458,7 +458,26 @@ mod local {
 			let (job_id, task_id) = manager.allocate_task().await.unwrap().unwrap();
 			let task = manager.get_allocated_task(&job_id, &task_id).await.unwrap();
 			assert!(task.is_some());
-			assert_eq!(task.unwrap(), task_src);
+			assert_eq!(task.unwrap().0, task_src);
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_returns_task_idx() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let (job_id, task_id) = manager.allocate_task().await.unwrap().unwrap();
+			let (_task, idx) = manager
+				.get_allocated_task(&job_id, &task_id)
+				.await
+				.unwrap()
+				.unwrap();
+			assert_eq!(idx, task_idx);
 		}
 	}
 }
