@@ -34,7 +34,12 @@ trait JobDb<JOB, TASK> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
 	/// Append task to job and return the task index
-	async fn append_task(&self, job_id: &Uuid, task: TASK) -> Result<usize, std::io::Error>;
+	async fn append_task(
+		&self,
+		job_id: &Uuid,
+		task: TASK,
+		dep: &[usize],
+	) -> Result<usize, std::io::Error>;
 	async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, std::io::Error>;
 	async fn get_task(&self, job_id: &Uuid, task_idx: usize) -> Result<TASK, std::io::Error> {
 		let task = self.get_tasks(job_id).await?.into_iter().nth(task_idx);
@@ -82,13 +87,21 @@ mod local {
 			Ok(key)
 		}
 
-		async fn append_task(&self, job_id: &Uuid, task: TASK) -> Result<usize, Error> {
+		async fn append_task(
+			&self,
+			job_id: &Uuid,
+			task: TASK,
+			dep: &[usize],
+		) -> Result<usize, Error> {
 			let mut guard = self.lock();
 			let job = match guard.get_mut(job_id).map(|(_, tasks)| tasks) {
 				None => return Err(Error::new(ErrorKind::NotFound, "Job not found")),
 				Some(tasks) => tasks,
 			};
 			let idx = job.len();
+			if dep.iter().any(|x| x >= &idx) {
+				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
+			}
 			job.push((task, None));
 			Ok(idx)
 		}
@@ -149,7 +162,9 @@ mod local {
 		async fn add_task_to_nonexistent_job_error() {
 			let manager = LocalJobDb::<String, String>::default();
 			let task = "Task 1".to_string();
-			let first_task = manager.append_task(&Uuid::from_u64_pair(1, 2), task).await;
+			let first_task = manager
+				.append_task(&Uuid::from_u64_pair(1, 2), task, &[])
+				.await;
 			assert_eq!(first_task.unwrap_err().kind(), ErrorKind::NotFound)
 		}
 
@@ -166,9 +181,33 @@ mod local {
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job.clone()).await.unwrap();
-			let task_idx = manager.append_task(&job_id, task.clone()).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task.clone(), &[])
+				.await
+				.unwrap();
 			let res = manager.get_task(&job_id, task_idx).await.unwrap();
 			assert_eq!(task, res)
+		}
+
+		#[tokio::test]
+		async fn add_task_with_dependency_that_does_not_exist_fails() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job.clone()).await.unwrap();
+			let task_idx = manager.append_task(&job_id, task, &[1000]).await;
+			assert!(task_idx.is_err());
+		}
+		#[tokio::test]
+		async fn add_task_with_previous_as_dependency() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task = "Task 1".to_string();
+			let task2 = "Task 2".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job.clone()).await.unwrap();
+			let task_idx = manager.append_task(&job_id, task, &[]).await.unwrap();
+			let task2_idx = manager.append_task(&job_id, task2, &[task_idx]).await;
+			assert!(task2_idx.is_ok());
 		}
 
 		#[tokio::test]
@@ -188,8 +227,14 @@ mod local {
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let job_id = manager.create_job(job.clone()).await.unwrap();
-			manager.append_task(&job_id, task_1.clone()).await.unwrap();
-			manager.append_task(&job_id, task_2.clone()).await.unwrap();
+			manager
+				.append_task(&job_id, task_1.clone(), &[])
+				.await
+				.unwrap();
+			manager
+				.append_task(&job_id, task_2.clone(), &[])
+				.await
+				.unwrap();
 			let tasks = manager.get_tasks(&job_id).await.unwrap();
 			assert_eq!(tasks, [task_1, task_2])
 		}
@@ -201,8 +246,8 @@ mod local {
 			let task_1 = "Task 1".to_string();
 			let task_2 = "Task 2".to_string();
 			let id = manager.create_job(job.clone()).await.unwrap();
-			let first_task = manager.append_task(&id, task_1).await.unwrap();
-			let second_task = manager.append_task(&id, task_2).await.unwrap();
+			let first_task = manager.append_task(&id, task_1, &[]).await.unwrap();
+			let second_task = manager.append_task(&id, task_2, &[]).await.unwrap();
 			assert!(
 				second_task > first_task,
 				"Second task should have a greater id than first task, {} > {}",
@@ -224,7 +269,7 @@ mod local {
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
-			let _task_idx = manager.append_task(&job_id, task).await.unwrap();
+			let _task_idx = manager.append_task(&job_id, task, &[]).await.unwrap();
 			let allocation_id: Uuid = manager.allocate_task().await.unwrap().unwrap();
 			assert!(!allocation_id.is_nil())
 		}
@@ -235,7 +280,7 @@ mod local {
 			let task = "Task 1".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
-			manager.append_task(&job_id, task).await.unwrap();
+			manager.append_task(&job_id, task, &[]).await.unwrap();
 			let _allocated = manager.allocate_task().await.unwrap();
 			let none = manager.allocate_task().await.unwrap();
 			assert!(none.is_none())
@@ -248,8 +293,8 @@ mod local {
 			let task_2 = "Task 2".to_string();
 			let job = "Job 1".to_string();
 			let job_id = manager.create_job(job).await.unwrap();
-			manager.append_task(&job_id, task_1).await.unwrap();
-			manager.append_task(&job_id, task_2).await.unwrap();
+			manager.append_task(&job_id, task_1, &[]).await.unwrap();
+			manager.append_task(&job_id, task_2, &[]).await.unwrap();
 			let allocated_1 = manager.allocate_task().await.unwrap();
 			let allocated_2 = manager.allocate_task().await.unwrap();
 			assert!(allocated_1.is_some());
