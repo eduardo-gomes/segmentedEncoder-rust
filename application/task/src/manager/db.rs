@@ -171,7 +171,7 @@ pub(crate) mod local {
 				.1
 				.iter()
 				.enumerate()
-				.find(|(i, entry)| entry.run_id.as_ref() == Some(task_id))
+				.find(|(_, entry)| entry.run_id.as_ref() == Some(task_id))
 				.map(|(i, entry)| (entry.task.clone(), i as u32));
 			Ok(task)
 		}
@@ -219,12 +219,12 @@ pub(crate) mod local {
 			task_idx: u32,
 		) -> Result<Option<STATUS>, Error> {
 			let binding = self.lock();
-			binding
+			let task = binding
 				.get(job_id)
 				.map(|(_, tasks)| tasks.get(task_idx as usize))
 				.unwrap_or_default()
-				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-				.map(|entry| entry.status.clone())
+				.map(|entry| entry.status.clone());
+			task.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task not found"))
 		}
 
 		async fn set_task_status(

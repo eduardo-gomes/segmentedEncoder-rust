@@ -18,18 +18,24 @@ trait Manager {
 		task_id: &Uuid,
 		status: Status,
 	) -> Result<(), Error>;
-	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
+	async fn set_task_output(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		output: Uuid,
+	) -> Result<(), Error>;
+	async fn get_task_output(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<Uuid>, Error>;
 	///Cancel this task execution, will be available for allocation
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
 	///Delete the job removing all tasks, completed or pending
 	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error>;
 }
 
-struct JobManager<DB: db::JobDb<JobSource, TaskSource, ()>> {
+struct JobManager<DB: db::JobDb<JobSource, TaskSource, Uuid>> {
 	db: DB,
 }
 
-impl<DB: db::JobDb<JobSource, TaskSource, ()>> Manager for JobManager<DB> {
+impl<DB: db::JobDb<JobSource, TaskSource, Uuid>> Manager for JobManager<DB> {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error> {
 		self.db.create_job(job).await
 	}
@@ -94,8 +100,23 @@ impl<DB: db::JobDb<JobSource, TaskSource, ()>> Manager for JobManager<DB> {
 		}
 	}
 
-	async fn set_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
-		todo!()
+	async fn set_task_output(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		output: Uuid,
+	) -> Result<(), Error> {
+		let idx = self
+			.db
+			.get_allocated_task(job_id, task_id)
+			.await?
+			.map(|(_, idx)| idx)
+			.unwrap_or(u32::MAX /*NOT FOUND*/);
+		self.db.set_task_status(job_id, idx, output).await
+	}
+
+	async fn get_task_output(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<Uuid>, Error> {
+		self.db.get_task_status(job_id, task_idx).await
 	}
 
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
@@ -114,7 +135,7 @@ mod test {
 	use crate::manager::db::{JobDb, MockJobDb};
 	use crate::manager::{JobManager, Manager};
 	use crate::Recipe::{Analysis, Merge};
-	use crate::{Input, Instance, JobSource, Options, Status, TaskSource};
+	use crate::{Input, Instance, JobSource, Options, TaskSource};
 
 	#[tokio::test]
 	async fn create_job_uses_db_and_returns_uuid() {
@@ -319,28 +340,97 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn update_status_to_finished_fulfill() {
-		let mut db = MockJobDb::new();
-		const IDX: u32 = 1;
-		const JOB: Uuid = Uuid::from_u64_pair(1, 1);
-		const TASK: Uuid = Uuid::from_u64_pair(1, 2);
-		db.expect_get_allocated_task().returning(|_job, _task| {
-			Ok(Some((
+	async fn get_task_output_bad_job_err() {
+		let db = super::db::local::LocalJobDb::default();
+		const JOB_ID: Uuid = Uuid::from_u64_pair(1, 1);
+		let manager = JobManager { db };
+		let res = manager.get_task_output(&JOB_ID, 0).await;
+		assert!(res.is_err())
+	}
+
+	#[tokio::test]
+	async fn get_task_output_bad_idx_err() {
+		let db = super::db::local::LocalJobDb::default();
+		let job_id = db
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let manager = JobManager { db };
+		let res = manager.get_task_output(&job_id, 0).await;
+		assert!(res.is_err())
+	}
+
+	#[tokio::test]
+	async fn get_task_output_before_set() {
+		let db = super::db::local::LocalJobDb::default();
+		let job_id = db
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let idx = db
+			.append_task(
+				&job_id,
 				TaskSource {
 					inputs: vec![],
 					recipe: Analysis(),
 				},
-				IDX,
-			)))
-		});
-		db.expect_fulfill()
-			.withf(|job, idx| job == &JOB && idx == &IDX)
-			.times(1)
-			.returning(|_, _| Ok(()));
+				&[],
+			)
+			.await
+			.unwrap();
 		let manager = JobManager { db };
-		let res = manager
-			.update_task_status(&JOB, &TASK, Status::Finished)
-			.await;
-		assert!(res.is_ok());
+		let output = manager.get_task_output(&job_id, idx).await.unwrap();
+		assert!(output.is_none())
+	}
+
+	#[tokio::test]
+	async fn get_task_output_after_set_equals() {
+		let db = super::db::local::LocalJobDb::default();
+		let job_id = db
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let idx = db
+			.append_task(
+				&job_id,
+				TaskSource {
+					inputs: vec![],
+					recipe: Analysis(),
+				},
+				&[],
+			)
+			.await
+			.unwrap();
+		let (job_id, task_id) = db.allocate_task().await.unwrap().unwrap();
+		let manager = JobManager { db };
+		let output = Uuid::from_u64_pair(1, 3);
+		manager
+			.set_task_output(&job_id, &task_id, output)
+			.await
+			.unwrap();
+		let got = manager
+			.get_task_output(&job_id, idx)
+			.await
+			.unwrap()
+			.expect("Should get the output");
+		assert_eq!(got, output);
 	}
 }
