@@ -15,4 +15,5 @@ runner = []
 uuid = { version = "1.7.0", features = ["v4"] }
 
 [dev-dependencies]
+mockall = "0.12.1"
 tokio = { version = "1.37.0", features = ["macros", "rt"] }
