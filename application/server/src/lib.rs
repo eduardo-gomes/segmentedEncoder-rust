@@ -1,56 +1,19 @@
-use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::connect_info::IntoMakeServiceWithConnectInfo;
-use axum::Router;
-use multiplex_tonic_hyper::MakeMultiplexer;
 use tokio::sync::RwLock;
-use tower::make::Shared;
 
-use crate::client_interface::{ServiceLock, ServiceWithAuth};
 use crate::jobs::manager::{JobManager, JobManagerLock};
 use crate::storage::Storage;
-
-#[allow(dead_code)] //until we use
-mod client_interface;
-pub mod web;
 
 struct State {
 	manager: RwLock<JobManager>,
 	storage: Storage,
-	grpc: Arc<ServiceLock>,
 }
 
 impl State {
-	fn new(manager: JobManagerLock, grpc: ServiceLock, storage: Storage) -> Arc<Self> {
-		Arc::new_cyclic(|weak| {
-			let grpc = Arc::new(grpc.with_state(weak.clone()));
-			Self {
-				manager,
-				storage,
-				grpc,
-			}
-		})
+	fn new(manager: JobManagerLock, storage: Storage) -> Arc<Self> {
+		Arc::new(Self { manager, storage })
 	}
-}
-
-/// Temporary function to 'build' the service.
-/// Will be replaced with a proper builder to set service proprieties.
-pub fn make_multiplexed_service(
-) -> MakeMultiplexer<Shared<ServiceWithAuth>, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
-	let storage = Storage::new().unwrap();
-	let manager_lock = RwLock::new(JobManager::new());
-	use crate::client_interface::Service;
-	let service_lock = Service::new().into_lock();
-	let state = State::new(manager_lock, service_lock, storage);
-	let grpc_service = state.grpc.clone().with_auth();
-
-	let web_router = web::make_service(state);
-	use tower_http::cors::CorsLayer;
-	let cors = CorsLayer::permissive();
-	let web_router = web_router.layer(cors);
-	let web = web_router.into_make_service_with_connect_info::<SocketAddr>();
-	MakeMultiplexer::new(Shared::new(grpc_service), web)
 }
 
 #[allow(dead_code)]

@@ -8,7 +8,7 @@ rust-version = "1.75"
 
 [features]
 default = ["web-debug"]
-# web-debug exposes internal data trough the web interface
+# web-debug exposes internal data through the web interface
 web-debug = []
 
 [dependencies]
@@ -17,17 +17,15 @@ async-trait = "0.1.57"
 tokio-util = { version = "0.7.4", features = ["io"] }
 futures = "0.3.24"
 tokio = { version = "1.24.2", features = ["macros", "rt-multi-thread", "signal", "fs", "io-util", "sync"] }
-hyper = "0.14.20"
-axum = "0.6.2"
+hyper = "1.2.0"
+axum = "0.7.5"
 tempfile = "3"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
-grpc-proto = { path = "../grpc-proto" }
-tonic = { version = "0.9.1", default-features = false }
-multiplex-tonic-hyper = "0.1.0"
 tower = "0.4.13"
-tower-http = { version = "0.4.0", features = ["cors"] }
+tower-http = { version = "0.5.2", features = ["cors"] }
 task = { path = "../task" }
+api = { path = "../api" }
 
 [dev-dependencies]
-tonic = "0.9.1"
-reqwest = { version = "0.11.12", default-features = false }
+tonic = "0.11.0"
+reqwest = { version = "0.12.3", default-features = false }

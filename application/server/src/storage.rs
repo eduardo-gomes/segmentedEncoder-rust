@@ -132,7 +132,7 @@ mod test {
 }
 
 pub mod stream {
-	use hyper::Body;
+	use axum::body::Body;
 	use tokio::fs::File;
 	use tokio::io::AsyncRead;
 	use tokio_util::io::{ReaderStream, StreamReader};
@@ -141,7 +141,7 @@ pub mod stream {
 
 	async fn body_to_file(body: Body, file: &mut File) -> std::io::Result<u64> {
 		use futures::StreamExt;
-		let body = body.map(|res| {
+		let body = body.into_data_stream().map(|res| {
 			res.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
 		});
 		let mut stream = StreamReader::new(body);
@@ -163,7 +163,7 @@ pub mod stream {
 
 	#[cfg(test)]
 	mod test {
-		use hyper::Body;
+		use axum::body::Body;
 
 		use crate::storage::stream::body_to_file;
 		use crate::{Storage, WEBM_SAMPLE};
