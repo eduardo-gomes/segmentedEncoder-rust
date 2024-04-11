@@ -81,13 +81,14 @@ pub(crate) mod local {
 
 	use super::JobDb;
 
-	type LocalMap<JOB, TASK, STATUS> = HashMap<
-		Uuid,
-		(
-			JOB,
-			Vec<(TASK, Option<Uuid>, BTreeSet<u32>, Option<STATUS>)>,
-		),
-	>;
+	struct Entry<TASK, STATUS> {
+		task: TASK,
+		run_id: Option<Uuid>,
+		dependencies: BTreeSet<u32>,
+		status: Option<STATUS>,
+	}
+
+	type LocalMap<JOB, TASK, STATUS> = HashMap<Uuid, (JOB, Vec<Entry<TASK, STATUS>>)>;
 
 	pub struct LocalJobDb<
 		JOB: Sync + Send + Clone,
@@ -141,14 +142,19 @@ pub(crate) mod local {
 			if dep.iter().any(|x| x >= &(idx as u32)) {
 				return Err(Error::new(ErrorKind::NotFound, "Dependency not found"));
 			}
-			job.push((task, None, BTreeSet::from_iter(dep.iter().cloned()), None));
+			job.push(Entry {
+				task,
+				run_id: None,
+				dependencies: BTreeSet::from_iter(dep.iter().cloned()),
+				status: None,
+			});
 			Ok(idx as u32)
 		}
 
 		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
 			self.lock()
 				.get(job_id)
-				.map(|(_, tasks)| tasks.iter().map(|(task, _, _, _)| task).cloned().collect())
+				.map(|(_, tasks)| tasks.iter().map(|entry| &entry.task).cloned().collect())
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
 		}
 
@@ -165,8 +171,8 @@ pub(crate) mod local {
 				.1
 				.iter()
 				.enumerate()
-				.find(|(i, (_task, id, _, _))| id.as_ref() == Some(task_id))
-				.map(|(i, (task, _, _, _))| (task.clone(), i as u32));
+				.find(|(i, entry)| entry.run_id.as_ref() == Some(task_id))
+				.map(|(i, entry)| (entry.task.clone(), i as u32));
 			Ok(task)
 		}
 
@@ -177,9 +183,7 @@ pub(crate) mod local {
 				.flat_map(|(job_id, (_, tasks))| {
 					tasks
 						.iter_mut()
-						.filter(|(_, allocation, dependencies, _)| {
-							allocation.is_none() && dependencies.is_empty()
-						})
+						.filter(|entry| entry.run_id.is_none() && entry.dependencies.is_empty())
 						.map(|task| (*job_id, task))
 				})
 				.next();
@@ -187,7 +191,7 @@ pub(crate) mod local {
 				None => Ok(None),
 				Some((job_id, available)) => {
 					let id = Uuid::new_v4();
-					available.1 = Some(id);
+					available.run_id = Some(id);
 					Ok(Some((job_id, id)))
 				}
 			}
@@ -203,8 +207,8 @@ pub(crate) mod local {
 				})
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Task_not_found"))?;
-			for (_, _, deps, _) in job.1.iter_mut().skip(task_idx as usize) {
-				deps.remove(&task_idx);
+			for entry in job.1.iter_mut().skip(task_idx as usize) {
+				entry.dependencies.remove(&task_idx);
 			}
 			Ok(())
 		}
@@ -220,8 +224,7 @@ pub(crate) mod local {
 				.map(|(_, tasks)| tasks.get(task_idx as usize))
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-				.map(|(_, _, _, status)| status)
-				.cloned()
+				.map(|entry| entry.status.clone())
 		}
 
 		async fn set_task_status(
@@ -236,7 +239,8 @@ pub(crate) mod local {
 				.map(|(_, tasks)| tasks.get_mut(task_idx as usize))
 				.unwrap_or_default()
 				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-				.map(|(_, _, _, prev_status)| *prev_status = Some(status))
+				.map(|entry| entry.status.insert(status))
+				.and(Ok(()))
 		}
 	}
 
