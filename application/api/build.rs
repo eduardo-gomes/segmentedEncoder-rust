@@ -4,17 +4,21 @@ use std::path::{Path, PathBuf};
 use futures_util::TryStreamExt;
 use tokio_util::io::StreamReader;
 
+const SIZE: u64 = 27011460;
+
 async fn download_cli() -> PathBuf {
 	let jar = "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.2.0/openapi-generator-cli-7.2.0.jar";
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 	let out_file = out_dir.join("openapi-generator-cli.jar");
-	let current_file = tokio::fs::metadata(&out_file)
+	let has_file = tokio::fs::metadata(&out_file)
 		.await
-		.map(|meta| meta.len())
-		.ok();
-	if current_file.is_some() {
+		.map(|meta| meta.len() == SIZE)
+		.unwrap_or_default();
+	if has_file {
+		println!("File already downloaded");
 		return out_file;
 	}
+	println!("Downloading file from {jar}");
 	let res = reqwest::get(jar).await.unwrap();
 	assert!(
 		res.status().is_success(),
@@ -27,6 +31,7 @@ async fn download_cli() -> PathBuf {
 	);
 	let mut file = tokio::fs::File::create(&out_file).await.unwrap();
 	tokio::io::copy(&mut stream, &mut file).await.unwrap();
+	println!("Downloaded to {:?}", file);
 	out_file
 }
 
@@ -34,7 +39,6 @@ async fn download_cli() -> PathBuf {
 async fn main() {
 	println!("cargo::rerun-if-changed=../../api.yaml");
 	let file = download_cli().await;
-	println!("Downloaded to {:?}", file);
 	let out_lib = Path::new(&env::var("OUT_DIR").unwrap()).join("generated");
 	let status = std::process::Command::new("java")
 		.arg("-jar")
