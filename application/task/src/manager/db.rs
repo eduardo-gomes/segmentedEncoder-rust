@@ -59,6 +59,11 @@ pub(crate) trait JobDb<JOB, TASK> {
 	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
 	///Mark the task as finished, allowing tasks that depend on this task to run
 	async fn fulfill(&self, job_id: &Uuid, task_idx: u32) -> Result<(), std::io::Error>;
+	async fn get_task_status(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+	) -> Result<Option<()>, std::io::Error>;
 }
 
 pub(crate) mod local {
@@ -182,6 +187,16 @@ pub(crate) mod local {
 				deps.remove(&task_idx);
 			}
 			Ok(())
+		}
+
+		async fn get_task_status(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<()>, Error> {
+			let binding = self.lock();
+			binding
+				.get(job_id)
+				.map(|(_, tasks)| tasks.get(task_idx as usize))
+				.unwrap_or_default()
+				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
+				.and(Ok(None))
 		}
 	}
 
@@ -485,6 +500,41 @@ pub(crate) mod local {
 				.unwrap()
 				.unwrap();
 			assert_eq!(idx, task_idx);
+		}
+
+		#[tokio::test]
+		async fn get_task_status_before_set_returns_none() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let status = manager.get_task_status(&job_id, task_idx).await.unwrap();
+			assert!(status.is_none());
+		}
+
+		#[tokio::test]
+		async fn get_task_status_bad_job_error() {
+			let manager = LocalJobDb::<String, String>::default();
+			let status = manager.get_task_status(&Uuid::nil(), 0).await;
+			assert!(status.is_err());
+		}
+
+		#[tokio::test]
+		async fn get_task_status_bad_task_error() {
+			let manager = LocalJobDb::<String, String>::default();
+			let task_src = "Task 1".to_string();
+			let job = "Job 1".to_string();
+			let job_id = manager.create_job(job).await.unwrap();
+			let task_idx = manager
+				.append_task(&job_id, task_src.clone(), &[])
+				.await
+				.unwrap();
+			let status = manager.get_task_status(&job_id, task_idx + 10).await;
+			assert!(status.is_err());
 		}
 	}
 }
