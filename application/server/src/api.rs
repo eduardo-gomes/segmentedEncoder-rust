@@ -2,7 +2,7 @@
 
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, StatusCode};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub fn make_router(credential: &str) -> Router {
 	Router::new()
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
+		.route("/job", post(job_post))
 		.with_state(AppState {
 			credential: credential.to_string(),
 		})
@@ -35,6 +36,10 @@ async fn login(
 			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
+}
+
+async fn job_post() -> StatusCode {
+	StatusCode::BAD_REQUEST
 }
 
 #[cfg(test)]
@@ -105,7 +110,7 @@ mod test {
 	#[tokio::test]
 	async fn get_login_returns_text() {
 		let server = test_server();
-		let status = server
+		let token = server
 			.get("/login")
 			.add_header(
 				HeaderName::from_static("credentials"),
@@ -113,6 +118,13 @@ mod test {
 			)
 			.await
 			.text();
-		assert!(!status.is_empty());
+		assert!(!token.is_empty());
+	}
+
+	#[tokio::test]
+	async fn job_post_without_headers_or_body_bad_request() {
+		let server = test_server();
+		let status = server.post("/job").await.status_code();
+		assert_eq!(status, StatusCode::BAD_REQUEST)
 	}
 }
