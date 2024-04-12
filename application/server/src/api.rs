@@ -1,16 +1,25 @@
 //! Api based on api.yaml spec
 
+use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, StatusCode};
 use axum::routing::get;
 use axum::Router;
 
-pub fn make_router() -> Router {
+#[derive(Clone)]
+struct AppState {
+	credential: String,
+}
+
+pub fn make_router(credential: &str) -> Router {
 	Router::new()
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
+		.with_state(AppState {
+			credential: credential.to_string(),
+		})
 }
 
-async fn login(header_map: HeaderMap) -> StatusCode {
+async fn login(State(state): State<AppState>, header_map: HeaderMap) -> StatusCode {
 	let credentials = header_map
 		.get(HeaderName::from_static("credentials"))
 		.map(|v| v.to_str())
@@ -18,7 +27,10 @@ async fn login(header_map: HeaderMap) -> StatusCode {
 		.unwrap_or_default();
 	match credentials {
 		None => StatusCode::BAD_REQUEST,
-		Some(_) => StatusCode::FORBIDDEN,
+		Some(provided) => match provided == state.credential {
+			true => StatusCode::NO_CONTENT,
+			false => StatusCode::FORBIDDEN,
+		},
 	}
 }
 
@@ -29,8 +41,9 @@ mod test {
 
 	use crate::api::make_router;
 
+	const TEST_CRED: &str = "test_auth";
 	fn test_server() -> TestServer {
-		TestServer::new(make_router()).unwrap()
+		TestServer::new(make_router(TEST_CRED)).unwrap()
 	}
 
 	#[tokio::test]
@@ -70,5 +83,19 @@ mod test {
 			.await
 			.status_code();
 		assert_eq!(status, StatusCode::FORBIDDEN);
+	}
+
+	#[tokio::test]
+	async fn get_login_with_good_auth() {
+		let server = test_server();
+		let status = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.status_code();
+		assert!(status.is_success());
 	}
 }
