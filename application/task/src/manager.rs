@@ -8,7 +8,7 @@ use crate::{Instance, JobSource, Status, TaskSource};
 mod db;
 
 ///Interface used by the server to manage jobs and tasks
-trait Manager {
+pub trait Manager {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error>;
 	async fn get_job(&self, job_id: &Uuid) -> Result<Option<JobSource>, Error>;
 	async fn allocate_task(&self) -> Result<Option<Instance>, Error>;

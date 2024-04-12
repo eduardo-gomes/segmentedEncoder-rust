@@ -8,14 +8,16 @@ use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
-use uuid::Uuid;
 
 use auth_module::AuthenticationHandler;
+use task::manager::Manager;
+use task::{JobSource, Options};
 
 #[derive(Clone, Default)]
 pub struct AppState {
 	credential: String,
 	auth_handler: Arc<auth_module::LocalAuthenticator>,
+	manager: Arc<task::manager::LocalJobManager>,
 }
 
 impl AppState {
@@ -81,14 +83,29 @@ async fn login(
 	}
 }
 
-async fn job_post(_auth: AuthToken, headers: HeaderMap) -> Result<impl IntoResponse, StatusCode> {
+async fn job_post(
+	State(state): State<AppState>,
+	_auth: AuthToken,
+	headers: HeaderMap,
+) -> Result<impl IntoResponse, StatusCode> {
 	let video_codec = headers
 		.get(HeaderName::from_static("video_codec"))
 		.map(HeaderValue::to_str)
 		.transpose()
 		.unwrap_or_default();
 	video_codec.ok_or(StatusCode::BAD_REQUEST)?;
-	Ok((StatusCode::CREATED, Uuid::nil().to_string()))
+	let job_id = state
+		.manager
+		.create_job(JobSource {
+			input_id: Default::default(),
+			video_options: Options {
+				codec: "".to_string(),
+				params: vec![],
+			},
+		})
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	Ok((StatusCode::CREATED, job_id.to_string()))
 }
 
 #[cfg(test)]
@@ -99,6 +116,7 @@ mod test {
 	use uuid::Uuid;
 
 	use auth_module::AuthenticationHandler;
+	use task::manager::Manager;
 
 	use crate::api::{make_router, AppState};
 	use crate::MKV_SAMPLE;
@@ -276,5 +294,24 @@ mod test {
 			.await
 			.text();
 		assert!(Uuid::parse_str(&job_id).is_ok())
+	}
+
+	#[tokio::test]
+	async fn job_post_creates_job_on_task_manager() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_id: Uuid = server
+			.post("/job")
+			.add_header(AUTHORIZATION, token)
+			.add_header(
+				HeaderName::from_static("video_codec"),
+				HeaderValue::from_static("libx264"),
+			)
+			.bytes(MKV_SAMPLE.as_slice().into())
+			.await
+			.text()
+			.parse()
+			.unwrap();
+		let job = state.manager.get_job(&job_id).await.unwrap();
+		assert!(job.is_some())
 	}
 }

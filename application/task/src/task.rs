@@ -6,8 +6,8 @@ use uuid::Uuid;
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct JobSource {
-	input_id: Uuid,
-	video_options: Options,
+	pub input_id: Uuid,
+	pub video_options: Options,
 }
 
 #[derive(Clone)]
@@ -20,9 +20,9 @@ pub struct TaskSource {
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-struct Options {
-	codec: String,
-	params: Vec<String>,
+pub struct Options {
+	pub codec: String,
+	pub params: Vec<String>,
 }
 
 #[derive(Clone)]
