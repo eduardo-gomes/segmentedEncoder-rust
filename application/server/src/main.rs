@@ -16,7 +16,7 @@ async fn shutdown_signal(handle: Handle) {
 
 #[tokio::main]
 async fn main() {
-	let api = server::make_router(server::AppState::with_cred("password"));
+	let api = server::make_router(server::AppState::with_cred("password").into());
 	let app = Router::new().nest("/api", api);
 	let handle = Handle::new();
 

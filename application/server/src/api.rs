@@ -13,11 +13,11 @@ use auth_module::AuthenticationHandler;
 use task::manager::Manager;
 use task::{JobSource, Options};
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct AppState {
 	credential: String,
-	auth_handler: Arc<auth_module::LocalAuthenticator>,
-	manager: Arc<task::manager::LocalJobManager>,
+	auth_handler: auth_module::LocalAuthenticator,
+	manager: task::manager::LocalJobManager,
 }
 
 impl AppState {
@@ -32,12 +32,12 @@ impl AppState {
 struct AuthToken(String);
 
 #[async_trait::async_trait]
-impl FromRequestParts<AppState> for AuthToken {
+impl FromRequestParts<Arc<AppState>> for AuthToken {
 	type Rejection = (StatusCode, &'static str);
 
 	async fn from_request_parts(
 		parts: &mut Parts,
-		state: &AppState,
+		state: &Arc<AppState>,
 	) -> Result<Self, Self::Rejection> {
 		let header = parts
 			.headers
@@ -57,8 +57,8 @@ impl FromRequestParts<AppState> for AuthToken {
 	}
 }
 
-pub fn make_router(state: AppState) -> Router {
-	Router::new()
+pub fn make_router(state: Arc<AppState>) -> Router {
+	Router::<Arc<AppState>>::new()
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
 		.route("/job", post(job_post))
@@ -66,7 +66,7 @@ pub fn make_router(state: AppState) -> Router {
 }
 
 async fn login(
-	State(state): State<AppState>,
+	State(state): State<Arc<AppState>>,
 	header_map: HeaderMap,
 ) -> Result<(StatusCode, String), StatusCode> {
 	let credentials = header_map
@@ -84,7 +84,7 @@ async fn login(
 }
 
 async fn job_post(
-	State(state): State<AppState>,
+	State(state): State<Arc<AppState>>,
 	_auth: AuthToken,
 	headers: HeaderMap,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -117,6 +117,8 @@ async fn job_post(
 
 #[cfg(test)]
 mod test {
+	use std::sync::Arc;
+
 	use axum::body::Bytes;
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
@@ -133,8 +135,9 @@ mod test {
 	fn test_server() -> TestServer {
 		test_server_state().0
 	}
-	fn test_server_state() -> (TestServer, AppState) {
-		let state = AppState::with_cred(TEST_CRED);
+
+	fn test_server_state() -> (TestServer, Arc<AppState>) {
+		let state = Arc::new(AppState::with_cred(TEST_CRED));
 		(TestServer::new(make_router(state.clone())).unwrap(), state)
 	}
 
@@ -143,7 +146,7 @@ mod test {
 		(server, token)
 	}
 
-	async fn test_server_state_auth() -> (TestServer, AppState, HeaderValue) {
+	async fn test_server_state_auth() -> (TestServer, Arc<AppState>, HeaderValue) {
 		let (server, state) = test_server_state();
 		let token: HeaderValue = server
 			.get("/login")
