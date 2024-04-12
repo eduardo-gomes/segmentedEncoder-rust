@@ -94,13 +94,20 @@ async fn job_post(
 		.transpose()
 		.unwrap_or_default()
 		.ok_or(StatusCode::BAD_REQUEST)?;
+	let video_param = headers
+		.get(HeaderName::from_static("video_param"))
+		.map(HeaderValue::to_str)
+		.transpose()
+		.unwrap_or_default()
+		.map(String::from)
+		.into_iter();
 	let job_id = state
 		.manager
 		.create_job(JobSource {
 			input_id: Default::default(),
 			video_options: Options {
 				codec: video_codec.to_string(),
-				params: vec![],
+				params: video_param.collect(),
 			},
 		})
 		.await
@@ -303,14 +310,25 @@ mod test {
 		options: task::Options,
 		body: Bytes,
 	) -> TestRequest {
-		server
+		let req = server
 			.post("/job")
 			.add_header(AUTHORIZATION, token)
 			.add_header(
 				HeaderName::from_static("video_codec"),
 				HeaderValue::from_str(&options.codec).unwrap(),
 			)
-			.bytes(body)
+			.bytes(body);
+		let params = options
+			.params
+			.first()
+			.map(String::as_str)
+			.map(HeaderValue::from_str)
+			.transpose()
+			.unwrap();
+		match params {
+			Some(p) => req.add_header(HeaderName::from_static("video_param"), p),
+			None => req,
+		}
 	}
 
 	#[tokio::test]
@@ -355,5 +373,32 @@ mod test {
 			.unwrap()
 			.video_options;
 		assert_eq!(job.codec, job_options.codec)
+	}
+
+	#[tokio::test]
+	async fn job_post_creates_job_with_same_first_params() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec!["opt".to_string()],
+		};
+		let job_id: Uuid = make_post_job_request(
+			server,
+			token,
+			job_options.clone(),
+			MKV_SAMPLE.as_slice().into(),
+		)
+		.await
+		.text()
+		.parse()
+		.unwrap();
+		let job = state
+			.manager
+			.get_job(&job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.video_options;
+		assert_eq!(job.params[0], job_options.params[0])
 	}
 }
