@@ -166,7 +166,8 @@ pub mod stream {
 		use axum::body::Body;
 
 		use crate::storage::stream::body_to_file;
-		use crate::{Storage, WEBM_SAMPLE};
+		use crate::storage::Storage;
+		use crate::WEBM_SAMPLE;
 
 		#[tokio::test]
 		async fn body_to_job_source() -> std::io::Result<()> {

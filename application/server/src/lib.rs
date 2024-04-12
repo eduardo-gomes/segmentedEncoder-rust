@@ -1,27 +1,7 @@
-use std::sync::Arc;
-
-use tokio::sync::RwLock;
-
 pub use api::{make_router, AppState};
-
-use crate::jobs::manager::{JobManager, JobManagerLock};
-use crate::storage::Storage;
-
-struct State {
-	manager: RwLock<JobManager>,
-	storage: Storage,
-}
-
-impl State {
-	fn new(manager: JobManagerLock, storage: Storage) -> Arc<Self> {
-		Arc::new(Self { manager, storage })
-	}
-}
 
 #[allow(dead_code)]
 mod storage;
-
-mod jobs;
 
 ///New API
 mod api;
