@@ -19,17 +19,20 @@ pub fn make_router(credential: &str) -> Router {
 		})
 }
 
-async fn login(State(state): State<AppState>, header_map: HeaderMap) -> StatusCode {
+async fn login(
+	State(state): State<AppState>,
+	header_map: HeaderMap,
+) -> Result<(StatusCode, String), StatusCode> {
 	let credentials = header_map
 		.get(HeaderName::from_static("credentials"))
 		.map(|v| v.to_str())
 		.transpose()
 		.unwrap_or_default();
 	match credentials {
-		None => StatusCode::BAD_REQUEST,
+		None => Err(StatusCode::BAD_REQUEST),
 		Some(provided) => match provided == state.credential {
-			true => StatusCode::NO_CONTENT,
-			false => StatusCode::FORBIDDEN,
+			true => Ok((StatusCode::OK, "some_random_token".into())),
+			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
 }
@@ -97,5 +100,19 @@ mod test {
 			.await
 			.status_code();
 		assert!(status.is_success());
+	}
+
+	#[tokio::test]
+	async fn get_login_returns_text() {
+		let server = test_server();
+		let status = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.text();
+		assert!(!status.is_empty());
 	}
 }
