@@ -1361,6 +1361,7 @@ version = "0.3.0"
 dependencies = [
  "api",
  "async-trait",
+ "auth_module",
  "axum 0.7.5",
  "axum-server",
  "axum-test",

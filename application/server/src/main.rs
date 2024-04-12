@@ -15,7 +15,7 @@ async fn shutdown_signal(handle: Handle) {
 
 #[tokio::main]
 async fn main() {
-	let app = server::make_router("password");
+	let app = server::make_router(server::AppState::with_cred("password"));
 	let handle = Handle::new();
 
 	// Spawn a task to gracefully shutdown server.

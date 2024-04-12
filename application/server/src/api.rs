@@ -1,23 +1,33 @@
 //! Api based on api.yaml spec
 
+use std::sync::Arc;
+
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, StatusCode};
-use axum::routing::{get, post};
 use axum::Router;
+use axum::routing::{get, post};
 
-#[derive(Clone)]
-struct AppState {
+#[derive(Clone, Default)]
+pub struct AppState {
 	credential: String,
+	auth_handler: Arc<auth_module::LocalAuthenticator>,
 }
 
-pub fn make_router(credential: &str) -> Router {
+impl AppState {
+	pub fn with_cred(cred: &str) -> AppState {
+		AppState {
+			credential: cred.into(),
+			..Default::default()
+		}
+	}
+}
+
+pub fn make_router(state: AppState) -> Router {
 	Router::new()
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
 		.route("/job", post(job_post))
-		.with_state(AppState {
-			credential: credential.to_string(),
-		})
+		.with_state(state)
 }
 
 async fn login(
@@ -39,7 +49,7 @@ async fn login(
 }
 
 async fn job_post() -> StatusCode {
-	StatusCode::BAD_REQUEST
+	StatusCode::FORBIDDEN
 }
 
 #[cfg(test)]
@@ -47,11 +57,11 @@ mod test {
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
 	use axum_test::TestServer;
 
-	use crate::api::make_router;
+	use crate::api::{AppState, make_router};
 
 	const TEST_CRED: &str = "test_auth";
 	fn test_server() -> TestServer {
-		TestServer::new(make_router(TEST_CRED)).unwrap()
+		TestServer::new(make_router(AppState::with_cred(TEST_CRED))).unwrap()
 	}
 
 	#[tokio::test]
@@ -122,9 +132,9 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn job_post_without_headers_or_body_bad_request() {
+	async fn job_post_without_auth_forbidden() {
 		let server = test_server();
 		let status = server.post("/job").await.status_code();
-		assert_eq!(status, StatusCode::BAD_REQUEST)
+		assert_eq!(status, StatusCode::FORBIDDEN)
 	}
 }
