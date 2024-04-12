@@ -19,7 +19,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/cargo
-    - uses: ./.github/actions/protoc
     - uses: actions/setup-java@v4
       with:
         distribution: "temurin"
@@ -51,7 +50,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/cargo
-    - uses: ./.github/actions/protoc
     - uses: actions/setup-java@v4
       with:
         distribution: "temurin"
