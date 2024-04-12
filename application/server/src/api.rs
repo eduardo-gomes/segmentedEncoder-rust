@@ -110,9 +110,10 @@ async fn job_post(
 
 #[cfg(test)]
 mod test {
+	use axum::body::Bytes;
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
-	use axum_test::TestServer;
+	use axum_test::{TestRequest, TestServer};
 	use uuid::Uuid;
 
 	use auth_module::AuthenticationHandler;
@@ -296,21 +297,35 @@ mod test {
 		assert!(Uuid::parse_str(&job_id).is_ok())
 	}
 
-	#[tokio::test]
-	async fn job_post_creates_job_on_task_manager() {
-		let (server, state, token) = test_server_state_auth().await;
-		let job_id: Uuid = server
+	fn make_post_job_request(
+		server: TestServer,
+		token: HeaderValue,
+		options: task::Options,
+		body: Bytes,
+	) -> TestRequest {
+		server
 			.post("/job")
 			.add_header(AUTHORIZATION, token)
 			.add_header(
 				HeaderName::from_static("video_codec"),
-				HeaderValue::from_static("libx264"),
+				HeaderValue::from_str(&options.codec).unwrap(),
 			)
-			.bytes(MKV_SAMPLE.as_slice().into())
-			.await
-			.text()
-			.parse()
-			.unwrap();
+			.bytes(body)
+	}
+
+	#[tokio::test]
+	async fn job_post_creates_job_on_task_manager() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec![],
+		};
+		let job_id: Uuid =
+			make_post_job_request(server, token, job_options, MKV_SAMPLE.as_slice().into())
+				.await
+				.text()
+				.parse()
+				.unwrap();
 		let job = state.manager.get_job(&job_id).await.unwrap();
 		assert!(job.is_some())
 	}
