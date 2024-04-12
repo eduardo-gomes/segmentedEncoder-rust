@@ -10,6 +10,7 @@ mod db;
 ///Interface used by the server to manage jobs and tasks
 trait Manager {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error>;
+	async fn get_job(&self, job_id: &Uuid) -> Result<Option<JobSource>, Error>;
 	async fn allocate_task(&self) -> Result<Option<Instance>, Error>;
 	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> Result<u32, Error>;
 	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error>;
@@ -54,6 +55,10 @@ pub struct JobManager<DB: db::JobDb<JobSource, TaskSource, TaskState>> {
 impl<DB: db::JobDb<JobSource, TaskSource, TaskState>> Manager for JobManager<DB> {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error> {
 		self.db.create_job(job).await
+	}
+
+	async fn get_job(&self, job_id: &Uuid) -> Result<Option<JobSource>, Error> {
+		self.db.get_job(job_id).await
 	}
 
 	async fn allocate_task(&self) -> Result<Option<Instance>, Error> {
@@ -183,6 +188,19 @@ mod test {
 		let manager = JobManager { db: mock };
 		let id = manager.create_job(source).await.unwrap();
 		assert_eq!(id, TARGET_ID);
+	}
+
+	#[tokio::test]
+	async fn get_job_bad_id_returns_none() {
+		let mut mock = MockJobDb::new();
+		const TARGET_ID: Uuid = Uuid::from_u64_pair(123, 123);
+		mock.expect_get_job()
+			.with(mockall::predicate::eq(TARGET_ID))
+			.times(1)
+			.returning(|_| Ok(None));
+		let manager = JobManager { db: mock };
+		let job = manager.get_job(&TARGET_ID).await.unwrap();
+		assert!(job.is_none());
 	}
 
 	#[tokio::test]
