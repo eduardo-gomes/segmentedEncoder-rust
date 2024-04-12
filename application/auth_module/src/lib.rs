@@ -20,10 +20,12 @@ pub trait AuthenticationHandler {
 	fn add(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<(), Error>> + Send;
 	fn remove(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<bool, Error>> + Send;
 	fn check(&self, token: &str, obj: Uuid) -> impl Future<Output = Result<bool, Error>> + Send;
+	fn is_valid(&self, token: &str) -> impl Future<Output = Result<bool, Error>> + Send;
 }
 
 mod local {
 	use std::collections::{HashMap, HashSet};
+	use std::future::Future;
 	use std::sync::atomic::Ordering;
 	use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 
@@ -85,6 +87,10 @@ mod local {
 				.get(token)
 				.and_then(|perms| perms.get(&obj))
 				.is_some())
+		}
+
+		async fn is_valid(&self, token: &str) -> Result<bool, Error> {
+			Ok(self.read_map().get(token).and(Some(true)).unwrap_or(false))
 		}
 	}
 
@@ -165,6 +171,31 @@ mod local {
 			handler.add(token.as_str(), obj).await.unwrap();
 			handler.remove(token.as_str(), obj).await.unwrap();
 			let check = handler.check(token.as_str(), obj).await.unwrap();
+			assert!(!check)
+		}
+
+		#[tokio::test]
+		async fn bad_token_is_valid_false() {
+			let handler = LocalAuthenticator::default();
+			let token = "bad_token";
+			let check = handler.is_valid(token).await.unwrap();
+			assert!(!check)
+		}
+
+		#[tokio::test]
+		async fn created_token_is_valid() {
+			let handler = LocalAuthenticator::default();
+			let token = handler.new_token().await;
+			let check = handler.is_valid(token.as_str()).await.unwrap();
+			assert!(check)
+		}
+
+		#[tokio::test]
+		async fn deleted_token_is_valid_false() {
+			let handler = LocalAuthenticator::default();
+			let token = handler.new_token().await;
+			handler.delete_token(token.as_str()).await.unwrap();
+			let check = handler.is_valid(token.as_str()).await.unwrap();
 			assert!(!check)
 		}
 	}
