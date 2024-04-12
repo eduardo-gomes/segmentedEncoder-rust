@@ -25,7 +25,6 @@ pub trait AuthenticationHandler {
 
 mod local {
 	use std::collections::{HashMap, HashSet};
-	use std::future::Future;
 	use std::sync::atomic::Ordering;
 	use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 

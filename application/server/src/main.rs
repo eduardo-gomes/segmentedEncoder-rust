@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use axum::routing::Router;
 use axum_server::Handle;
 
 async fn shutdown_signal(handle: Handle) {
@@ -15,7 +16,8 @@ async fn shutdown_signal(handle: Handle) {
 
 #[tokio::main]
 async fn main() {
-	let app = server::make_router(server::AppState::with_cred("password"));
+	let api = server::make_router(server::AppState::with_cred("password"));
+	let app = Router::new().nest("/api", api);
 	let handle = Handle::new();
 
 	// Spawn a task to gracefully shutdown server.
