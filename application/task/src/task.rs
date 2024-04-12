@@ -18,8 +18,7 @@ pub struct TaskSource {
 	recipe: Recipe,
 }
 
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Options {
 	pub codec: String,
 	pub params: Vec<String>,

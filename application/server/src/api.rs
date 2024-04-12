@@ -92,14 +92,14 @@ async fn job_post(
 		.get(HeaderName::from_static("video_codec"))
 		.map(HeaderValue::to_str)
 		.transpose()
-		.unwrap_or_default();
-	video_codec.ok_or(StatusCode::BAD_REQUEST)?;
+		.unwrap_or_default()
+		.ok_or(StatusCode::BAD_REQUEST)?;
 	let job_id = state
 		.manager
 		.create_job(JobSource {
 			input_id: Default::default(),
 			video_options: Options {
-				codec: "".to_string(),
+				codec: video_codec.to_string(),
 				params: vec![],
 			},
 		})
@@ -328,5 +328,32 @@ mod test {
 				.unwrap();
 		let job = state.manager.get_job(&job_id).await.unwrap();
 		assert!(job.is_some())
+	}
+
+	#[tokio::test]
+	async fn job_post_creates_job_with_same_codec() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec![],
+		};
+		let job_id: Uuid = make_post_job_request(
+			server,
+			token,
+			job_options.clone(),
+			MKV_SAMPLE.as_slice().into(),
+		)
+		.await
+		.text()
+		.parse()
+		.unwrap();
+		let job = state
+			.manager
+			.get_job(&job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.video_options;
+		assert_eq!(job.codec, job_options.codec)
 	}
 }
