@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::http::{HeaderMap, HeaderName, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::routing::{get, post};
 use axum::Router;
 
@@ -50,12 +50,26 @@ async fn login(
 	}
 }
 
-async fn job_post() -> StatusCode {
-	StatusCode::FORBIDDEN
+async fn job_post(State(state): State<AppState>, header_map: HeaderMap) -> StatusCode {
+	let auth = header_map
+		.get(header::AUTHORIZATION)
+		.map(|v| v.to_str())
+		.transpose()
+		.unwrap_or_default()
+		.map(|a| state.auth_handler.is_valid(a));
+	let auth = match auth {
+		None => false,
+		Some(f) => f.await.unwrap_or_default(),
+	};
+	match auth {
+		true => StatusCode::BAD_REQUEST,
+		false => StatusCode::FORBIDDEN,
+	}
 }
 
 #[cfg(test)]
 mod test {
+	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
 	use axum_test::TestServer;
 
@@ -163,5 +177,26 @@ mod test {
 		let server = test_server();
 		let status = server.post("/job").await.status_code();
 		assert_eq!(status, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn job_empty_post_with_auth_bad_request() {
+		let server = test_server();
+		let token: HeaderValue = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.text()
+			.parse()
+			.unwrap();
+		let status = server
+			.post("/job")
+			.add_header(AUTHORIZATION, token)
+			.await
+			.status_code();
+		assert_eq!(status, StatusCode::BAD_REQUEST)
 	}
 }
