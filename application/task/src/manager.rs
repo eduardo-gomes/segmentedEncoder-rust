@@ -7,6 +7,7 @@ use crate::{Instance, JobSource, Status, TaskSource};
 
 mod db;
 
+#[allow(async_fn_in_trait)]
 ///Interface used by the server to manage jobs and tasks
 pub trait Manager {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error>;

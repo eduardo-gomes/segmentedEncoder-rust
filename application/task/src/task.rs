@@ -33,7 +33,7 @@ enum Recipe {
 }
 
 #[derive(Clone)]
-enum Status {
+pub enum Status {
 	Finished,
 	Running,
 }
@@ -48,7 +48,7 @@ struct Input {
 
 ///An allocated task
 #[cfg_attr(test, derive(Debug, PartialEq))]
-struct Instance {
+pub struct Instance {
 	job_id: Uuid,
 	task_id: Uuid,
 	inputs: Vec<Input>,

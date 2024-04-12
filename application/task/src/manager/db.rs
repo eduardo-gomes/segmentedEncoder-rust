@@ -30,8 +30,9 @@
 
 use uuid::Uuid;
 
+#[allow(async_fn_in_trait)]
 #[cfg_attr(test, mockall::automock)]
-pub(crate) trait JobDb<JOB, TASK, STATUS> {
+pub trait JobDb<JOB, TASK, STATUS> {
 	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
 	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
 	/// Append task to job and return the task index
