@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
-use axum::http::{header, HeaderMap, HeaderName, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::routing::{get, post};
 use axum::Router;
 
@@ -79,8 +79,16 @@ async fn login(
 	}
 }
 
-async fn job_post(_auth: AuthToken) -> StatusCode {
-	StatusCode::BAD_REQUEST
+async fn job_post(_auth: AuthToken, headers: HeaderMap) -> StatusCode {
+	let video_codec = headers
+		.get(HeaderName::from_static("video_codec"))
+		.map(HeaderValue::to_str)
+		.transpose()
+		.unwrap_or_default();
+	match video_codec {
+		None => StatusCode::BAD_REQUEST,
+		Some(_) => StatusCode::CREATED,
+	}
 }
 
 #[cfg(test)]
@@ -92,6 +100,7 @@ mod test {
 	use auth_module::AuthenticationHandler;
 
 	use crate::api::{make_router, AppState};
+	use crate::MKV_SAMPLE;
 
 	const TEST_CRED: &str = "test_auth";
 	fn test_server() -> TestServer {
@@ -214,5 +223,31 @@ mod test {
 			.await
 			.status_code();
 		assert_eq!(status, StatusCode::BAD_REQUEST)
+	}
+
+	#[tokio::test]
+	async fn job_post_with_body_and_video_codec_created() {
+		let server = test_server();
+		let token: HeaderValue = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.text()
+			.parse()
+			.unwrap();
+		let status = server
+			.post("/job")
+			.add_header(AUTHORIZATION, token)
+			.add_header(
+				HeaderName::from_static("video_codec"),
+				HeaderValue::from_static("libx264"),
+			)
+			.bytes(MKV_SAMPLE.as_slice().into())
+			.await
+			.status_code();
+		assert_eq!(status, StatusCode::CREATED)
 	}
 }
