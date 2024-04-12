@@ -94,20 +94,20 @@ async fn job_post(
 		.transpose()
 		.unwrap_or_default()
 		.ok_or(StatusCode::BAD_REQUEST)?;
-	let video_param = headers
-		.get(HeaderName::from_static("video_param"))
+	let video_param: Vec<String> = headers
+		.get_all(HeaderName::from_static("video_param"))
+		.iter()
 		.map(HeaderValue::to_str)
-		.transpose()
-		.unwrap_or_default()
-		.map(String::from)
-		.into_iter();
+		.map(|v| v.map(String::from))
+		.collect::<Result<Vec<_>, _>>()
+		.or(Err(StatusCode::BAD_REQUEST))?;
 	let job_id = state
 		.manager
 		.create_job(JobSource {
 			input_id: Default::default(),
 			video_options: Options {
 				codec: video_codec.to_string(),
-				params: video_param.collect(),
+				params: video_param,
 			},
 		})
 		.await
@@ -310,7 +310,7 @@ mod test {
 		options: task::Options,
 		body: Bytes,
 	) -> TestRequest {
-		let req = server
+		let mut req = server
 			.post("/job")
 			.add_header(AUTHORIZATION, token)
 			.add_header(
@@ -320,15 +320,14 @@ mod test {
 			.bytes(body);
 		let params = options
 			.params
-			.first()
+			.iter()
 			.map(String::as_str)
 			.map(HeaderValue::from_str)
-			.transpose()
-			.unwrap();
-		match params {
-			Some(p) => req.add_header(HeaderName::from_static("video_param"), p),
-			None => req,
+			.map(|x| x.unwrap());
+		for param in params {
+			req = req.add_header(HeaderName::from_static("video_param"), param);
 		}
+		req
 	}
 
 	#[tokio::test]
@@ -400,5 +399,35 @@ mod test {
 			.unwrap()
 			.video_options;
 		assert_eq!(job.params[0], job_options.params[0])
+	}
+
+	#[tokio::test]
+	async fn job_post_creates_job_with_multiple_params() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec!["opt1", "opt2", "opt3", "opt4"]
+				.into_iter()
+				.map(String::from)
+				.collect(),
+		};
+		let job_id: Uuid = make_post_job_request(
+			server,
+			token,
+			job_options.clone(),
+			MKV_SAMPLE.as_slice().into(),
+		)
+		.await
+		.text()
+		.parse()
+		.unwrap();
+		let job = state
+			.manager
+			.get_job(&job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.video_options;
+		assert_eq!(job.params, job_options.params)
 	}
 }
