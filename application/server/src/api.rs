@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, StatusCode};
-use axum::Router;
 use axum::routing::{get, post};
+use axum::Router;
+
+use auth_module::AuthenticationHandler;
 
 #[derive(Clone, Default)]
 pub struct AppState {
@@ -42,7 +44,7 @@ async fn login(
 	match credentials {
 		None => Err(StatusCode::BAD_REQUEST),
 		Some(provided) => match provided == state.credential {
-			true => Ok((StatusCode::OK, "some_random_token".into())),
+			true => Ok((StatusCode::OK, state.auth_handler.new_token().await)),
 			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
@@ -57,11 +59,17 @@ mod test {
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
 	use axum_test::TestServer;
 
-	use crate::api::{AppState, make_router};
+	use auth_module::AuthenticationHandler;
+
+	use crate::api::{make_router, AppState};
 
 	const TEST_CRED: &str = "test_auth";
 	fn test_server() -> TestServer {
-		TestServer::new(make_router(AppState::with_cred(TEST_CRED))).unwrap()
+		test_server_state().0
+	}
+	fn test_server_state() -> (TestServer, AppState) {
+		let state = AppState::with_cred(TEST_CRED);
+		(TestServer::new(make_router(state.clone())).unwrap(), state)
 	}
 
 	#[tokio::test]
@@ -129,6 +137,25 @@ mod test {
 			.await
 			.text();
 		assert!(!token.is_empty());
+	}
+
+	#[tokio::test]
+	async fn login_will_return_a_token_recognizable_by_auth_handler() {
+		let (server, state) = test_server_state();
+		let token = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.text();
+		let valid = state
+			.auth_handler
+			.is_valid(&token)
+			.await
+			.unwrap_or_default();
+		assert!(valid);
 	}
 
 	#[tokio::test]
