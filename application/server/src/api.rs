@@ -2,7 +2,8 @@
 
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::routing::{get, post};
 use axum::Router;
@@ -21,6 +22,34 @@ impl AppState {
 			credential: cred.into(),
 			..Default::default()
 		}
+	}
+}
+
+struct AuthToken(String);
+
+#[async_trait::async_trait]
+impl FromRequestParts<AppState> for AuthToken {
+	type Rejection = (StatusCode, &'static str);
+
+	async fn from_request_parts(
+		parts: &mut Parts,
+		state: &AppState,
+	) -> Result<Self, Self::Rejection> {
+		let header = parts
+			.headers
+			.get(header::AUTHORIZATION)
+			.map(|v| v.to_str())
+			.transpose()
+			.unwrap_or_default()
+			.ok_or((StatusCode::FORBIDDEN, "Missing authorization"))?
+			.to_string();
+		let auth = state
+			.auth_handler
+			.is_valid(&header)
+			.await
+			.unwrap_or_default();
+		auth.then_some(AuthToken(header))
+			.ok_or((StatusCode::FORBIDDEN, "Bad authorization"))
 	}
 }
 
@@ -50,21 +79,8 @@ async fn login(
 	}
 }
 
-async fn job_post(State(state): State<AppState>, header_map: HeaderMap) -> StatusCode {
-	let auth = header_map
-		.get(header::AUTHORIZATION)
-		.map(|v| v.to_str())
-		.transpose()
-		.unwrap_or_default()
-		.map(|a| state.auth_handler.is_valid(a));
-	let auth = match auth {
-		None => false,
-		Some(f) => f.await.unwrap_or_default(),
-	};
-	match auth {
-		true => StatusCode::BAD_REQUEST,
-		false => StatusCode::FORBIDDEN,
-	}
+async fn job_post(_auth: AuthToken) -> StatusCode {
+	StatusCode::BAD_REQUEST
 }
 
 #[cfg(test)]
