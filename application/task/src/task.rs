@@ -5,14 +5,14 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-struct JobSource {
+pub struct JobSource {
 	input_id: Uuid,
 	video_options: Options,
 }
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-struct TaskSource {
+pub struct TaskSource {
 	///Here, the input should be the task id, or 0 for the job source
 	inputs: Vec<Input>,
 	recipe: Recipe,
@@ -56,4 +56,4 @@ struct Instance {
 	recipe: Recipe,
 }
 
-mod manager;
+pub mod manager;

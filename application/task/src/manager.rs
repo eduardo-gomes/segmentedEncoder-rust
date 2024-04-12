@@ -2,6 +2,7 @@ use std::io::{Error, ErrorKind};
 
 use uuid::Uuid;
 
+use crate::manager::db::local::LocalJobDb;
 use crate::{Instance, JobSource, Status, TaskSource};
 
 mod db;
@@ -32,11 +33,21 @@ trait Manager {
 }
 
 #[derive(Clone)]
-struct TaskState {
+pub struct TaskState {
 	output: Option<Uuid>,
 }
 
-struct JobManager<DB: db::JobDb<JobSource, TaskSource, TaskState>> {
+pub type LocalJobManager = JobManager<LocalJobDb<JobSource, TaskSource, TaskState>>;
+
+impl Default for LocalJobManager {
+	fn default() -> Self {
+		LocalJobManager {
+			db: Default::default(),
+		}
+	}
+}
+
+pub struct JobManager<DB: db::JobDb<JobSource, TaskSource, TaskState>> {
 	db: DB,
 }
 
