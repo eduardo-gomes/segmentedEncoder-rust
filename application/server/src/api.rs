@@ -111,6 +111,21 @@ mod test {
 		(TestServer::new(make_router(state.clone())).unwrap(), state)
 	}
 
+	async fn test_server_auth() -> (TestServer, HeaderValue) {
+		let server = test_server();
+		let token: HeaderValue = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await
+			.text()
+			.parse()
+			.unwrap();
+		(server, token)
+	}
+
 	#[tokio::test]
 	async fn get_version_ok() {
 		let server = test_server();
@@ -227,17 +242,7 @@ mod test {
 
 	#[tokio::test]
 	async fn job_post_with_body_and_video_codec_created() {
-		let server = test_server();
-		let token: HeaderValue = server
-			.get("/login")
-			.add_header(
-				HeaderName::from_static("credentials"),
-				HeaderValue::from_static(TEST_CRED),
-			)
-			.await
-			.text()
-			.parse()
-			.unwrap();
+		let (server, token) = test_server_auth().await;
 		let status = server
 			.post("/job")
 			.add_header(AUTHORIZATION, token)
