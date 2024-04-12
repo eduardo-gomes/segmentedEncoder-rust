@@ -113,7 +113,12 @@ mod test {
 	}
 
 	async fn test_server_auth() -> (TestServer, HeaderValue) {
-		let server = test_server();
+		let (server, _, token) = test_server_state_auth().await;
+		(server, token)
+	}
+
+	async fn test_server_state_auth() -> (TestServer, AppState, HeaderValue) {
+		let (server, state) = test_server_state();
 		let token: HeaderValue = server
 			.get("/login")
 			.add_header(
@@ -124,7 +129,7 @@ mod test {
 			.text()
 			.parse()
 			.unwrap();
-		(server, token)
+		(server, state, token)
 	}
 
 	#[tokio::test]
