@@ -29,10 +29,13 @@ components:
         properties:
           input:
             type: integer
+            format:
           start:
             type: number
+            format: double
           end:
             type: number
+            format: double
         example:
           - input: 0
             start: 0

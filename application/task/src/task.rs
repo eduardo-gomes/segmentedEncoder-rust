@@ -87,6 +87,18 @@ mod conversion {
 		}
 	}
 
+	impl TryFrom<api::models::TaskInputInner> for Input {
+		type Error = ();
+
+		fn try_from(value: api::models::TaskInputInner) -> Result<Self, Self::Error> {
+			Ok(Input {
+				index: u32::try_from(value.input).or(Err(()))?,
+				start: value.start,
+				end: value.end,
+			})
+		}
+	}
+
 	impl TryFrom<api::models::Task> for Instance {
 		type Error = ();
 
@@ -106,11 +118,18 @@ mod conversion {
 				.unwrap_or_default()
 				.ok_or(())?;
 			let from_recipe = value.recipe.ok_or(())?;
+			let inputs: Result<Vec<Input>, ()> = value
+				.input
+				.ok_or(())?
+				.into_iter()
+				.map(Input::try_from)
+				.collect();
+			let inputs = inputs?;
 			let recipe = Recipe::try_from(from_recipe.as_ref())?;
 			Ok(Instance {
 				job_id,
 				task_id,
-				inputs: vec![],
+				inputs,
 				recipe,
 			})
 		}
