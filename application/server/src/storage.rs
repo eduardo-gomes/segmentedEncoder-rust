@@ -13,11 +13,14 @@ mod old;
 pub(crate) trait Storage {
 	type WriteFile: AsyncWrite + Send + Unpin;
 	async fn read_file(&self, uuid: &Uuid) -> std::io::Result<impl AsyncRead + AsyncSeek + Unpin>;
+	///Create a writer for a new file, the content may only be stored after a call to store
 	fn create_file(&self) -> impl Future<Output = std::io::Result<Self::WriteFile>> + Send;
+	///Save the file and return its id
 	fn store_file(
 		&self,
 		file: Self::WriteFile,
 	) -> impl Future<Output = std::io::Result<Uuid>> + Send;
+	///Copy the body content to a new file
 	fn body_to_new_file(
 		&self,
 		body: axum::body::Body,
