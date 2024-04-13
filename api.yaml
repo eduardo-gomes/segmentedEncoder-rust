@@ -124,27 +124,31 @@ paths:
       security:
         - auth_token: [ ]
       parameters:
-        - name: video_encoder
+        - name: video_codec
           required: true
           in: header
           example: libsvtav1
           schema:
             type: string
-        - name: video_args
+        - name: video_param
           in: header
-          example: -preset 4 -crf 27
+          example: [ "-preset", "4", "-crf", "27" ]
           schema:
-            type: string
-        - name: audio_encoder
+            type: array
+            items:
+              type: string
+        - name: audio_codec
           in: header
           example: libopus
           schema:
             type: string
-        - name: audio_args
+        - name: audio_param
           in: header
-          example: -b:a 96k
+          example: [ "-b:a", "96k" ]
           schema:
-            type: string
+            type: array
+            items:
+              type: string
       requestBody:
         required: true
         content:
