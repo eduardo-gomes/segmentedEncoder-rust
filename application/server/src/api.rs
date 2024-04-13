@@ -16,8 +16,17 @@ use task::{JobSource, Options};
 #[derive(Default)]
 pub struct AppState {
 	credential: String,
-	auth_handler: auth_module::LocalAuthenticator,
-	manager: task::manager::LocalJobManager,
+	_auth_handler: auth_module::LocalAuthenticator,
+	_manager: task::manager::LocalJobManager,
+}
+
+impl AppState {
+	fn manager(&self) -> &impl Manager {
+		&self._manager
+	}
+	fn auth_handler(&self) -> &impl AuthenticationHandler {
+		&self._auth_handler
+	}
 }
 
 impl AppState {
@@ -48,7 +57,7 @@ impl FromRequestParts<Arc<AppState>> for AuthToken {
 			.ok_or((StatusCode::FORBIDDEN, "Missing authorization"))?
 			.to_string();
 		let auth = state
-			.auth_handler
+			.auth_handler()
 			.is_valid(&header)
 			.await
 			.unwrap_or_default();
@@ -77,7 +86,7 @@ async fn login(
 	match credentials {
 		None => Err(StatusCode::BAD_REQUEST),
 		Some(provided) => match provided == state.credential {
-			true => Ok((StatusCode::OK, state.auth_handler.new_token().await)),
+			true => Ok((StatusCode::OK, state.auth_handler().new_token().await)),
 			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
@@ -102,7 +111,7 @@ async fn job_post(
 		.collect::<Result<Vec<_>, _>>()
 		.or(Err(StatusCode::BAD_REQUEST))?;
 	let job_id = state
-		.manager
+		.manager()
 		.create_job(JobSource {
 			input_id: Default::default(),
 			video_options: Options {
@@ -240,7 +249,7 @@ mod test {
 			.await
 			.text();
 		let valid = state
-			.auth_handler
+			.auth_handler()
 			.is_valid(&token)
 			.await
 			.unwrap_or_default();
@@ -346,7 +355,7 @@ mod test {
 				.text()
 				.parse()
 				.unwrap();
-		let job = state.manager.get_job(&job_id).await.unwrap();
+		let job = state.manager().get_job(&job_id).await.unwrap();
 		assert!(job.is_some())
 	}
 
@@ -368,7 +377,7 @@ mod test {
 		.parse()
 		.unwrap();
 		let job = state
-			.manager
+			.manager()
 			.get_job(&job_id)
 			.await
 			.unwrap()
@@ -395,7 +404,7 @@ mod test {
 		.parse()
 		.unwrap();
 		let job = state
-			.manager
+			.manager()
 			.get_job(&job_id)
 			.await
 			.unwrap()
@@ -425,7 +434,7 @@ mod test {
 		.parse()
 		.unwrap();
 		let job = state
-			.manager
+			.manager()
 			.get_job(&job_id)
 			.await
 			.unwrap()
