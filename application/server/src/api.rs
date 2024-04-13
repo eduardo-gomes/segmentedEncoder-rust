@@ -201,6 +201,7 @@ mod test {
 	pub(crate) async fn test_server_state_auth() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
 		test_server_state_auth_generic(Arc::new(AppStateLocal::with_cred(TEST_CRED))).await
 	}
+
 	pub(crate) async fn test_server_state_auth_generic<S: AppState + 'static>(
 		state: Arc<S>,
 	) -> (TestServer, Arc<S>, HeaderValue) {
@@ -208,16 +209,8 @@ mod test {
 			TestServer::new(make_router::<S>(state.clone())).unwrap(),
 			state,
 		);
-		let token: HeaderValue = server
-			.get("/login")
-			.add_header(
-				HeaderName::from_static("credentials"),
-				HeaderValue::from_static(TEST_CRED),
-			)
-			.await
-			.text()
-			.parse()
-			.unwrap();
+		let token = state.auth_handler().new_token().await;
+		let token: HeaderValue = token.parse().unwrap();
 		(server, state, token)
 	}
 

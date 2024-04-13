@@ -9,11 +9,14 @@ use axum::http::StatusCode;
 
 use task::manager::Manager;
 
-use crate::api::AppState;
+use crate::api::{AppState, AuthToken};
 
-pub(super) async fn allocate_task<S: AppState>(State(state): State<Arc<S>>) -> StatusCode {
-	let allocate = state.manager().allocate_task().await.unwrap();
-	StatusCode::FORBIDDEN
+pub(super) async fn allocate_task<S: AppState>(
+	State(state): State<Arc<S>>,
+	_auth: AuthToken,
+) -> StatusCode {
+	let _allocate = state.manager().allocate_task().await.unwrap();
+	StatusCode::NOT_FOUND
 }
 
 #[cfg(test)]
@@ -117,5 +120,20 @@ mod test {
 			.add_header(AUTHORIZATION, auth)
 			.await
 			.assert_status_not_ok();
+	}
+
+	#[tokio::test]
+	async fn allocate_task_without_auth_will_not_probe_manager() {
+		let mut mock_manager = MockThisManager::new();
+		mock_manager.expect_allocate_task().never();
+		let state = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let (server, _, _) = test_server_state_auth_generic(Arc::new(state)).await;
+		let code = server.get("/allocate_task").await.status_code();
+		assert_eq!(code, StatusCode::FORBIDDEN)
 	}
 }
