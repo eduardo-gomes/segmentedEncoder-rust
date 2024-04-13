@@ -7,31 +7,57 @@ use crate::{Instance, JobSource, Status, TaskSource};
 
 mod db;
 
-#[allow(async_fn_in_trait)]
 ///Interface used by the server to manage jobs and tasks
 pub trait Manager {
-	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error>;
-	async fn get_job(&self, job_id: &Uuid) -> Result<Option<JobSource>, Error>;
-	async fn allocate_task(&self) -> Result<Option<Instance>, Error>;
-	async fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> Result<u32, Error>;
-	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error>;
-	async fn update_task_status(
+	fn create_job(
+		&self,
+		job: JobSource,
+	) -> impl std::future::Future<Output = Result<Uuid, Error>> + Send;
+	fn get_job(
+		&self,
+		job_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<Option<JobSource>, Error>> + Send;
+	fn allocate_task(
+		&self,
+	) -> impl std::future::Future<Output = Result<Option<Instance>, Error>> + Send;
+	fn add_task_to_job(
+		&self,
+		job_id: &Uuid,
+		task: TaskSource,
+	) -> impl std::future::Future<Output = Result<u32, Error>> + Send;
+	fn get_task(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<Option<Instance>, Error>> + Send;
+	fn update_task_status(
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
 		status: Status,
-	) -> Result<(), Error>;
-	async fn set_task_output(
+	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	fn set_task_output(
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
 		output: Uuid,
-	) -> Result<(), Error>;
-	async fn get_task_output(&self, job_id: &Uuid, task_idx: u32) -> Result<Option<Uuid>, Error>;
+	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	fn get_task_output(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
 	///Cancel this task execution, will be available for allocation
-	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error>;
+	fn cancel_task(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 	///Delete the job removing all tasks, completed or pending
-	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error>;
+	fn delete_job(
+		&self,
+		job_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
 }
 
 #[derive(Clone)]
@@ -53,7 +79,7 @@ pub struct JobManager<DB: db::JobDb<JobSource, TaskSource, TaskState>> {
 	db: DB,
 }
 
-impl<DB: db::JobDb<JobSource, TaskSource, TaskState>> Manager for JobManager<DB> {
+impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobManager<DB> {
 	async fn create_job(&self, job: JobSource) -> Result<Uuid, Error> {
 		self.db.create_job(job).await
 	}
@@ -185,7 +211,7 @@ mod test {
 		mock.expect_create_job()
 			.with(mockall::predicate::eq(source.clone()))
 			.times(1)
-			.returning(|_| Ok(TARGET_ID));
+			.returning(|_| Box::pin(async { Ok(TARGET_ID) }));
 		let manager = JobManager { db: mock };
 		let id = manager.create_job(source).await.unwrap();
 		assert_eq!(id, TARGET_ID);
@@ -198,7 +224,7 @@ mod test {
 		mock.expect_get_job()
 			.with(mockall::predicate::eq(TARGET_ID))
 			.times(1)
-			.returning(|_| Ok(None));
+			.returning(|_| Box::pin(async { Ok(None) }));
 		let manager = JobManager { db: mock };
 		let job = manager.get_job(&TARGET_ID).await.unwrap();
 		assert!(job.is_none());
@@ -207,7 +233,9 @@ mod test {
 	#[tokio::test]
 	async fn allocate_task_no_available() {
 		let mut mock = MockJobDb::new();
-		mock.expect_allocate_task().times(1).returning(|| Ok(None));
+		mock.expect_allocate_task()
+			.times(1)
+			.returning(|| Box::pin(async { Ok(None) }));
 		let manager = JobManager { db: mock };
 		let instance = manager.allocate_task().await.unwrap();
 		assert!(instance.is_none());
@@ -236,18 +264,20 @@ mod test {
 
 		mock.expect_allocate_task()
 			.times(1)
-			.returning(|| Ok(Some((JOB_ID, TASK_ID))));
+			.returning(|| Box::pin(async { Ok(Some((JOB_ID, TASK_ID))) }));
 		mock.expect_get_allocated_task()
 			.withf(|a, b| *a == JOB_ID && *b == TASK_ID)
 			.times(1)
 			.returning(|_job_id, _task_id| {
-				Ok(Some((
-					TaskSource {
-						inputs: vec![INPUT],
-						recipe: Analysis(),
-					},
-					0,
-				)))
+				Box::pin(async {
+					Ok(Some((
+						TaskSource {
+							inputs: vec![INPUT],
+							recipe: Analysis(),
+						},
+						0,
+					)))
+				})
 			});
 		let manager = JobManager { db: mock };
 		let instance = manager.allocate_task().await.unwrap().unwrap();
@@ -274,7 +304,7 @@ mod test {
 				job_id == &JOB_ID && task.inputs[0] == INPUT && deps.is_empty()
 			})
 			.times(1)
-			.returning(|_, _, _| Ok(IDX));
+			.returning(|_, _, _| Box::pin(async { Ok(IDX) }));
 		let manager = JobManager { db: mock };
 		let idx = manager.add_task_to_job(&JOB_ID, task).await.unwrap();
 		assert_eq!(idx, IDX);
@@ -302,7 +332,7 @@ mod test {
 		mock.expect_append_task()
 			.withf(|_job_id, _task, deps| deps.contains(&1) && deps.contains(&2))
 			.times(1)
-			.returning(|_, _, _| Ok(3));
+			.returning(|_, _, _| Box::pin(async { Ok(3) }));
 		let manager = JobManager { db: mock };
 		manager.add_task_to_job(&JOB_ID, task).await.unwrap();
 	}
@@ -323,7 +353,7 @@ mod test {
 		mock.expect_append_task()
 			.withf(|_job_id, _task, deps| deps.is_empty())
 			.times(1)
-			.returning(|_, _, _| Ok(0));
+			.returning(|_, _, _| Box::pin(async { Ok(0) }));
 		let manager = JobManager { db: mock };
 		manager
 			.add_task_to_job(&Uuid::from_u64_pair(1, 1), task)

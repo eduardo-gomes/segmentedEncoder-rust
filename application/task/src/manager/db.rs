@@ -28,21 +28,29 @@
 //! - TaskDependencies
 //! 	job_id, task_number, dependency_task_number
 
+use std::future::Future;
+
 use uuid::Uuid;
 
-#[allow(async_fn_in_trait)]
 #[cfg_attr(test, mockall::automock)]
 pub trait JobDb<JOB, TASK, STATUS> {
-	async fn get_job(&self, id: &Uuid) -> Result<Option<JOB>, std::io::Error>;
-	async fn create_job(&self, job: JOB) -> Result<Uuid, std::io::Error>;
+	fn get_job(
+		&self,
+		id: &Uuid,
+	) -> impl Future<Output = Result<Option<JOB>, std::io::Error>> + Send;
+	fn create_job(&self, job: JOB) -> impl Future<Output = Result<Uuid, std::io::Error>> + Send;
 	/// Append task to job and return the task index
-	async fn append_task(
+	fn append_task(
 		&self,
 		job_id: &Uuid,
 		task: TASK,
 		dep: &[u32],
-	) -> Result<u32, std::io::Error>;
-	async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, std::io::Error>;
+	) -> impl Future<Output = Result<u32, std::io::Error>> + Send;
+	fn get_tasks(
+		&self,
+		job_id: &Uuid,
+	) -> impl Future<Output = Result<Vec<TASK>, std::io::Error>> + Send;
+	#[allow(async_fn_in_trait)]
 	async fn get_task(&self, job_id: &Uuid, task_idx: u32) -> Result<TASK, std::io::Error> {
 		let task = self
 			.get_tasks(job_id)
@@ -51,26 +59,32 @@ pub trait JobDb<JOB, TASK, STATUS> {
 			.nth(task_idx as usize);
 		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
 	}
-	async fn get_allocated_task(
+	fn get_allocated_task(
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
-	) -> Result<Option<(TASK, u32)>, std::io::Error>;
+	) -> impl Future<Output = Result<Option<(TASK, u32)>, std::io::Error>> + Send;
 
-	async fn allocate_task(&self) -> Result<Option<(Uuid, Uuid)>, std::io::Error>;
+	fn allocate_task(
+		&self,
+	) -> impl Future<Output = Result<Option<(Uuid, Uuid)>, std::io::Error>> + Send;
 	///Mark the task as finished, allowing tasks that depend on this task to run
-	async fn fulfill(&self, job_id: &Uuid, task_idx: u32) -> Result<(), std::io::Error>;
-	async fn get_task_status(
+	fn fulfill(
 		&self,
 		job_id: &Uuid,
 		task_idx: u32,
-	) -> Result<Option<STATUS>, std::io::Error>;
-	async fn set_task_status(
+	) -> impl Future<Output = Result<(), std::io::Error>> + Send;
+	fn get_task_status(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+	) -> impl Future<Output = Result<Option<STATUS>, std::io::Error>> + Send;
+	fn set_task_status(
 		&self,
 		job_id: &Uuid,
 		task_idx: u32,
 		status: STATUS,
-	) -> Result<(), std::io::Error>;
+	) -> impl Future<Output = Result<(), std::io::Error>> + Send;
 }
 
 pub(crate) mod local {
