@@ -16,6 +16,8 @@ use task::{Input, JobSource, Options, Recipe, TaskSource};
 
 use crate::storage::{MemStorage, Storage};
 
+mod worker;
+
 pub trait AppState: Sync + Send {
 	fn manager(&self) -> &impl Manager;
 	fn auth_handler(&self) -> &impl AuthenticationHandler;
@@ -88,6 +90,7 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
 		.route("/job", post(job_post))
+		.route("/allocate_task", get(worker::allocate_task))
 		.with_state(state)
 }
 
@@ -171,6 +174,7 @@ mod test {
 
 	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
+	use task::Recipe;
 
 	use crate::api::{make_router, AppState, AppStateLocal};
 	use crate::storage::Storage;
@@ -194,7 +198,7 @@ mod test {
 		(server, token)
 	}
 
-	async fn test_server_state_auth() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
+	pub(crate) async fn test_server_state_auth() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
 		let (server, state) = test_server_state();
 		let token: HeaderValue = server
 			.get("/login")
