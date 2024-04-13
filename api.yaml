@@ -75,6 +75,12 @@ components:
       name: Authorization
       in: header
       type: apiKey
+tags:
+  - name: default
+  - name: nice
+    description: Nice optional features that arent needed for the software to work properly
+  - name: worker
+    description: Endpoints used by workers
 
 paths:
   /version:
@@ -175,6 +181,20 @@ paths:
           description: Redirect to the task output that is the output of the job
         404:
           description: The job is not finished yet
+  /job/{job_id}/input:
+    get:
+      description: Get the job input
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+      responses:
+        200:
+          description: The job input
+        404:
+          description: The job not found
+      tags:
+        - nice
   #Workers endpoints
   /allocate_task:
     get:
