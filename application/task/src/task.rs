@@ -24,8 +24,7 @@ pub struct Options {
 	pub params: Vec<String>,
 }
 
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Recipe {
 	///Determines how long the tasks segments should be
 	Analysis(Option<f32>),
@@ -39,8 +38,7 @@ pub enum Status {
 	Running,
 }
 
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Input {
 	index: u32,
 	start: Option<f64>,
@@ -58,8 +56,7 @@ impl Input {
 }
 
 ///An allocated task
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Instance {
 	pub job_id: Uuid,
 	pub task_id: Uuid,
@@ -68,6 +65,8 @@ pub struct Instance {
 }
 
 mod conversion {
+	use api::models::AnalysisTask;
+
 	use super::*;
 
 	impl TryFrom<&api::models::Recipe> for Recipe {
@@ -132,6 +131,64 @@ mod conversion {
 				inputs,
 				recipe,
 			})
+		}
+	}
+
+	impl From<Options> for api::models::TranscodeTask {
+		fn from(value: Options) -> Self {
+			Self {
+				options: Box::new(api::models::CodecParams {
+					codec: Some(value.codec),
+					params: Some(value.params),
+				}),
+			}
+		}
+	}
+
+	impl From<Recipe> for api::models::Recipe {
+		fn from(value: Recipe) -> Self {
+			match value {
+				Recipe::Analysis(val) => api::models::Recipe {
+					analysis: Some(Box::new(AnalysisTask { duration: val })),
+					transcode: None,
+					merge: None,
+				},
+				Recipe::Transcode(opt) => api::models::Recipe {
+					analysis: None,
+					transcode: Some(Box::new(opt.into())),
+					merge: None,
+				},
+				Recipe::Merge(_) => api::models::Recipe {
+					analysis: None,
+					transcode: None,
+					merge: Some(Default::default()),
+				},
+			}
+		}
+	}
+
+	impl From<Instance> for api::models::Task {
+		fn from(value: Instance) -> api::models::Task {
+			let job_id = Some(value.job_id.to_string());
+			let task_id = Some(value.task_id.to_string());
+			let input = Some(
+				value
+					.inputs
+					.into_iter()
+					.map(|input| api::models::TaskInputInner {
+						input: input.index as i32,
+						start: input.start,
+						end: input.end,
+					})
+					.collect(),
+			);
+			let recipe = Some(Box::new(value.recipe.into()));
+			api::models::Task {
+				job_id,
+				task_id,
+				input,
+				recipe,
+			}
 		}
 	}
 }
