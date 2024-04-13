@@ -60,10 +60,10 @@ impl Input {
 ///An allocated task
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Instance {
-	job_id: Uuid,
-	task_id: Uuid,
-	inputs: Vec<Input>,
-	recipe: Recipe,
+	pub job_id: Uuid,
+	pub task_id: Uuid,
+	pub inputs: Vec<Input>,
+	pub recipe: Recipe,
 }
 
 pub mod manager;

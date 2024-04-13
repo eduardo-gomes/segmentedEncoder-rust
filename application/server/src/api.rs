@@ -532,6 +532,8 @@ mod test {
 		.parse()
 		.unwrap();
 		let task = state.manager().allocate_task().await.unwrap();
-		assert!(task.is_some())
+		assert!(task.is_some());
+		let task = task.unwrap().recipe;
+		assert!(matches!(task, Recipe::Analysis(_)))
 	}
 }
