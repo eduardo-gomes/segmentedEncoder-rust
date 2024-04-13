@@ -252,7 +252,7 @@ mod test {
 		};
 		let task: TaskSource = TaskSource {
 			inputs: vec![INPUT],
-			recipe: Analysis(),
+			recipe: Analysis(None),
 		};
 		let target_instance = Instance {
 			job_id: JOB_ID,
@@ -273,7 +273,7 @@ mod test {
 					Ok(Some((
 						TaskSource {
 							inputs: vec![INPUT],
-							recipe: Analysis(),
+							recipe: Analysis(None),
 						},
 						0,
 					)))
@@ -295,7 +295,7 @@ mod test {
 		};
 		let task: TaskSource = TaskSource {
 			inputs: vec![INPUT],
-			recipe: Analysis(),
+			recipe: Analysis(None),
 		};
 		let mut mock = MockJobDb::new();
 
@@ -346,7 +346,7 @@ mod test {
 		};
 		let task: TaskSource = TaskSource {
 			inputs: vec![INPUT],
-			recipe: Analysis(),
+			recipe: Analysis(None),
 		};
 		let mut mock = MockJobDb::new();
 
@@ -370,7 +370,7 @@ mod test {
 		};
 		let task: TaskSource = TaskSource {
 			inputs: vec![INPUT],
-			recipe: Analysis(),
+			recipe: Analysis(None),
 		};
 
 		let db = super::db::local::LocalJobDb::default();
@@ -461,7 +461,7 @@ mod test {
 				&job_id,
 				TaskSource {
 					inputs: vec![],
-					recipe: Analysis(),
+					recipe: Analysis(None),
 				},
 				&[],
 			)
@@ -490,7 +490,7 @@ mod test {
 				&job_id,
 				TaskSource {
 					inputs: vec![],
-					recipe: Analysis(),
+					recipe: Analysis(None),
 				},
 				&[],
 			)

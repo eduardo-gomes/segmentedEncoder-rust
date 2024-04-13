@@ -27,7 +27,8 @@ pub struct Options {
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 enum Recipe {
-	Analysis(),
+	///Determines how long the tasks segments should be
+	Analysis(Option<f32>),
 	Transcode(Options),
 	Merge(Vec<u32>),
 }
