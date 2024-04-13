@@ -12,7 +12,7 @@ use axum::Router;
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
-use task::{JobSource, Options};
+use task::{Input, JobSource, Options, Recipe, TaskSource};
 
 use crate::storage::{MemStorage, Storage};
 
@@ -142,6 +142,17 @@ async fn job_post<S: AppState>(
 				params: video_param,
 			},
 		})
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	state
+		.manager()
+		.add_task_to_job(
+			&job_id,
+			TaskSource {
+				inputs: vec![Input::source()],
+				recipe: Recipe::Analysis(None),
+			},
+		)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	Ok((StatusCode::CREATED, job_id.to_string()))
@@ -501,5 +512,26 @@ mod test {
 			.await
 			.unwrap();
 		assert_eq!(readed, MKV_SAMPLE);
+	}
+
+	#[tokio::test]
+	async fn job_post_will_schedule_a_task() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec![],
+		};
+		let job_id: Uuid = make_post_job_request(
+			server,
+			token,
+			job_options.clone(),
+			MKV_SAMPLE.as_slice().into(),
+		)
+		.await
+		.text()
+		.parse()
+		.unwrap();
+		let task = state.manager().allocate_task().await.unwrap();
+		assert!(task.is_some())
 	}
 }

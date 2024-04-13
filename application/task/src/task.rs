@@ -14,8 +14,8 @@ pub struct JobSource {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct TaskSource {
 	///Here, the input should be the task id, or 0 for the job source
-	inputs: Vec<Input>,
-	recipe: Recipe,
+	pub inputs: Vec<Input>,
+	pub recipe: Recipe,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,7 +26,7 @@ pub struct Options {
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-enum Recipe {
+pub enum Recipe {
 	///Determines how long the tasks segments should be
 	Analysis(Option<f32>),
 	Transcode(Options),
@@ -41,10 +41,20 @@ pub enum Status {
 
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-struct Input {
+pub struct Input {
 	index: u32,
 	start: Option<f64>,
 	end: Option<f64>,
+}
+
+impl Input {
+	pub fn source() -> Input {
+		Input {
+			index: 0,
+			start: None,
+			end: None,
+		}
+	}
 }
 
 ///An allocated task
