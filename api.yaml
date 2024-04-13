@@ -59,17 +59,33 @@ components:
         input:
           $ref: "#/components/schemas/task_input"
         recipe:
-          oneOf:
-            - $ref: "#/components/schemas/transcode_task"
-            - $ref: "#/components/schemas/merge_task"
+          $ref: "#/components/schemas/recipe"
     transcode_task:
       type: object
       properties:
         options:
           $ref: "#/components/schemas/codec_params"
+      required: [ options ]
+    analysis_task:
+      type: object
+      properties:
+        duration:
+          type: number
     merge_task:
       type: string
       description: How to merge the inputs
+    recipe:
+      type: object
+      properties:
+        analysis:
+          $ref: "#/components/schemas/analysis_task"
+        transcode:
+          $ref: "#/components/schemas/transcode_task"
+        merge:
+          $ref: "#/components/schemas/merge_task"
+      minProperties: 1
+      maxProperties: 1
+      additionalProperties: false
   securitySchemes:
     auth_token:
       name: Authorization
