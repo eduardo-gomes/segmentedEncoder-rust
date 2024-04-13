@@ -58,12 +58,63 @@ impl Input {
 }
 
 ///An allocated task
+#[derive(Clone)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Instance {
 	pub job_id: Uuid,
 	pub task_id: Uuid,
 	pub inputs: Vec<Input>,
 	pub recipe: Recipe,
+}
+
+mod conversion {
+	use super::*;
+
+	impl TryFrom<&api::models::Recipe> for Recipe {
+		type Error = ();
+
+		fn try_from(value: &api::models::Recipe) -> Result<Self, Self::Error> {
+			let transcode = value.transcode.as_ref().map(|e| &e.options);
+			match (&value.analysis, transcode, &value.merge) {
+				(Some(s), None, None) => Ok(Recipe::Analysis(s.duration)),
+				(None, Some(opt), None) => Ok(Recipe::Transcode(Options {
+					codec: opt.codec.clone().unwrap_or_default(),
+					params: opt.params.clone().unwrap_or_default(),
+				})),
+				(None, None, Some(_)) => Ok(Recipe::Merge(vec![])),
+				(_, _, _) => Err(()),
+			}
+		}
+	}
+
+	impl TryFrom<api::models::Task> for Instance {
+		type Error = ();
+
+		fn try_from(value: api::models::Task) -> Result<Self, Self::Error> {
+			let job_id = value
+				.job_id
+				.as_deref()
+				.map(Uuid::parse_str)
+				.transpose()
+				.unwrap_or_default()
+				.ok_or(())?;
+			let task_id = value
+				.task_id
+				.as_deref()
+				.map(Uuid::parse_str)
+				.transpose()
+				.unwrap_or_default()
+				.ok_or(())?;
+			let from_recipe = value.recipe.ok_or(())?;
+			let recipe = Recipe::try_from(from_recipe.as_ref())?;
+			Ok(Instance {
+				job_id,
+				task_id,
+				inputs: vec![],
+				recipe,
+			})
+		}
+	}
 }
 
 pub mod manager;
