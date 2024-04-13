@@ -23,7 +23,7 @@ async fn main() {
 	// Spawn a task to gracefully shutdown server.
 	tokio::spawn(shutdown_signal(handle.clone()));
 
-	let addr = SocketAddr::from(([127, 0, 0, 1], 8888));
+	let addr: SocketAddr = "[::]:8888".parse().unwrap();
 	println!("listening on {}", addr);
 	axum_server::bind(addr)
 		.handle(handle)

@@ -1,6 +1,5 @@
 pub use api::{make_router, AppState};
 
-#[allow(dead_code)]
 mod storage;
 
 ///New API
