@@ -1,23 +1,31 @@
 //! Api based on api.yaml spec
 
+use std::io;
+use std::io::ErrorKind;
 use std::sync::Arc;
 
+use axum::body::Body;
 use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
+use futures::StreamExt;
+use tokio_util::io::StreamReader;
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
 use task::{JobSource, Options};
+
+use crate::storage::{MemStorage, Storage};
 
 #[derive(Default)]
 pub struct AppState {
 	credential: String,
 	_auth_handler: auth_module::LocalAuthenticator,
 	_manager: task::manager::LocalJobManager,
+	_storage: MemStorage,
 }
 
 impl AppState {
@@ -26,6 +34,9 @@ impl AppState {
 	}
 	fn auth_handler(&self) -> &impl AuthenticationHandler {
 		&self._auth_handler
+	}
+	fn storage(&self) -> &impl Storage {
+		&self._storage
 	}
 }
 
@@ -96,6 +107,7 @@ async fn job_post(
 	State(state): State<Arc<AppState>>,
 	_auth: AuthToken,
 	headers: HeaderMap,
+	body: Body,
 ) -> Result<impl IntoResponse, StatusCode> {
 	let video_codec = headers
 		.get(HeaderName::from_static("video_codec"))
@@ -110,10 +122,27 @@ async fn job_post(
 		.map(|v| v.map(String::from))
 		.collect::<Result<Vec<_>, _>>()
 		.or(Err(StatusCode::BAD_REQUEST))?;
+	let mut write = state
+		.storage()
+		.create_file()
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	let body_stream = body
+		.into_data_stream()
+		.map(|res| res.map_err(|e| io::Error::new(ErrorKind::Other, e.to_string())));
+	let mut stream = StreamReader::new(body_stream);
+	tokio::io::copy(&mut stream, &mut write)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	let input_id = state
+		.storage()
+		.store_file(write)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	let job_id = state
 		.manager()
 		.create_job(JobSource {
-			input_id: Default::default(),
+			input_id,
 			video_options: Options {
 				codec: video_codec.to_string(),
 				params: video_param,
@@ -132,12 +161,14 @@ mod test {
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderName, HeaderValue, StatusCode};
 	use axum_test::{TestRequest, TestServer};
+	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
 	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
 
 	use crate::api::{make_router, AppState};
+	use crate::storage::Storage;
 	use crate::MKV_SAMPLE;
 
 	const TEST_CRED: &str = "test_auth";
@@ -441,5 +472,37 @@ mod test {
 			.unwrap()
 			.video_options;
 		assert_eq!(job.params, job_options.params)
+	}
+
+	#[tokio::test]
+	async fn job_post_body_will_be_saved_on_storage() {
+		let (server, state, token) = test_server_state_auth().await;
+		let job_options = task::Options {
+			codec: "libx264".to_string(),
+			params: vec![],
+		};
+		let job_id: Uuid = make_post_job_request(
+			server,
+			token,
+			job_options.clone(),
+			MKV_SAMPLE.as_slice().into(),
+		)
+		.await
+		.text()
+		.parse()
+		.unwrap();
+		let input = state
+			.manager()
+			.get_job(&job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.input_id;
+		let mut read = state.storage().read_file(&input).await.unwrap();
+		let mut readed = Vec::new();
+		AsyncReadExt::read_to_end(&mut read, &mut readed)
+			.await
+			.unwrap();
+		assert_eq!(readed, MKV_SAMPLE);
 	}
 }
