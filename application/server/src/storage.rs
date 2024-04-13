@@ -18,6 +18,27 @@ pub(crate) trait Storage {
 		&self,
 		file: Self::WriteFile,
 	) -> impl Future<Output = std::io::Result<Uuid>> + Send;
+	fn body_to_new_file(
+		&self,
+		body: axum::body::Body,
+	) -> impl Future<Output = std::io::Result<Uuid>> + Send
+	where
+		Self: Sync,
+	{
+		use futures::StreamExt;
+		use std::io;
+		use std::io::ErrorKind;
+		use tokio_util::io::StreamReader;
+		async {
+			let mut write = self.create_file().await?;
+			let body_stream = body
+				.into_data_stream()
+				.map(|res| res.map_err(|e| io::Error::new(ErrorKind::Other, e)));
+			let mut stream = StreamReader::new(body_stream);
+			tokio::io::copy(&mut stream, &mut write).await?;
+			self.store_file(write).await
+		}
+	}
 }
 
 mod mem {

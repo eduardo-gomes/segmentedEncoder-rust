@@ -1,7 +1,5 @@
 //! Api based on api.yaml spec
 
-use std::io;
-use std::io::ErrorKind;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -11,8 +9,6 @@ use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Router;
-use futures::StreamExt;
-use tokio_util::io::StreamReader;
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
@@ -122,21 +118,9 @@ async fn job_post(
 		.map(|v| v.map(String::from))
 		.collect::<Result<Vec<_>, _>>()
 		.or(Err(StatusCode::BAD_REQUEST))?;
-	let mut write = state
-		.storage()
-		.create_file()
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	let body_stream = body
-		.into_data_stream()
-		.map(|res| res.map_err(|e| io::Error::new(ErrorKind::Other, e.to_string())));
-	let mut stream = StreamReader::new(body_stream);
-	tokio::io::copy(&mut stream, &mut write)
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	let input_id = state
 		.storage()
-		.store_file(write)
+		.body_to_new_file(body)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	let job_id = state
