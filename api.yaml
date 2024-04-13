@@ -149,6 +149,13 @@ paths:
             type: array
             items:
               type: string
+        - name: segment_duration
+          in: header
+          description: Size of generated segmentes in seconds, 0 means single segment
+          example: 25
+          schema:
+            type: number
+            minimum: 0
       requestBody:
         required: true
         content:
