@@ -22,3 +22,4 @@ auth_module = { path = "../auth_module" }
 
 [dev-dependencies]
 axum-test = "14.8.0"
+mockall = "0.12.1"
