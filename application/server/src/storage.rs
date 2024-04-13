@@ -8,9 +8,12 @@ pub(crate) use mem::MemStorage;
 /// Trait for async file operations
 ///
 /// Each file will be mapped to a UUID, and the related types supports streaming through AsyncRead and AsyncWrite
-pub(crate) trait Storage {
+pub trait Storage: Sync {
 	type WriteFile: AsyncWrite + Send + Unpin;
-	async fn read_file(&self, uuid: &Uuid) -> std::io::Result<impl AsyncRead + AsyncSeek + Unpin>;
+	fn read_file(
+		&self,
+		uuid: &Uuid,
+	) -> impl Future<Output = std::io::Result<impl AsyncRead + AsyncSeek + Unpin>> + Send;
 	///Create a writer for a new file, the content may only be stored after a call to store
 	fn create_file(&self) -> impl Future<Output = std::io::Result<Self::WriteFile>> + Send;
 	///Save the file and return its id

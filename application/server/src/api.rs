@@ -16,15 +16,22 @@ use task::{JobSource, Options};
 
 use crate::storage::{MemStorage, Storage};
 
+pub trait AppState: Sync + Send {
+	fn manager(&self) -> &impl Manager;
+	fn auth_handler(&self) -> &impl AuthenticationHandler;
+	fn storage(&self) -> &impl Storage;
+	fn check_credential(&self, cred: &str) -> bool;
+}
+
 #[derive(Default)]
-pub struct AppState {
+pub struct AppStateLocal {
 	credential: String,
 	_auth_handler: auth_module::LocalAuthenticator,
 	_manager: task::manager::LocalJobManager,
 	_storage: MemStorage,
 }
 
-impl AppState {
+impl AppState for AppStateLocal {
 	fn manager(&self) -> &impl Manager {
 		&self._manager
 	}
@@ -34,11 +41,14 @@ impl AppState {
 	fn storage(&self) -> &impl Storage {
 		&self._storage
 	}
+	fn check_credential(&self, cred: &str) -> bool {
+		self.credential == cred
+	}
 }
 
-impl AppState {
-	pub fn with_cred(cred: &str) -> AppState {
-		AppState {
+impl AppStateLocal {
+	pub fn with_cred(cred: &str) -> AppStateLocal {
+		AppStateLocal {
 			credential: cred.into(),
 			..Default::default()
 		}
@@ -48,12 +58,12 @@ impl AppState {
 struct AuthToken(String);
 
 #[async_trait::async_trait]
-impl FromRequestParts<Arc<AppState>> for AuthToken {
+impl<S: AppState> FromRequestParts<Arc<S>> for AuthToken {
 	type Rejection = (StatusCode, &'static str);
 
 	async fn from_request_parts(
 		parts: &mut Parts,
-		state: &Arc<AppState>,
+		state: &Arc<S>,
 	) -> Result<Self, Self::Rejection> {
 		let header = parts
 			.headers
@@ -73,16 +83,16 @@ impl FromRequestParts<Arc<AppState>> for AuthToken {
 	}
 }
 
-pub fn make_router(state: Arc<AppState>) -> Router {
-	Router::<Arc<AppState>>::new()
+pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
+	Router::<Arc<S>>::new()
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
 		.route("/job", post(job_post))
 		.with_state(state)
 }
 
-async fn login(
-	State(state): State<Arc<AppState>>,
+async fn login<S: AppState>(
+	State(state): State<Arc<S>>,
 	header_map: HeaderMap,
 ) -> Result<(StatusCode, String), StatusCode> {
 	let credentials = header_map
@@ -92,15 +102,15 @@ async fn login(
 		.unwrap_or_default();
 	match credentials {
 		None => Err(StatusCode::BAD_REQUEST),
-		Some(provided) => match provided == state.credential {
+		Some(provided) => match state.check_credential(provided) {
 			true => Ok((StatusCode::OK, state.auth_handler().new_token().await)),
 			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
 }
 
-async fn job_post(
-	State(state): State<Arc<AppState>>,
+async fn job_post<S: AppState>(
+	State(state): State<Arc<S>>,
 	_auth: AuthToken,
 	headers: HeaderMap,
 	body: Body,
@@ -151,7 +161,7 @@ mod test {
 	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
 
-	use crate::api::{make_router, AppState};
+	use crate::api::{make_router, AppState, AppStateLocal};
 	use crate::storage::Storage;
 	use crate::MKV_SAMPLE;
 
@@ -160,9 +170,12 @@ mod test {
 		test_server_state().0
 	}
 
-	fn test_server_state() -> (TestServer, Arc<AppState>) {
-		let state = Arc::new(AppState::with_cred(TEST_CRED));
-		(TestServer::new(make_router(state.clone())).unwrap(), state)
+	fn test_server_state() -> (TestServer, Arc<AppStateLocal>) {
+		let state = Arc::new(AppStateLocal::with_cred(TEST_CRED));
+		(
+			TestServer::new(make_router::<AppStateLocal>(state.clone())).unwrap(),
+			state,
+		)
 	}
 
 	async fn test_server_auth() -> (TestServer, HeaderValue) {
@@ -170,7 +183,7 @@ mod test {
 		(server, token)
 	}
 
-	async fn test_server_state_auth() -> (TestServer, Arc<AppState>, HeaderValue) {
+	async fn test_server_state_auth() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
 		let (server, state) = test_server_state();
 		let token: HeaderValue = server
 			.get("/login")
