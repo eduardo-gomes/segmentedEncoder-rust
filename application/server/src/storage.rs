@@ -1,16 +1,23 @@
+use std::future::Future;
+
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite};
 use uuid::Uuid;
+
+pub(crate) use mem::MemStorage;
 
 mod old;
 
 /// Trait for async file operations
 ///
 /// Each file will be mapped to a UUID, and the related types supports streaming through AsyncRead and AsyncWrite
-trait Storage {
-	type WriteFile: AsyncWrite;
-	async fn read_file(&self, uuid: &Uuid) -> std::io::Result<impl AsyncRead + AsyncSeek>;
-	async fn create_file(&self) -> std::io::Result<Self::WriteFile>;
-	async fn store_file(&self, file: Self::WriteFile) -> std::io::Result<Uuid>;
+pub(crate) trait Storage {
+	type WriteFile: AsyncWrite + Send + Unpin;
+	async fn read_file(&self, uuid: &Uuid) -> std::io::Result<impl AsyncRead + AsyncSeek + Unpin>;
+	fn create_file(&self) -> impl Future<Output = std::io::Result<Self::WriteFile>> + Send;
+	fn store_file(
+		&self,
+		file: Self::WriteFile,
+	) -> impl Future<Output = std::io::Result<Uuid>> + Send;
 }
 
 mod mem {
@@ -25,7 +32,7 @@ mod mem {
 	use crate::storage::Storage;
 
 	#[derive(Default)]
-	struct MemStorage {
+	pub(crate) struct MemStorage {
 		storage: RwLock<BTreeMap<Uuid, MemReadFile>>,
 	}
 
@@ -43,7 +50,7 @@ mod mem {
 	}
 
 	#[derive(Clone)]
-	struct MemReadFile(Arc<Vec<u8>>);
+	pub(crate) struct MemReadFile(Arc<Vec<u8>>);
 
 	impl Debug for MemReadFile {
 		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
