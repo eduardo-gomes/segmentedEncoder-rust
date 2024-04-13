@@ -5,8 +5,6 @@ use uuid::Uuid;
 
 pub(crate) use mem::MemStorage;
 
-mod old;
-
 /// Trait for async file operations
 ///
 /// Each file will be mapped to a UUID, and the related types supports streaming through AsyncRead and AsyncWrite
