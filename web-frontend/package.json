@@ -6,11 +6,13 @@
   "type": "module",
   "scripts": {
     "build": "node build.js",
-    "dev": "node build.js dev"
+    "dev": "node build.js dev",
+    "gen": "npx @openapitools/openapi-generator-cli generate -i ../api.yaml -g typescript-fetch -o ./gen/"
   },
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
+    "@openapitools/openapi-generator-cli": "^2.13.1",
     "@typescript-eslint/eslint-plugin": "^5.54.1",
     "@typescript-eslint/parser": "^5.54.1",
     "esbuild": "^0.16.17",
