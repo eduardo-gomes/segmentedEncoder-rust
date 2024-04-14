@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::Json;
 
 use task::manager::Manager;
 
@@ -14,9 +15,14 @@ use crate::api::{AppState, AuthToken};
 pub(super) async fn allocate_task<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
-) -> StatusCode {
-	let _allocate = state.manager().allocate_task().await.unwrap();
-	StatusCode::NOT_FOUND
+) -> Result<Json<api::models::Task>, StatusCode> {
+	let allocate = state
+		.manager()
+		.allocate_task()
+		.await
+		.unwrap()
+		.ok_or(StatusCode::NOT_FOUND)?;
+	Ok(Json(allocate.into()))
 }
 
 #[cfg(test)]
@@ -31,7 +37,7 @@ mod test {
 
 	use auth_module::{AuthenticationHandler, LocalAuthenticator};
 	use task::manager::Manager;
-	use task::{Instance, JobSource, Status, TaskSource};
+	use task::{Input, Instance, JobSource, Recipe, Status, TaskSource};
 
 	use crate::api::AppState;
 	use crate::storage::{MemStorage, Storage};
@@ -135,5 +141,38 @@ mod test {
 		let (server, _, _) = test_server_state_auth_generic(Arc::new(state)).await;
 		let code = server.get("/allocate_task").await.status_code();
 		assert_eq!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn allocate_task_will_return_value_from_manager() {
+		let mut mock_manager = MockThisManager::new();
+		let instance = Instance {
+			job_id: Uuid::from_u64_pair(1, 2),
+			task_id: Uuid::from_u64_pair(1, 3),
+			inputs: vec![Input::source()],
+			recipe: Recipe::Analysis(None),
+		};
+		let _result = instance.clone();
+		mock_manager
+			.expect_allocate_task()
+			.times(1)
+			.returning(move || {
+				let _result = _result.clone();
+				Box::pin(async { Ok(Some(_result)) })
+			});
+		let state = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let (server, _, auth) = test_server_state_auth_generic(Arc::new(state)).await;
+		let res = server
+			.get("/allocate_task")
+			.add_header(AUTHORIZATION, auth)
+			.await;
+		assert!(res.status_code().is_success());
+		let got: Instance = res.json::<api::models::Task>().try_into().unwrap();
+		assert_eq!(got, instance);
 	}
 }
