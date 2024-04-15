@@ -1,9 +1,9 @@
-import type { ApiContextType } from "./api";
+import type { ApiContextTypeOld } from "./api_old";
 
 type Successful = { job: string, isErr: false };
 type Rejected = { text: string, isErr: true };
 
-export function create_task(api: ApiContextType, task: Task): Promise<Rejected | Successful> {
+export function create_task(api: ApiContextTypeOld, task: Task): Promise<Rejected | Successful> {
 	async function send_fulfilled(res: Response): Promise<Rejected | Successful> {
 		console.debug("Created task response:", res);
 		if (res.ok) {
@@ -45,7 +45,7 @@ function visible_ascii(str: string) {
 	return str;
 }
 
-async function send_task(api: ApiContextType, task: Task) {
+async function send_task(api: ApiContextTypeOld, task: Task) {
 	const headers = {
 		video_encoder: visible_ascii(task.video_encoder),
 		video_args: visible_ascii(task.video_args),

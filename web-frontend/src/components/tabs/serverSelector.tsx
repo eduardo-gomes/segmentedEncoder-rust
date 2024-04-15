@@ -1,9 +1,9 @@
-import { ApiContext } from "../../lib/api";
+import { ApiContextOld } from "../../lib/api_old";
 import { createSignal, useContext } from "solid-js";
 import { textChange } from "../../lib/utils";
 
 function ServerSelector() {
-	const {url, set_url, version} = useContext(ApiContext);
+	const {url, set_url, version} = useContext(ApiContextOld);
 	const [value, setValue] = createSignal("")
 
 	return (

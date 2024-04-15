@@ -1,10 +1,10 @@
-import { ApiContext } from "../../lib/api";
+import { ApiContextOld } from "../../lib/api_old";
 import { createEffect, createSignal, Match, onCleanup, Switch, useContext } from "solid-js";
 
 function StatusTab(props: { visible: boolean }) {
 	const [status, setStatus] = createSignal("");
 
-	const {path_on_url, is_connected} = useContext(ApiContext);
+	const {path_on_url, is_connected} = useContext(ApiContextOld);
 
 	async function refresh() {
 		let res;

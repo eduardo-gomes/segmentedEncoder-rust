@@ -1,6 +1,6 @@
 import "./style.css"
 import { createSignal } from "solid-js";
-import { ApiProvider } from "./lib/api";
+import { ApiProviderOld } from "./lib/api_old";
 import { hashIntegration, Router } from "@solidjs/router";
 import { TabBar } from "./components/tabs";
 import StatusTab from "./components/tabs/status";
@@ -11,7 +11,7 @@ export function App() {
 	const [statusActive, setStatusActive] = createSignal(false);
 	return (
 		<Router source={hashIntegration()}>
-			<ApiProvider>
+			<ApiProviderOld>
 				<TabBar>
 					{[
 						{
@@ -29,7 +29,7 @@ export function App() {
 						},
 					]}
 				</TabBar>
-			</ApiProvider>
+			</ApiProviderOld>
 		</Router>
 	)
 }

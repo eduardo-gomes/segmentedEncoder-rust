@@ -8,7 +8,7 @@ function get_path_on_api(url: URL, path: string) {
 	return url;
 }
 
-export type ApiContextType = {
+export type ApiContextTypeOld = {
 	url: Accessor<URL>,
 	/**Return server version string if is connected or undefined*/
 	version: Accessor<string | undefined>,
@@ -19,13 +19,13 @@ export type ApiContextType = {
 
 const fallback_url = new URL("http://localhost:8888/api");
 
-export const ApiContext = createContext<ApiContextType>({
+export const ApiContextOld = createContext<ApiContextTypeOld>({
 	url: () => fallback_url,
 	version: () => undefined,
 	is_connected: () => false,
 	path_on_url: (p) => get_path_on_api(fallback_url, p),
 	set_url: () => undefined
-} as ApiContextType);
+} as ApiContextTypeOld);
 
 async function get_version(url: Accessor<URL>) {
 	async function version_parser(response: Response): Promise<string> {
@@ -77,14 +77,14 @@ function versionWatcher(url: Accessor<URL>): Accessor<string | undefined> {
 	return version;
 }
 
-export function ApiProvider(props: ParentProps<{ url?: URL }>) {
+export function ApiProviderOld(props: ParentProps<{ url?: URL }>) {
 	// eslint-disable-next-line solid/reactivity
 	const url = router_extract_server_url() ?? props.url ?? fallback_url;
 	const [path, setPath] = createSignal(url);
 	// eslint-disable-next-line solid/reactivity
 	const version = versionWatcher(path);
 	const clone_url = () => new URL(path());
-	const api: ApiContextType = {
+	const api: ApiContextTypeOld = {
 		url: clone_url,
 		version,
 		is_connected: () => version() != undefined,
@@ -92,8 +92,8 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 		set_url: setPath
 	};
 	return (
-		<ApiContext.Provider value={api}>
+		<ApiContextOld.Provider value={api}>
 			{props.children}
-		</ApiContext.Provider>
+		</ApiContextOld.Provider>
 	)
 }

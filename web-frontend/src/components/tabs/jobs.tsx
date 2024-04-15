@@ -2,11 +2,11 @@ import "./jobs.css";
 import { createSignal, Show, useContext } from "solid-js";
 import type { Task } from "../../lib/task";
 import { create_task } from "../../lib/task";
-import { ApiContext } from "../../lib/api";
+import { ApiContextOld } from "../../lib/api_old";
 import { textChange } from "../../lib/utils";
 
 function JobsTab() {
-	const api = useContext(ApiContext);
+	const api = useContext(ApiContextOld);
 	const [videoCodec, setVideoCodec] = createSignal("libsvtav1");
 	const [videoArgs, setVideoArgs] = createSignal("-preset 4 -crf 27");
 	const [audioCodec, setAudioCodec] = createSignal("libopus");
