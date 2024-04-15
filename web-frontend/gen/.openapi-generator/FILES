@@ -1,0 +1,14 @@
+.openapi-generator-ignore
+apis/DefaultApi.ts
+apis/NiceApi.ts
+apis/WorkerApi.ts
+apis/index.ts
+index.ts
+models/AnalysisTask.ts
+models/CodecParams.ts
+models/Recipe.ts
+models/Task.ts
+models/TaskInputInner.ts
+models/TranscodeTask.ts
+models/index.ts
+runtime.ts
