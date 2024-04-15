@@ -1,7 +1,7 @@
-import type {Accessor, ParentProps, Setter,} from "solid-js";
-import {createContext, createEffect, createSignal} from "solid-js";
-import {router_extract_server_url} from "./router_util";
-import { Configuration, DefaultApi } from "@api";
+import type { Accessor, ParentProps, Setter } from "solid-js";
+import { createContext, createEffect, createSignal, onCleanup, untrack } from "solid-js";
+import { router_extract_server_url } from "./router_util";
+import { BASE_PATH, Configuration, DefaultApi } from "@api";
 
 export type ApiContextType = {
 	api: Accessor<DefaultApi>
@@ -10,7 +10,7 @@ export type ApiContextType = {
 	set_path: Setter<URL>
 };
 
-const fallback_url = new URL("http://localhost:8888/api");
+const fallback_url = new URL(BASE_PATH);
 
 export const ApiContext = createContext<ApiContextType>({
 	api: () => new DefaultApi(),
@@ -22,17 +22,28 @@ export const ApiContext = createContext<ApiContextType>({
 
 function versionWatcher(api: Accessor<DefaultApi>): Accessor<string | undefined> {
 	const [version, setVersion] = createSignal<string | undefined>(undefined);
-	const [repeat, setRepeat] = createSignal(undefined, {equals: false});
-
+	const [sinceOk, setSinceOk] = createSignal(0, { equals: false });
+	const LONG_UPDATE = 30;
 	createEffect(() => {
-		repeat();
-		let timeout = 60000;
+		api();
+		setSinceOk(0);
+	}, undefined, { name: "Track api changes" });
+	createEffect(() => {
+		if (sinceOk() % LONG_UPDATE) return;
 		api().versionGet().catch((err) => {
 			console.warn("Failed to get version:", err);
-			//Smaller timeout on error
-			timeout = 5000;
-		}).then(setVersion).finally(() => setTimeout(setRepeat, timeout));
+		}).then(setVersion);
 	});
+
+	function increment() {
+		if (version())
+			setSinceOk((val) => val + 1);
+		else
+			setSinceOk(0);
+	}
+
+	const interval = setInterval(increment, 5000);
+	onCleanup(() => clearInterval(interval));
 	createEffect((initial) => {
 		if (version() || !initial)
 			console.info("Version:", version());
@@ -42,19 +53,19 @@ function versionWatcher(api: Accessor<DefaultApi>): Accessor<string | undefined>
 }
 
 export function ApiProvider(props: ParentProps<{ url?: URL }>) {
-	const url = props.url ?? fallback_url;
+	const url = untrack(() => props.url) ?? fallback_url;
 	const [path, setPath] = createSignal(url);
 	createEffect(() => {
 		const url = router_extract_server_url();
-		if(url)
+		if (url)
 			setPath(url);
-	},undefined, {name: "provider_extract_url"});
+	}, undefined, { name: "provider_extract_url" });
 	const [gen, setGen] = createSignal(new DefaultApi());
-	let version: Accessor<string | undefined> = versionWatcher(gen);
+	// eslint-disable-next-line solid/reactivity
+	const version: Accessor<string | undefined> = versionWatcher(gen);
 	createEffect(() => {
-		setGen(new DefaultApi(new Configuration({basePath: path().href})));
-		version = versionWatcher(gen)
-	},undefined, {name: "provider_update_api"});
+		setGen(new DefaultApi(new Configuration({ basePath: path().href })));
+	}, undefined, { name: "provider_update_api" });
 	const api: ApiContextType = {
 		api: gen,
 		version,
