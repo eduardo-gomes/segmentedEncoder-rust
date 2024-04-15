@@ -1,14 +1,14 @@
-import { ApiContextOld } from "../../lib/api_old";
 import { createSignal, useContext } from "solid-js";
 import { textChange } from "../../lib/utils";
+import { ApiContext } from "../../lib/apiProvider";
 
 function ServerSelector() {
-	const {url, set_url, version} = useContext(ApiContextOld);
+	const {api, version, set_path, path} = useContext(ApiContext);
 	const [value, setValue] = createSignal("")
 
 	return (
 		<>
-			<label>Selected server <output>{url().toString()}</output></label>
+			<label>Selected server <output>{path().href}</output></label>
 			<br/>
 			<label>Version: <output>{version() ?? "Not connected"}</output></label>
 			<br/>
@@ -18,7 +18,7 @@ function ServerSelector() {
 				e.preventDefault();
 				try {
 					const url = new URL(value());
-					set_url(url);
+					set_path(url);
 					console.log("Changed url to", url.href);
 				} catch (e) {
 					alert(e)

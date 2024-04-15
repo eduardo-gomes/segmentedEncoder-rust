@@ -1,12 +1,11 @@
 import "./jobs.css";
 import { createSignal, Show, useContext } from "solid-js";
 import type { Task } from "../../lib/task";
-import { create_task } from "../../lib/task";
-import { ApiContextOld } from "../../lib/api_old";
 import { textChange } from "../../lib/utils";
+import { ApiContext } from "../../lib/apiProvider";
 
 function JobsTab() {
-	const api = useContext(ApiContextOld);
+	const { api } = useContext(ApiContext);
 	const [videoCodec, setVideoCodec] = createSignal("libsvtav1");
 	const [videoArgs, setVideoArgs] = createSignal("-preset 4 -crf 27");
 	const [audioCodec, setAudioCodec] = createSignal("libopus");
@@ -29,13 +28,20 @@ function JobsTab() {
 
 	function onCreate() {
 		setStatus("Uploading job!");
-		create_task(api, get_task()).then((res) => {
-				if (!res.isErr)
-					setStatus("Created job " + res.job);
-				else
-					setStatus(res.text);
-			}
-		)
+		const task = get_task();
+		api().jobPost({
+			audioCodec: task.audio_encoder,
+			audioParam: task.audio_args.split(" "),
+			videoCodec: task.video_encoder,
+			videoParam: task.video_args.split(" "),
+			// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+			// @ts-ignore
+			body: task.file,
+			segmentDuration: 0,
+
+		}).then((res) => {
+			setStatus("Created job " + res);
+		}).catch((e) => setStatus(e))
 	}
 
 	const [status, setStatus] = createSignal("");
