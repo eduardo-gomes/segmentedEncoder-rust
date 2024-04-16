@@ -25,6 +25,11 @@ pub trait Manager {
 		job_id: &Uuid,
 		task: TaskSource,
 	) -> impl std::future::Future<Output = Result<u32, Error>> + Send;
+	fn get_task_source(
+		&self,
+		job_id: &Uuid,
+		task: u32,
+	) -> impl std::future::Future<Output = Result<TaskSource, Error>> + Send;
 	fn get_task(
 		&self,
 		job_id: &Uuid,
@@ -111,6 +116,10 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 			.filter(|zero| *zero != 0)
 			.collect();
 		self.db.append_task(job_id, task, deps.as_slice()).await
+	}
+
+	async fn get_task_source(&self, job_id: &Uuid, task: u32) -> Result<TaskSource, Error> {
+		self.db.get_task(&job_id, task).await
 	}
 
 	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error> {
@@ -414,6 +423,63 @@ mod test {
 			.await
 			.unwrap();
 		assert!(none.is_none());
+	}
+
+	mod task_source {
+		use crate::manager::LocalJobManager;
+		use crate::Recipe;
+
+		use super::*;
+
+		#[tokio::test]
+		async fn get_with_invalid_job_err() {
+			let manager = LocalJobManager::default();
+			let job_id = Uuid::nil();
+			let res = manager.get_task_source(&job_id, 0).await;
+			assert!(res.is_err())
+		}
+
+		#[tokio::test]
+		async fn job_without_task_err() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let res = manager.get_task_source(&job_id, 0).await;
+			assert!(res.is_err())
+		}
+
+		#[tokio::test]
+		async fn get_with_valid_job_task_returns_the_task_source() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task_source = TaskSource {
+				inputs: vec![],
+				recipe: Recipe::Analysis(None),
+			};
+			let task = manager
+				.add_task_to_job(&job_id, task_source.clone())
+				.await
+				.unwrap();
+			let res = manager.get_task_source(&job_id, task).await.unwrap();
+			assert_eq!(res, task_source)
+		}
 	}
 
 	mod task_output {

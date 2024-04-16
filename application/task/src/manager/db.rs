@@ -33,7 +33,7 @@ use std::future::Future;
 use uuid::Uuid;
 
 #[cfg_attr(test, mockall::automock)]
-pub trait JobDb<JOB, TASK, STATUS> {
+pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 	fn get_job(
 		&self,
 		id: &Uuid,
@@ -50,14 +50,21 @@ pub trait JobDb<JOB, TASK, STATUS> {
 		&self,
 		job_id: &Uuid,
 	) -> impl Future<Output = Result<Vec<TASK>, std::io::Error>> + Send;
-	#[allow(async_fn_in_trait)]
-	async fn get_task(&self, job_id: &Uuid, task_idx: u32) -> Result<TASK, std::io::Error> {
-		let task = self
-			.get_tasks(job_id)
-			.await?
-			.into_iter()
-			.nth(task_idx as usize);
-		task.ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound"))
+	fn get_task(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+	) -> impl std::future::Future<Output = Result<TASK, std::io::Error>> + Send {
+		async move {
+			let task = self
+				.get_tasks(job_id)
+				.await?
+				.into_iter()
+				.nth(task_idx as usize);
+			task.ok_or_else(|| {
+				std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound")
+			})
+		}
 	}
 	fn get_allocated_task(
 		&self,

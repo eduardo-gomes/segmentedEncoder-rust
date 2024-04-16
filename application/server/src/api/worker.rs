@@ -62,6 +62,8 @@ mod test {
 
 			fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> impl Future<Output=Result<u32, Error>> + Send;
 
+			fn get_task_source(&self, job_id: &Uuid, task_idx: u32) -> impl Future<Output=Result<TaskSource, Error>> + Send;
+
 			fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> impl Future<Output=Result<Option<Instance>, Error>> + Send;
 
 			fn update_task_status(&self, job_id: &Uuid, task_id: &Uuid, status: Status) -> impl Future<Output=Result<(), Error>> + Send;
