@@ -416,98 +416,104 @@ mod test {
 		assert!(none.is_none());
 	}
 
-	#[tokio::test]
-	async fn get_task_output_bad_job_err() {
-		let db = super::db::local::LocalJobDb::default();
-		const JOB_ID: Uuid = Uuid::from_u64_pair(1, 1);
-		let manager = JobManager { db };
-		let res = manager.get_task_output(&JOB_ID, 0).await;
-		assert!(res.is_err())
-	}
+	mod task_output {
+		use crate::manager::db::local::LocalJobDb;
 
-	#[tokio::test]
-	async fn get_task_output_bad_idx_err() {
-		let db = super::db::local::LocalJobDb::default();
-		let job_id = db
-			.create_job(JobSource {
-				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
-			})
-			.await
-			.unwrap();
-		let manager = JobManager { db };
-		let res = manager.get_task_output(&job_id, 0).await;
-		assert!(res.is_err())
-	}
+		use super::*;
 
-	#[tokio::test]
-	async fn get_task_output_before_set() {
-		let db = super::db::local::LocalJobDb::default();
-		let job_id = db
-			.create_job(JobSource {
-				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
-			})
-			.await
-			.unwrap();
-		let idx = db
-			.append_task(
-				&job_id,
-				TaskSource {
-					inputs: vec![],
-					recipe: Analysis(None),
-				},
-				&[],
-			)
-			.await
-			.unwrap();
-		let manager = JobManager { db };
-		let output = manager.get_task_output(&job_id, idx).await.unwrap();
-		assert!(output.is_none())
-	}
+		#[tokio::test]
+		async fn get_task_output_bad_job_err() {
+			let db = LocalJobDb::default();
+			const JOB_ID: Uuid = Uuid::from_u64_pair(1, 1);
+			let manager = JobManager { db };
+			let res = manager.get_task_output(&JOB_ID, 0).await;
+			assert!(res.is_err())
+		}
 
-	#[tokio::test]
-	async fn get_task_output_after_set_equals() {
-		let db = super::db::local::LocalJobDb::default();
-		let job_id = db
-			.create_job(JobSource {
-				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
-			})
-			.await
-			.unwrap();
-		let idx = db
-			.append_task(
-				&job_id,
-				TaskSource {
-					inputs: vec![],
-					recipe: Analysis(None),
-				},
-				&[],
-			)
-			.await
-			.unwrap();
-		let (job_id, task_id) = db.allocate_task().await.unwrap().unwrap();
-		let manager = JobManager { db };
-		let output = Uuid::from_u64_pair(1, 3);
-		manager
-			.set_task_output(&job_id, &task_id, output)
-			.await
-			.unwrap();
-		let got = manager
-			.get_task_output(&job_id, idx)
-			.await
-			.unwrap()
-			.expect("Should get the output");
-		assert_eq!(got, output);
+		#[tokio::test]
+		async fn get_task_output_bad_idx_err() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			let res = manager.get_task_output(&job_id, 0).await;
+			assert!(res.is_err())
+		}
+
+		#[tokio::test]
+		async fn get_task_output_before_set() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let idx = db
+				.append_task(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Analysis(None),
+					},
+					&[],
+				)
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			let output = manager.get_task_output(&job_id, idx).await.unwrap();
+			assert!(output.is_none())
+		}
+
+		#[tokio::test]
+		async fn get_task_output_after_set_equals() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let idx = db
+				.append_task(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Analysis(None),
+					},
+					&[],
+				)
+				.await
+				.unwrap();
+			let (job_id, task_id) = db.allocate_task().await.unwrap().unwrap();
+			let manager = JobManager { db };
+			let output = Uuid::from_u64_pair(1, 3);
+			manager
+				.set_task_output(&job_id, &task_id, output)
+				.await
+				.unwrap();
+			let got = manager
+				.get_task_output(&job_id, idx)
+				.await
+				.unwrap()
+				.expect("Should get the output");
+			assert_eq!(got, output);
+		}
 	}
 }
