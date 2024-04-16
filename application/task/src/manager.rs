@@ -8,7 +8,7 @@ use crate::{Instance, JobSource, Status, TaskSource};
 mod db;
 
 ///Interface used by the server to manage jobs and tasks
-pub trait Manager {
+pub trait Manager: Sync {
 	fn create_job(
 		&self,
 		job: JobSource,
@@ -52,6 +52,27 @@ pub trait Manager {
 		job_id: &Uuid,
 		task_idx: u32,
 	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
+	fn get_task_input(
+		&self,
+		job_id: &Uuid,
+		task_idx: u32,
+		input_idx: u32,
+	) -> impl std::future::Future<Output = Result<Uuid, Error>> + Send {
+		async move {
+			let err = Error::new(ErrorKind::NotFound, "Input out of bounds");
+			let task = self.get_task_source(&job_id, task_idx).await?;
+			let _input = task.inputs.get(input_idx as usize).ok_or(err)?;
+			let job_input = self
+				.get_job(&job_id)
+				.await?
+				.ok_or(Error::new(
+					ErrorKind::NotFound,
+					"Job deleted during operation",
+				))?
+				.input_id;
+			Ok(job_input)
+		}
+	}
 	///Cancel this task execution, will be available for allocation
 	fn cancel_task(
 		&self,
@@ -580,6 +601,97 @@ mod test {
 				.unwrap()
 				.expect("Should get the output");
 			assert_eq!(got, output);
+		}
+	}
+
+	mod task_input {
+		use uuid::Uuid;
+
+		use crate::manager::{LocalJobManager, Manager};
+		use crate::{Input, JobSource, Options, Recipe, TaskSource};
+
+		#[tokio::test]
+		async fn with_invalid_job_err() {
+			let manager = LocalJobManager::default();
+			let job_id = Uuid::nil();
+			let task = 0;
+			let idx = 0;
+			let input = manager.get_task_input(&job_id, task, idx).await;
+			assert!(input.is_err())
+		}
+
+		#[tokio::test]
+		async fn job_without_task_err() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task = 0;
+			let idx = 0;
+			let input = manager.get_task_input(&job_id, task, idx).await;
+			assert!(input.is_err())
+		}
+
+		#[tokio::test]
+		async fn job_with_input_out_of_bounds_err() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task = manager
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![Input::source()],
+						recipe: Recipe::Analysis(None),
+					},
+				)
+				.await
+				.unwrap();
+			let input = manager.get_task_input(&job_id, task, 1000).await;
+			assert!(input.is_err());
+		}
+
+		#[tokio::test]
+		async fn input_for_source_will_be_the_job_input() {
+			let manager = LocalJobManager::default();
+			let job_input = Uuid::from_u64_pair(123, 123);
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: job_input,
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task = manager
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![Input::source()],
+						recipe: Recipe::Analysis(None),
+					},
+				)
+				.await
+				.unwrap();
+			let input = manager.get_task_input(&job_id, task, 0).await.unwrap();
+			assert_eq!(input, job_input)
 		}
 	}
 }
