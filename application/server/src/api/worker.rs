@@ -4,9 +4,10 @@
 
 use std::sync::Arc;
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use uuid::Uuid;
 
 use task::manager::Manager;
 
@@ -28,6 +29,7 @@ pub(super) async fn allocate_task<S: AppState>(
 pub(super) async fn get_task_input<S: AppState>(
 	State(_state): State<Arc<S>>,
 	_auth: AuthToken,
+	Path((_job_id, _task_id)): Path<(Uuid, Uuid)>,
 ) -> StatusCode {
 	StatusCode::NOT_FOUND
 }
@@ -240,17 +242,40 @@ mod test_get_input {
 	}
 
 	#[tokio::test]
-	async fn with_bad_job_returns_not_found() {
+	async fn with_no_job_returns_not_found() {
 		let (server, auth) = test_server_auth().await;
-		let path = format!(
-			"/job/{id}/task/{id}/input/0",
-			id = Uuid::nil().as_hyphenated()
-		);
+		let path = format!("/job/{id}/task/{id}/input/0", id = Uuid::nil());
 		let code = server
 			.get(&path)
 			.add_header(AUTHORIZATION, auth)
 			.await
 			.status_code();
 		assert_eq!(code, StatusCode::NOT_FOUND)
+	}
+
+	#[tokio::test]
+	async fn with_non_uuid_task_id_bad_request() {
+		let (server, auth) = test_server_auth().await;
+		let uuid = Uuid::nil();
+		let path = format!("/job/{uuid}/task/BAD_UUID/input/0");
+		let code = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::BAD_REQUEST)
+	}
+
+	#[tokio::test]
+	async fn with_non_uuid_job_id_bad_request() {
+		let (server, auth) = test_server_auth().await;
+		let uuid = Uuid::nil();
+		let path = format!("/job/BAD_UUID/task/{uuid}/input/0");
+		let code = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::BAD_REQUEST)
 	}
 }
