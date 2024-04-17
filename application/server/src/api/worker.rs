@@ -27,11 +27,18 @@ pub(super) async fn allocate_task<S: AppState>(
 }
 
 pub(super) async fn get_task_input<S: AppState>(
-	State(_state): State<Arc<S>>,
+	State(state): State<Arc<S>>,
 	_auth: AuthToken,
-	Path((_job_id, _task_id)): Path<(Uuid, Uuid)>,
-) -> StatusCode {
-	StatusCode::NOT_FOUND
+	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, StatusCode> {
+	let instance = state
+		.manager()
+		.get_task(&job_id, &task_id)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	instance
+		.and(Some(StatusCode::NO_CONTENT))
+		.ok_or(StatusCode::NOT_FOUND)
 }
 
 #[cfg(test)]
@@ -48,7 +55,7 @@ mod test_util {
 	use crate::api::AppState;
 	use crate::storage::Storage;
 
-	pub use super::super::test::*;
+	pub(crate) use super::super::test::*;
 
 	mockall::mock! {
 	pub ThisManager{}
@@ -120,7 +127,6 @@ mod test_allocate_task {
 	use auth_module::LocalAuthenticator;
 	use task::{Input, Instance, Recipe};
 
-	use crate::api::AppState;
 	use crate::storage::MemStorage;
 
 	use super::test_util::*;
@@ -212,22 +218,37 @@ mod test_get_input {
 	use uuid::Uuid;
 
 	use task::manager::Manager;
-	use task::JobSource;
+	use task::Recipe;
+	use task::{Input, JobSource, Options, TaskSource};
 
 	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
+	use crate::api::AppState;
 	use crate::storage::Storage;
-	use crate::AppStateLocal;
+	use crate::{AppStateLocal, WEBM_SAMPLE};
 
-	async fn app_with_task(
-		mut job: JobSource,
-		input: &'static [u8],
-	) -> (Uuid, (TestServer, Arc<AppStateLocal>, HeaderValue)) {
+	async fn app_with_job_and_analyse_task() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
 		let app = AppStateLocal::default();
-		let data = axum::body::Body::from(input);
+		let data = axum::body::Body::from(WEBM_SAMPLE.as_slice());
 		let input = app._storage.body_to_new_file(data).await.unwrap();
-		job.input_id = input;
-		app._manager.create_job(job).await.unwrap();
-		(input, test_server_state_auth_generic(Arc::new(app)).await)
+		let job = JobSource {
+			input_id: input,
+			video_options: Options {
+				codec: "libx264".to_string(),
+				params: vec![],
+			},
+		};
+		let job_id = app._manager.create_job(job).await.unwrap();
+		app._manager
+			.add_task_to_job(
+				&job_id,
+				TaskSource {
+					inputs: vec![Input::source()],
+					recipe: Recipe::Analysis(None),
+				},
+			)
+			.await
+			.unwrap();
+		test_server_state_auth_generic(Arc::new(app)).await
 	}
 
 	#[tokio::test]
@@ -277,5 +298,24 @@ mod test_get_input {
 			.await
 			.status_code();
 		assert_eq!(code, StatusCode::BAD_REQUEST)
+	}
+
+	#[tokio::test]
+	async fn with_valid_task_is_success() {
+		let (server, app, auth) = app_with_job_and_analyse_task().await;
+		let task = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("There should be a task");
+		assert!(!task.inputs.is_empty(), "This task should have a input");
+		let path = format!("/job/{}/task/{}/input/0", task.job_id, task.task_id);
+		let code = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert!(code.is_success())
 	}
 }
