@@ -186,9 +186,12 @@ pub(crate) mod local {
 			task_id: &Uuid,
 		) -> Result<Option<(TASK, u32)>, Error> {
 			let guard = self.lock();
-			let job = guard
-				.get(job_id)
-				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))?;
+			let job = match guard.get(job_id) {
+				None => {
+					return Ok(None);
+				}
+				Some(job) => job,
+			};
 			let task = job
 				.1
 				.iter()
@@ -515,10 +518,10 @@ pub(crate) mod local {
 		}
 
 		#[tokio::test]
-		async fn get_allocated_task_with_bad_job_fails() {
+		async fn get_allocated_task_with_bad_job_returns_none() {
 			let manager = LocalJobDb::<String, String, ()>::default();
-			let task: Result<_, _> = manager.get_allocated_task(&Uuid::nil(), &Uuid::nil()).await;
-			assert!(task.is_err());
+			let task = manager.get_allocated_task(&Uuid::nil(), &Uuid::nil()).await;
+			assert_eq!(task.unwrap(), None);
 		}
 
 		#[tokio::test]
