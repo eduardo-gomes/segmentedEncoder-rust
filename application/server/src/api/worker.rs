@@ -25,6 +25,13 @@ pub(super) async fn allocate_task<S: AppState>(
 	Ok(Json(allocate.into()))
 }
 
+pub(super) async fn get_task_input<S: AppState>(
+	State(_state): State<Arc<S>>,
+	_auth: AuthToken,
+) -> StatusCode {
+	StatusCode::NOT_FOUND
+}
+
 #[cfg(test)]
 mod test_util {
 	use std::future::Future;
@@ -190,5 +197,59 @@ mod test_allocate_task {
 		assert!(res.status_code().is_success());
 		let got: Instance = res.json::<api::models::Task>().try_into().unwrap();
 		assert_eq!(got, instance);
+	}
+}
+
+#[cfg(test)]
+mod test_get_input {
+	use std::sync::Arc;
+
+	use axum::http::header::AUTHORIZATION;
+	use axum::http::{HeaderValue, StatusCode};
+	use axum_test::TestServer;
+	use uuid::Uuid;
+
+	use task::manager::Manager;
+	use task::JobSource;
+
+	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
+	use crate::storage::Storage;
+	use crate::AppStateLocal;
+
+	async fn app_with_task(
+		mut job: JobSource,
+		input: &'static [u8],
+	) -> (Uuid, (TestServer, Arc<AppStateLocal>, HeaderValue)) {
+		let app = AppStateLocal::default();
+		let data = axum::body::Body::from(input);
+		let input = app._storage.body_to_new_file(data).await.unwrap();
+		job.input_id = input;
+		app._manager.create_job(job).await.unwrap();
+		(input, test_server_state_auth_generic(Arc::new(app)).await)
+	}
+
+	#[tokio::test]
+	async fn requires_authentication() {
+		let server = test_server();
+		let path = format!(
+			"/job/{id}/task/{id}/input/0",
+			id = Uuid::nil().as_hyphenated()
+		);
+		let code = server.get(&path).await.status_code();
+		assert_eq!(code, StatusCode::FORBIDDEN)
+	}
+	#[tokio::test]
+	async fn with_bad_job_returns_not_found() {
+		let (server, auth) = test_server_auth().await;
+		let path = format!(
+			"/job/{id}/task/{id}/input/0",
+			id = Uuid::nil().as_hyphenated()
+		);
+		let code = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::NOT_FOUND)
 	}
 }

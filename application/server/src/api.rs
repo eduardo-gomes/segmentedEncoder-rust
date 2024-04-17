@@ -90,6 +90,10 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
 		.route("/login", get(login))
 		.route("/job", post(job_post))
+		.route(
+			"/job/:job_id/task/:task_id/input/0",
+			get(worker::get_task_input),
+		)
 		.route("/allocate_task", get(worker::allocate_task))
 		.with_state(state)
 }
@@ -180,12 +184,13 @@ mod test {
 	use crate::storage::Storage;
 	use crate::MKV_SAMPLE;
 
-	const TEST_CRED: &str = "test_auth";
-	fn test_server() -> TestServer {
+	pub(crate) const TEST_CRED: &str = "test_auth";
+
+	pub(crate) fn test_server() -> TestServer {
 		test_server_state().0
 	}
 
-	fn test_server_state() -> (TestServer, Arc<AppStateLocal>) {
+	pub(crate) fn test_server_state() -> (TestServer, Arc<AppStateLocal>) {
 		let state = Arc::new(AppStateLocal::with_cred(TEST_CRED));
 		(
 			TestServer::new(make_router::<AppStateLocal>(state.clone())).unwrap(),
@@ -193,7 +198,7 @@ mod test {
 		)
 	}
 
-	async fn test_server_auth() -> (TestServer, HeaderValue) {
+	pub(crate) async fn test_server_auth() -> (TestServer, HeaderValue) {
 		let (server, _, token) = test_server_state_auth().await;
 		(server, token)
 	}
