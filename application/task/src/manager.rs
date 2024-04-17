@@ -73,6 +73,12 @@ pub trait Manager: Sync {
 			Ok(job_input)
 		}
 	}
+	fn get_allocated_task_input(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		input_idx: u32,
+	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
 	///Cancel this task execution, will be available for allocation
 	fn cancel_task(
 		&self,
@@ -207,6 +213,19 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 			.get_task_status(job_id, task_idx)
 			.await?
 			.and_then(|status| status.output))
+	}
+
+	async fn get_allocated_task_input(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		input_idx: u32,
+	) -> Result<Option<Uuid>, Error> {
+		let task = self.db.get_allocated_task(&job_id, &task_id).await?;
+		Ok(match task {
+			None => None,
+			Some((_, task_idx)) => Some(self.get_task_input(&job_id, task_idx, input_idx).await?),
+		})
 	}
 
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
@@ -692,6 +711,62 @@ mod test {
 				.unwrap();
 			let input = manager.get_task_input(&job_id, task, 0).await.unwrap();
 			assert_eq!(input, job_input)
+		}
+
+		#[tokio::test]
+		async fn for_invalid_allocated_task_returns_none() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task = 0;
+			let idx = 0;
+			let input = manager
+				.get_allocated_task_input(&job_id, &Uuid::nil(), idx)
+				.await
+				.unwrap();
+			assert!(input.is_none())
+		}
+
+		#[tokio::test]
+		async fn return_same_content_for_allocated_task_by_its_idx() {
+			let manager = LocalJobManager::default();
+			let job_id = manager
+				.create_job(JobSource {
+					input_id: Uuid::from_u64_pair(1, 2),
+					video_options: Options {
+						codec: "".to_string(),
+						params: vec![],
+					},
+				})
+				.await
+				.unwrap();
+			let task = manager
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![Input::source()],
+						recipe: Recipe::Analysis(None),
+					},
+				)
+				.await
+				.unwrap();
+			let idx = 0;
+			let task_id = manager.allocate_task().await.unwrap().unwrap().task_id;
+			let input = manager
+				.get_allocated_task_input(&job_id, &task_id, idx)
+				.await
+				.unwrap()
+				.unwrap();
+			let input_by_idx = manager.get_task_input(&job_id, task, idx).await.unwrap();
+			assert_eq!(input, input_by_idx)
 		}
 	}
 }
