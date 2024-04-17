@@ -26,33 +26,23 @@ pub(super) async fn allocate_task<S: AppState>(
 }
 
 #[cfg(test)]
-mod test {
+mod test_util {
 	use std::future::Future;
 	use std::io::Error;
-	use std::sync::Arc;
 
-	use axum::http::header::AUTHORIZATION;
-	use axum::http::StatusCode;
 	use uuid::Uuid;
 
-	use auth_module::{AuthenticationHandler, LocalAuthenticator};
+	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
-	use task::{Input, Instance, JobSource, Recipe, Status, TaskSource};
+	use task::{Instance, JobSource, Status, TaskSource};
 
 	use crate::api::AppState;
-	use crate::storage::{MemStorage, Storage};
+	use crate::storage::Storage;
 
-	use super::super::test::*;
-
-	#[tokio::test]
-	async fn allocate_task_requires_auth() {
-		let (server, _, _) = test_server_state_auth().await;
-		let res = server.get("/allocate_task").await.status_code();
-		assert_eq!(res, StatusCode::FORBIDDEN)
-	}
+	pub use super::super::test::*;
 
 	mockall::mock! {
-	ThisManager{}
+	pub ThisManager{}
 	impl Manager for ThisManager{
 			fn create_job(&self, job: JobSource) -> impl Future<Output=Result<Uuid, Error>> + Send;
 
@@ -79,11 +69,11 @@ mod test {
 		}
 	}
 
-	struct GenericApp<A: AuthenticationHandler, B: Manager, C: Storage> {
-		credential: String,
-		_auth_handler: A,
-		_manager: B,
-		_storage: C,
+	pub struct GenericApp<A: AuthenticationHandler, B: Manager, C: Storage> {
+		pub credential: String,
+		pub _auth_handler: A,
+		pub _manager: B,
+		pub _storage: C,
 	}
 
 	impl<
@@ -108,9 +98,33 @@ mod test {
 			self.credential == cred
 		}
 	}
+}
+
+#[cfg(test)]
+mod test_allocate_task {
+	use std::sync::Arc;
+
+	use axum::http::header::AUTHORIZATION;
+	use axum::http::StatusCode;
+	use uuid::Uuid;
+
+	use auth_module::LocalAuthenticator;
+	use task::{Input, Instance, Recipe};
+
+	use crate::api::AppState;
+	use crate::storage::MemStorage;
+
+	use super::test_util::*;
 
 	#[tokio::test]
-	async fn allocate_task_with_auth_will_probe_manager() {
+	async fn requires_auth() {
+		let (server, _, _) = test_server_state_auth().await;
+		let res = server.get("/allocate_task").await.status_code();
+		assert_eq!(res, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn with_auth_will_probe_manager() {
 		let mut mock_manager = MockThisManager::new();
 		mock_manager
 			.expect_allocate_task()
@@ -131,7 +145,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn allocate_task_without_auth_will_not_probe_manager() {
+	async fn without_auth_will_not_probe_manager() {
 		let mut mock_manager = MockThisManager::new();
 		mock_manager.expect_allocate_task().never();
 		let state = GenericApp {
@@ -146,7 +160,7 @@ mod test {
 	}
 
 	#[tokio::test]
-	async fn allocate_task_will_return_value_from_manager() {
+	async fn will_return_value_from_manager() {
 		let mut mock_manager = MockThisManager::new();
 		let instance = Instance {
 			job_id: Uuid::from_u64_pair(1, 2),
