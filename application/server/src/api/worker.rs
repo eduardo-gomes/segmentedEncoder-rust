@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 
+use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -12,6 +13,7 @@ use uuid::Uuid;
 use task::manager::Manager;
 
 use crate::api::{AppState, AuthToken};
+use crate::storage::Storage;
 
 pub(super) async fn allocate_task<S: AppState>(
 	State(state): State<Arc<S>>,
@@ -30,15 +32,20 @@ pub(super) async fn get_task_input<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
-) -> Result<StatusCode, StatusCode> {
-	let instance = state
+) -> Result<Body, StatusCode> {
+	let file = state
 		.manager()
-		.get_task(&job_id, &task_id)
+		.get_allocated_task_input(&job_id, &task_id, 0)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+		.ok_or(StatusCode::NOT_FOUND)?;
+	let read = state
+		.storage()
+		.read_file(&file)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	instance
-		.and(Some(StatusCode::NO_CONTENT))
-		.ok_or(StatusCode::NOT_FOUND)
+	let stream = tokio_util::io::ReaderStream::new(Box::new(read));
+	Ok(Body::from_stream(stream))
 }
 
 #[cfg(test)]
@@ -217,6 +224,7 @@ mod test_get_input {
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderValue, StatusCode};
 	use axum_test::TestServer;
+	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
 	use task::manager::Manager;
@@ -319,5 +327,40 @@ mod test_get_input {
 			.await
 			.status_code();
 		assert!(code.is_success())
+	}
+
+	#[tokio::test]
+	async fn returns_the_right_content_on_the_body() {
+		let (server, app, auth) = app_with_job_and_analyse_task().await;
+		let task = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("There should be a task");
+		assert!(!task.inputs.is_empty(), "This task should have a input");
+		let input_id = app
+			.manager()
+			.get_job(&task.job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.input_id;
+		let path = format!("/job/{}/task/{}/input/0", task.job_id, task.task_id);
+		let ret = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.into_bytes()
+			.to_vec();
+		let mut expected = Vec::new();
+		app.storage()
+			.read_file(&input_id)
+			.await
+			.unwrap()
+			.read_to_end(&mut expected)
+			.await
+			.unwrap();
+		assert_eq!(ret, expected)
 	}
 }
