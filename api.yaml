@@ -261,7 +261,7 @@ paths:
       responses:
         201:
           description: Created task
-  /job/{job_id}/tasks/{task_id}/input/{num}:
+  /job/{job_id}/task/{task_id}/input/{num}:
     get:
       security:
         - auth_token: [ ]

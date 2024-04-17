@@ -238,6 +238,7 @@ mod test_get_input {
 		let code = server.get(&path).await.status_code();
 		assert_eq!(code, StatusCode::FORBIDDEN)
 	}
+
 	#[tokio::test]
 	async fn with_bad_job_returns_not_found() {
 		let (server, auth) = test_server_auth().await;
