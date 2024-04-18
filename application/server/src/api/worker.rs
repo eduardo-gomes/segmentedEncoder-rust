@@ -48,8 +48,8 @@ pub(super) async fn get_task_input<S: AppState>(
 	Ok(Body::from_stream(stream))
 }
 
-pub(super) async fn post_task_output() -> StatusCode {
-	StatusCode::FORBIDDEN
+pub(super) async fn post_task_output(_auth: AuthToken) -> StatusCode {
+	StatusCode::NOT_FOUND
 }
 
 #[cfg(test)]
@@ -371,10 +371,11 @@ mod test_get_input {
 
 #[cfg(test)]
 mod test_post_input {
+	use axum::http::header::AUTHORIZATION;
 	use axum::http::StatusCode;
 	use uuid::Uuid;
 
-	use crate::api::test::test_server;
+	use crate::api::test::{test_server, test_server_auth};
 
 	#[tokio::test]
 	async fn fail_without_auth() {
@@ -382,5 +383,17 @@ mod test_post_input {
 		let path = format!("/job/{id}/task/{id}/output", id = Uuid::nil());
 		let code = server.post(&path).await.status_code();
 		assert_eq!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn with_auth_but_no_job_not_found() {
+		let (server, auth) = test_server_auth().await;
+		let path = format!("/job/{id}/task/{id}/output", id = Uuid::nil());
+		let code = server
+			.post(&path)
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::NOT_FOUND)
 	}
 }
