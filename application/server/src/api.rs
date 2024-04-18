@@ -7,7 +7,7 @@ use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::Router;
 
 use auth_module::AuthenticationHandler;
@@ -96,7 +96,7 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 		)
 		.route(
 			"/job/:job_id/task/:task_id/output",
-			post(worker::post_task_output),
+			put(worker::put_task_output),
 		)
 		.route("/allocate_task", get(worker::allocate_task))
 		.with_state(state)

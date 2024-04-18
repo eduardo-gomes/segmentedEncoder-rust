@@ -48,7 +48,7 @@ pub(super) async fn get_task_input<S: AppState>(
 	Ok(Body::from_stream(stream))
 }
 
-pub(super) async fn post_task_output(_auth: AuthToken) -> StatusCode {
+pub(super) async fn put_task_output(_auth: AuthToken) -> StatusCode {
 	StatusCode::NOT_FOUND
 }
 
@@ -381,7 +381,7 @@ mod test_post_input {
 	async fn fail_without_auth() {
 		let server = test_server();
 		let path = format!("/job/{id}/task/{id}/output", id = Uuid::nil());
-		let code = server.post(&path).await.status_code();
+		let code = server.put(&path).await.status_code();
 		assert_eq!(code, StatusCode::FORBIDDEN)
 	}
 
@@ -390,7 +390,7 @@ mod test_post_input {
 		let (server, auth) = test_server_auth().await;
 		let path = format!("/job/{id}/task/{id}/output", id = Uuid::nil());
 		let code = server
-			.post(&path)
+			.put(&path)
 			.add_header(AUTHORIZATION, auth)
 			.await
 			.status_code();
