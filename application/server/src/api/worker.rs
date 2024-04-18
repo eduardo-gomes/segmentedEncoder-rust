@@ -56,15 +56,19 @@ pub(super) async fn put_task_output(_auth: AuthToken) -> StatusCode {
 mod test_util {
 	use std::future::Future;
 	use std::io::Error;
+	use std::sync::Arc;
 
+	use axum::http::HeaderValue;
+	use axum_test::TestServer;
 	use uuid::Uuid;
 
 	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
-	use task::{Instance, JobSource, Status, TaskSource};
+	use task::{Input, Instance, JobSource, Options, Recipe, Status, TaskSource};
 
 	use crate::api::AppState;
 	use crate::storage::Storage;
+	use crate::{AppStateLocal, WEBM_SAMPLE};
 
 	pub(crate) use super::super::test::*;
 
@@ -126,6 +130,32 @@ mod test_util {
 		fn check_credential(&self, cred: &str) -> bool {
 			self.credential == cred
 		}
+	}
+
+	pub(crate) async fn app_with_job_and_analyse_task(
+	) -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
+		let app = AppStateLocal::default();
+		let data = axum::body::Body::from(WEBM_SAMPLE.as_slice());
+		let input = app._storage.body_to_new_file(data).await.unwrap();
+		let job = JobSource {
+			input_id: input,
+			video_options: Options {
+				codec: "libx264".to_string(),
+				params: vec![],
+			},
+		};
+		let job_id = app._manager.create_job(job).await.unwrap();
+		app._manager
+			.add_task_to_job(
+				&job_id,
+				TaskSource {
+					inputs: vec![Input::source()],
+					recipe: Recipe::Analysis(None),
+				},
+			)
+			.await
+			.unwrap();
+		test_server_state_auth_generic(Arc::new(app)).await
 	}
 }
 
@@ -223,47 +253,18 @@ mod test_allocate_task {
 
 #[cfg(test)]
 mod test_get_input {
-	use std::sync::Arc;
-
 	use axum::http::header::AUTHORIZATION;
-	use axum::http::{HeaderValue, StatusCode};
-	use axum_test::TestServer;
+	use axum::http::StatusCode;
 	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
 	use task::manager::Manager;
-	use task::Recipe;
-	use task::{Input, JobSource, Options, TaskSource};
 
-	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
+	use crate::api::test::{test_server, test_server_auth};
 	use crate::api::AppState;
 	use crate::storage::Storage;
-	use crate::{AppStateLocal, WEBM_SAMPLE};
 
-	async fn app_with_job_and_analyse_task() -> (TestServer, Arc<AppStateLocal>, HeaderValue) {
-		let app = AppStateLocal::default();
-		let data = axum::body::Body::from(WEBM_SAMPLE.as_slice());
-		let input = app._storage.body_to_new_file(data).await.unwrap();
-		let job = JobSource {
-			input_id: input,
-			video_options: Options {
-				codec: "libx264".to_string(),
-				params: vec![],
-			},
-		};
-		let job_id = app._manager.create_job(job).await.unwrap();
-		app._manager
-			.add_task_to_job(
-				&job_id,
-				TaskSource {
-					inputs: vec![Input::source()],
-					recipe: Recipe::Analysis(None),
-				},
-			)
-			.await
-			.unwrap();
-		test_server_state_auth_generic(Arc::new(app)).await
-	}
+	use super::test_util::*;
 
 	#[tokio::test]
 	async fn requires_authentication() {
