@@ -57,13 +57,15 @@ pub trait Manager: Sync {
 		job_id: &Uuid,
 		task_idx: u32,
 		input_idx: u32,
-	) -> impl std::future::Future<Output = Result<Uuid, Error>> + Send {
+	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send {
 		async move {
 			let err = || Error::new(ErrorKind::NotFound, "Input out of bounds");
-			let task = self
-				.get_task_source(&job_id, task_idx)
-				.await?
-				.ok_or_else(err)?;
+			let task = match self.get_task_source(&job_id, task_idx).await? {
+				Some(task) => task,
+				None => {
+					return Ok(None);
+				}
+			};
 			let _input = task.inputs.get(input_idx as usize).ok_or_else(err)?;
 			let job_input = self
 				.get_job(&job_id)
@@ -73,7 +75,7 @@ pub trait Manager: Sync {
 					"Job deleted during operation",
 				))?
 				.input_id;
-			Ok(job_input)
+			Ok(Some(job_input))
 		}
 	}
 	fn get_allocated_task_input(
@@ -227,7 +229,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		let task = self.db.get_allocated_task(&job_id, &task_id).await?;
 		Ok(match task {
 			None => None,
-			Some((_, task_idx)) => Some(self.get_task_input(&job_id, task_idx, input_idx).await?),
+			Some((_, task_idx)) => self.get_task_input(&job_id, task_idx, input_idx).await?,
 		})
 	}
 
@@ -637,17 +639,17 @@ mod test {
 		use crate::{Input, JobSource, Options, Recipe, TaskSource};
 
 		#[tokio::test]
-		async fn with_invalid_job_err() {
+		async fn with_invalid_job_none() {
 			let manager = LocalJobManager::default();
 			let job_id = Uuid::nil();
 			let task = 0;
 			let idx = 0;
-			let input = manager.get_task_input(&job_id, task, idx).await;
-			assert!(input.is_err())
+			let input = manager.get_task_input(&job_id, task, idx).await.unwrap();
+			assert!(input.is_none())
 		}
 
 		#[tokio::test]
-		async fn job_without_task_err() {
+		async fn job_without_task_none() {
 			let manager = LocalJobManager::default();
 			let job_id = manager
 				.create_job(JobSource {
@@ -661,8 +663,8 @@ mod test {
 				.unwrap();
 			let task = 0;
 			let idx = 0;
-			let input = manager.get_task_input(&job_id, task, idx).await;
-			assert!(input.is_err())
+			let input = manager.get_task_input(&job_id, task, idx).await.unwrap();
+			assert!(input.is_none())
 		}
 
 		#[tokio::test]
@@ -717,7 +719,7 @@ mod test {
 				.await
 				.unwrap();
 			let input = manager.get_task_input(&job_id, task, 0).await.unwrap();
-			assert_eq!(input, job_input)
+			assert_eq!(input.unwrap(), job_input)
 		}
 
 		#[tokio::test]
@@ -773,7 +775,7 @@ mod test {
 				.unwrap()
 				.unwrap();
 			let input_by_idx = manager.get_task_input(&job_id, task, idx).await.unwrap();
-			assert_eq!(input, input_by_idx)
+			assert_eq!(input, input_by_idx.unwrap())
 		}
 	}
 }
