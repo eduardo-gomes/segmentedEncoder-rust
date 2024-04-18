@@ -29,7 +29,7 @@ pub trait Manager: Sync {
 		&self,
 		job_id: &Uuid,
 		task: u32,
-	) -> impl std::future::Future<Output = Result<TaskSource, Error>> + Send;
+	) -> impl std::future::Future<Output = Result<Option<TaskSource>, Error>> + Send;
 	fn get_task(
 		&self,
 		job_id: &Uuid,
@@ -59,9 +59,12 @@ pub trait Manager: Sync {
 		input_idx: u32,
 	) -> impl std::future::Future<Output = Result<Uuid, Error>> + Send {
 		async move {
-			let err = Error::new(ErrorKind::NotFound, "Input out of bounds");
-			let task = self.get_task_source(&job_id, task_idx).await?;
-			let _input = task.inputs.get(input_idx as usize).ok_or(err)?;
+			let err = || Error::new(ErrorKind::NotFound, "Input out of bounds");
+			let task = self
+				.get_task_source(&job_id, task_idx)
+				.await?
+				.ok_or_else(err)?;
+			let _input = task.inputs.get(input_idx as usize).ok_or_else(err)?;
 			let job_input = self
 				.get_job(&job_id)
 				.await?
@@ -84,12 +87,12 @@ pub trait Manager: Sync {
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
-	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	) -> impl std::future::Future<Output = Result<Option<()>, Error>> + Send;
 	///Delete the job removing all tasks, completed or pending
 	fn delete_job(
 		&self,
 		job_id: &Uuid,
-	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	) -> impl std::future::Future<Output = Result<Option<()>, Error>> + Send;
 }
 
 #[derive(Clone)]
@@ -145,8 +148,8 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		self.db.append_task(job_id, task, deps.as_slice()).await
 	}
 
-	async fn get_task_source(&self, job_id: &Uuid, task: u32) -> Result<TaskSource, Error> {
-		self.db.get_task(&job_id, task).await
+	async fn get_task_source(&self, job_id: &Uuid, task: u32) -> Result<Option<TaskSource>, Error> {
+		self.db.get_task(job_id, task).await
 	}
 
 	async fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<Instance>, Error> {
@@ -228,11 +231,11 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		})
 	}
 
-	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<(), Error> {
+	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<()>, Error> {
 		todo!()
 	}
 
-	async fn delete_job(&self, job_id: &Uuid) -> Result<(), Error> {
+	async fn delete_job(&self, job_id: &Uuid) -> Result<Option<()>, Error> {
 		todo!()
 	}
 }
@@ -472,15 +475,15 @@ mod test {
 		use super::*;
 
 		#[tokio::test]
-		async fn get_with_invalid_job_err() {
+		async fn get_with_invalid_job_none() {
 			let manager = LocalJobManager::default();
 			let job_id = Uuid::nil();
-			let res = manager.get_task_source(&job_id, 0).await;
-			assert!(res.is_err())
+			let res = manager.get_task_source(&job_id, 0).await.unwrap();
+			assert!(res.is_none())
 		}
 
 		#[tokio::test]
-		async fn job_without_task_err() {
+		async fn job_without_task_none() {
 			let manager = LocalJobManager::default();
 			let job_id = manager
 				.create_job(JobSource {
@@ -492,8 +495,8 @@ mod test {
 				})
 				.await
 				.unwrap();
-			let res = manager.get_task_source(&job_id, 0).await;
-			assert!(res.is_err())
+			let res = manager.get_task_source(&job_id, 0).await.unwrap();
+			assert!(res.is_none())
 		}
 
 		#[tokio::test]
@@ -517,7 +520,11 @@ mod test {
 				.add_task_to_job(&job_id, task_source.clone())
 				.await
 				.unwrap();
-			let res = manager.get_task_source(&job_id, task).await.unwrap();
+			let res = manager
+				.get_task_source(&job_id, task)
+				.await
+				.unwrap()
+				.unwrap();
 			assert_eq!(res, task_source)
 		}
 	}

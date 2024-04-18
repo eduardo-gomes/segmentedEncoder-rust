@@ -95,7 +95,7 @@ mod test_util {
 
 			fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> impl Future<Output=Result<u32, Error>> + Send;
 
-			fn get_task_source(&self, job_id: &Uuid, task_idx: u32) -> impl Future<Output=Result<TaskSource, Error>> + Send;
+			fn get_task_source(&self, job_id: &Uuid, task_idx: u32) -> impl Future<Output=Result<Option<TaskSource>, Error>> + Send;
 
 			fn get_task(&self, job_id: &Uuid, task_id: &Uuid) -> impl Future<Output=Result<Option<Instance>, Error>> + Send;
 
@@ -107,9 +107,9 @@ mod test_util {
 
 			fn get_allocated_task_input(&self, job_id: &Uuid, task_id: &Uuid, input_idx: u32) -> impl Future<Output = Result<Option<Uuid>, Error>> + Send;
 
-			fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> impl Future<Output=Result<(), Error>> + Send;
+			fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> impl Future<Output=Result<Option<()>, Error>> + Send;
 
-			fn delete_job(&self, job_id: &Uuid) -> impl Future<Output=Result<(), Error>> + Send;
+			fn delete_job(&self, job_id: &Uuid) -> impl Future<Output=Result<Option<()>, Error>> + Send;
 
 		}
 	}

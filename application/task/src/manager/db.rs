@@ -49,21 +49,15 @@ pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 	fn get_tasks(
 		&self,
 		job_id: &Uuid,
-	) -> impl Future<Output = Result<Vec<TASK>, std::io::Error>> + Send;
+	) -> impl Future<Output = Result<Option<Vec<TASK>>, std::io::Error>> + Send;
 	fn get_task(
 		&self,
 		job_id: &Uuid,
 		task_idx: u32,
-	) -> impl std::future::Future<Output = Result<TASK, std::io::Error>> + Send {
+	) -> impl Future<Output = Result<Option<TASK>, std::io::Error>> + Send {
 		async move {
-			let task = self
-				.get_tasks(job_id)
-				.await?
-				.into_iter()
-				.nth(task_idx as usize);
-			task.ok_or_else(|| {
-				std::io::Error::new(std::io::ErrorKind::NotFound, "index out of bound")
-			})
+			let tasks = self.get_tasks(job_id).await?;
+			Ok(tasks.and_then(|tasks| tasks.into_iter().nth(task_idx as usize)))
 		}
 	}
 	fn get_allocated_task(
@@ -173,11 +167,11 @@ pub(crate) mod local {
 			Ok(idx as u32)
 		}
 
-		async fn get_tasks(&self, job_id: &Uuid) -> Result<Vec<TASK>, Error> {
-			self.lock()
+		async fn get_tasks(&self, job_id: &Uuid) -> Result<Option<Vec<TASK>>, Error> {
+			Ok(self
+				.lock()
 				.get(job_id)
-				.map(|(_, tasks)| tasks.iter().map(|entry| &entry.task).cloned().collect())
-				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
+				.map(|(_, tasks)| tasks.iter().map(|entry| &entry.task).cloned().collect()))
 		}
 
 		async fn get_allocated_task(
@@ -305,10 +299,10 @@ pub(crate) mod local {
 		}
 
 		#[tokio::test]
-		async fn get_task_nonexistent_job_error() {
+		async fn get_task_nonexistent_job_none() {
 			let manager = LocalJobDb::<String, String, ()>::default();
 			let res = manager.get_task(&Uuid::from_u64_pair(1, 2), 0).await;
-			assert_eq!(res.unwrap_err().kind(), ErrorKind::NotFound)
+			assert!(res.unwrap().is_none())
 		}
 
 		#[tokio::test]
@@ -321,7 +315,7 @@ pub(crate) mod local {
 				.append_task(&job_id, task.clone(), &[])
 				.await
 				.unwrap();
-			let res = manager.get_task(&job_id, task_idx).await.unwrap();
+			let res = manager.get_task(&job_id, task_idx).await.unwrap().unwrap();
 			assert_eq!(task, res)
 		}
 
@@ -348,13 +342,10 @@ pub(crate) mod local {
 		}
 
 		#[tokio::test]
-		async fn add_get_all_tasks_nonexistent_job() {
+		async fn add_get_all_tasks_nonexistent_job_none() {
 			let manager = LocalJobDb::<String, String, ()>::default();
-			let error = manager
-				.get_tasks(&Uuid::from_u64_pair(1, 3))
-				.await
-				.unwrap_err();
-			assert_eq!(error.kind(), ErrorKind::NotFound)
+			let error = manager.get_tasks(&Uuid::from_u64_pair(1, 3)).await.unwrap();
+			assert!(error.is_none())
 		}
 
 		#[tokio::test]
@@ -372,7 +363,7 @@ pub(crate) mod local {
 				.append_task(&job_id, task_2.clone(), &[])
 				.await
 				.unwrap();
-			let tasks = manager.get_tasks(&job_id).await.unwrap();
+			let tasks = manager.get_tasks(&job_id).await.unwrap().unwrap();
 			assert_eq!(tasks, [task_1, task_2])
 		}
 
