@@ -52,6 +52,7 @@ pub(super) async fn put_task_output<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
+	body: Body,
 ) -> Result<StatusCode, StatusCode> {
 	if let None = state
 		.manager()
@@ -60,13 +61,18 @@ pub(super) async fn put_task_output<S: AppState>(
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
 	{
 		return Ok(StatusCode::NOT_FOUND);
-	}
-	let res = state
-		.manager()
-		.set_task_output(&job_id, &task_id, Uuid::nil())
+	};
+	let file = state
+		.storage()
+		.body_to_new_file(body)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	Ok(StatusCode::ACCEPTED)
+	state
+		.manager()
+		.set_task_output(&job_id, &task_id, file)
+		.await
+		.and(Ok(StatusCode::ACCEPTED))
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
 #[cfg(test)]
@@ -466,5 +472,43 @@ mod test_post_input {
 			.await
 			.unwrap();
 		assert!(task_output.is_some())
+	}
+
+	#[tokio::test]
+	async fn will_store_the_content_on_storage() {
+		use task::manager::Manager;
+		let (server, app, auth) = super::test_util::app_with_job_and_analyse_task().await;
+		let instance = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("Should have task");
+		let path = format!("/job/{}/task/{}/output", instance.job_id, instance.task_id);
+		const SOURCE: &[u8] = WEBM_SAMPLE.as_slice();
+		server
+			.put(&path)
+			.add_header(AUTHORIZATION, auth)
+			.bytes(SOURCE.into())
+			.await
+			.status_code()
+			.is_success()
+			.then_some(Some(()))
+			.expect("Should upload");
+		let task_output = app
+			.manager()
+			.get_task_output(&instance.job_id, 0)
+			.await
+			.unwrap()
+			.unwrap();
+		let mut content = Vec::new();
+		app.storage()
+			.read_file(&task_output)
+			.await
+			.unwrap()
+			.read_to_end(&mut content)
+			.await
+			.unwrap();
+		assert_eq!(content.as_slice(), SOURCE)
 	}
 }
