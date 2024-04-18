@@ -54,14 +54,12 @@ pub(super) async fn put_task_output<S: AppState>(
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
 	body: Body,
 ) -> Result<StatusCode, StatusCode> {
-	if let None = state
+	state
 		.manager()
 		.get_task(&job_id, &task_id)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-	{
-		return Ok(StatusCode::NOT_FOUND);
-	};
+		.ok_or(StatusCode::NOT_FOUND)?;
 	let file = state
 		.storage()
 		.body_to_new_file(body)
@@ -396,9 +394,12 @@ mod test_get_input {
 #[cfg(test)]
 mod test_post_input {
 	use axum::http::header::AUTHORIZATION;
-	use axum::http::StatusCode;
+	use axum::http::{HeaderValue, StatusCode};
+	use axum_test::TestServer;
 	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
+
+	use task::manager::Manager;
 
 	use crate::api::test::{test_server, test_server_auth};
 	use crate::api::AppState;
@@ -445,6 +446,21 @@ mod test_post_input {
 		assert!(code.is_success())
 	}
 
+	async fn put_task_output(
+		server: &TestServer,
+		job_id: &Uuid,
+		task_id: &Uuid,
+		auth: HeaderValue,
+		content: &'static [u8],
+	) -> StatusCode {
+		let path = format!("/job/{}/task/{}/output", job_id, task_id);
+		server
+			.put(&path)
+			.add_header(AUTHORIZATION, auth)
+			.bytes(content.into())
+			.await
+			.status_code()
+	}
 	#[tokio::test]
 	async fn task_will_have_output_after_put() {
 		use task::manager::Manager;
@@ -455,17 +471,9 @@ mod test_post_input {
 			.await
 			.unwrap()
 			.expect("Should have task");
-		let path = format!("/job/{}/task/{}/output", instance.job_id, instance.task_id);
-		const SOURCE: &[u8] = WEBM_SAMPLE.as_slice();
-		server
-			.put(&path)
-			.add_header(AUTHORIZATION, auth)
-			.bytes(SOURCE.into())
-			.await
-			.status_code()
-			.is_success()
-			.then_some(Some(()))
-			.expect("Should upload");
+		let source = WEBM_SAMPLE.as_slice();
+		let put = put_task_output(&server, &instance.job_id, &instance.task_id, auth, source).await;
+		assert!(put.is_success());
 		let task_output = app
 			.manager()
 			.get_task_output(&instance.job_id, 0)
@@ -484,17 +492,9 @@ mod test_post_input {
 			.await
 			.unwrap()
 			.expect("Should have task");
-		let path = format!("/job/{}/task/{}/output", instance.job_id, instance.task_id);
 		const SOURCE: &[u8] = WEBM_SAMPLE.as_slice();
-		server
-			.put(&path)
-			.add_header(AUTHORIZATION, auth)
-			.bytes(SOURCE.into())
-			.await
-			.status_code()
-			.is_success()
-			.then_some(Some(()))
-			.expect("Should upload");
+		let put = put_task_output(&server, &instance.job_id, &instance.task_id, auth, SOURCE).await;
+		assert!(put.is_success());
 		let task_output = app
 			.manager()
 			.get_task_output(&instance.job_id, 0)
