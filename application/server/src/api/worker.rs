@@ -23,7 +23,7 @@ pub(super) async fn allocate_task<S: AppState>(
 		.manager()
 		.allocate_task()
 		.await
-		.unwrap()
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
 		.ok_or(StatusCode::NOT_FOUND)?;
 	Ok(Json(allocate.into()))
 }
