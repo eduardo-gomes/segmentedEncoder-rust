@@ -85,7 +85,7 @@ pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 		job_id: &Uuid,
 		task_idx: u32,
 		status: STATUS,
-	) -> impl Future<Output = Result<(), std::io::Error>> + Send;
+	) -> impl Future<Output = Result<Option<()>, std::io::Error>> + Send;
 }
 
 pub(crate) mod local {
@@ -251,15 +251,13 @@ pub(crate) mod local {
 			job_id: &Uuid,
 			task_idx: u32,
 			status: STATUS,
-		) -> Result<(), Error> {
+		) -> Result<Option<()>, Error> {
 			let mut binding = self.lock();
-			binding
+			let task = binding
 				.get_mut(job_id)
 				.map(|(_, tasks)| tasks.get_mut(task_idx as usize))
-				.unwrap_or_default()
-				.ok_or_else(|| Error::new(ErrorKind::NotFound, "Job not found"))
-				.map(|entry| entry.status.insert(status))
-				.and(Ok(()))
+				.unwrap_or_default();
+			Ok(task.map(|entry| entry.status.insert(status)).and(Some(())))
 		}
 	}
 
@@ -612,14 +610,14 @@ pub(crate) mod local {
 		}
 
 		#[tokio::test]
-		async fn set_task_status_bad_job_error() {
+		async fn set_task_status_bad_job_none() {
 			let manager = LocalJobDb::<String, String, ()>::default();
-			let status = manager.set_task_status(&Uuid::nil(), 0, ()).await;
-			assert!(status.is_err());
+			let status = manager.set_task_status(&Uuid::nil(), 0, ()).await.unwrap();
+			assert!(status.is_none());
 		}
 
 		#[tokio::test]
-		async fn set_task_status_bad_task_error() {
+		async fn set_task_status_bad_task_none() {
 			let manager = LocalJobDb::<String, String, ()>::default();
 			let task_src = "Task 1".to_string();
 			let job = "Job 1".to_string();
@@ -628,8 +626,11 @@ pub(crate) mod local {
 				.append_task(&job_id, task_src.clone(), &[])
 				.await
 				.unwrap();
-			let status = manager.set_task_status(&job_id, task_idx + 10, ()).await;
-			assert!(status.is_err());
+			let status = manager
+				.set_task_status(&job_id, task_idx + 10, ())
+				.await
+				.unwrap();
+			assert!(status.is_none());
 		}
 
 		#[tokio::test]

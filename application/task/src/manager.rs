@@ -46,7 +46,7 @@ pub trait Manager: Sync {
 		job_id: &Uuid,
 		task_id: &Uuid,
 		output: Uuid,
-	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	) -> impl std::future::Future<Output = Result<Option<()>, Error>> + Send;
 	fn get_task_output(
 		&self,
 		job_id: &Uuid,
@@ -192,7 +192,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		job_id: &Uuid,
 		task_id: &Uuid,
 		output: Uuid,
-	) -> Result<(), Error> {
+	) -> Result<Option<()>, Error> {
 		let idx = self
 			.db
 			.get_allocated_task(job_id, task_id)
