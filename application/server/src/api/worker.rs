@@ -53,15 +53,20 @@ pub(super) async fn put_task_output<S: AppState>(
 	_auth: AuthToken,
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
-	let has_task = state
+	if let None = state
 		.manager()
 		.get_task(&job_id, &task_id)
 		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+	{
+		return Ok(StatusCode::NOT_FOUND);
+	}
+	let res = state
+		.manager()
+		.set_task_output(&job_id, &task_id, Uuid::nil())
+		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	Ok(match has_task {
-		None => StatusCode::NOT_FOUND,
-		Some(_) => StatusCode::ACCEPTED,
-	})
+	Ok(StatusCode::ACCEPTED)
 }
 
 #[cfg(test)]
@@ -386,10 +391,12 @@ mod test_get_input {
 mod test_post_input {
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::StatusCode;
+	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
 	use crate::api::test::{test_server, test_server_auth};
 	use crate::api::AppState;
+	use crate::storage::Storage;
 	use crate::WEBM_SAMPLE;
 
 	#[tokio::test]
@@ -430,5 +437,34 @@ mod test_post_input {
 			.await
 			.status_code();
 		assert!(code.is_success())
+	}
+
+	#[tokio::test]
+	async fn task_will_have_output_after_put() {
+		use task::manager::Manager;
+		let (server, app, auth) = super::test_util::app_with_job_and_analyse_task().await;
+		let instance = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("Should have task");
+		let path = format!("/job/{}/task/{}/output", instance.job_id, instance.task_id);
+		const SOURCE: &[u8] = WEBM_SAMPLE.as_slice();
+		server
+			.put(&path)
+			.add_header(AUTHORIZATION, auth)
+			.bytes(SOURCE.into())
+			.await
+			.status_code()
+			.is_success()
+			.then_some(Some(()))
+			.expect("Should upload");
+		let task_output = app
+			.manager()
+			.get_task_output(&instance.job_id, 0)
+			.await
+			.unwrap();
+		assert!(task_output.is_some())
 	}
 }
