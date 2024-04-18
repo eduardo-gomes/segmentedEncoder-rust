@@ -181,7 +181,7 @@ paths:
           video/*:
             schema:
               type: string
-              format: byte
+              format: binary
       responses:
         201:
           description: Job created
@@ -211,6 +211,29 @@ paths:
           description: Redirect to the task output that is the output of the job
         404:
           description: The job is not finished yet
+  /job/{job_id}:
+    delete:
+      description: Delete this job and its tasks
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+      responses:
+        204:
+          description: Task instance canceled
+  /job/{job_id}/task/{task_id}:
+    delete:
+      description: Abort task instance. Will rerun
+      security:
+        - auth_token: [ ]
+      parameters:
+        - $ref: "#/components/parameters/job_id"
+        - $ref: "#/components/parameters/task_id"
+      responses:
+        204:
+          description: Task instance canceled
+        409:
+          description: Task can not be canceled. Will happens after the task finishes
   /job/{job_id}/input:
     get:
       description: Get the job input
