@@ -107,7 +107,7 @@ mod mem {
 		}
 
 		async fn store_file(&self, file: Self::WriteFile) -> std::io::Result<Uuid> {
-			let id = Uuid::nil();
+			let id = Uuid::new_v4();
 			self.write().insert(id, MemReadFile(Arc::new(file)));
 			Ok(id)
 		}
@@ -148,6 +148,14 @@ mod mem {
 			let write = storage.create_file().await.unwrap();
 			let id = storage.store_file(write).await;
 			assert!(id.is_ok())
+		}
+
+		#[tokio::test]
+		async fn create_file_the_store_returns_non_nil_uuid() {
+			let storage = MemStorage::default();
+			let write = storage.create_file().await.unwrap();
+			let id = storage.store_file(write).await.unwrap();
+			assert!(!id.is_nil())
 		}
 
 		#[tokio::test]
