@@ -40,7 +40,7 @@ pub trait Manager: Sync {
 		job_id: &Uuid,
 		task_id: &Uuid,
 		status: Status,
-	) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+	) -> impl std::future::Future<Output = Result<Option<()>, Error>> + Send;
 	fn set_task_output(
 		&self,
 		job_id: &Uuid,
@@ -173,7 +173,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		job_id: &Uuid,
 		task_id: &Uuid,
 		status: Status,
-	) -> Result<(), Error> {
+	) -> Result<Option<()>, Error> {
 		if let Status::Finished = status {
 			match self
 				.db
@@ -181,8 +181,8 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 				.await?
 				.map(|(_, idx)| idx)
 			{
-				Some(idx) => self.db.fulfill(job_id, idx).await,
-				None => Err(Error::new(ErrorKind::NotFound, "Task not found")),
+				Some(idx) => self.db.fulfill(job_id, idx).await.map(|_| Some(())),
+				None => Ok(None),
 			}
 		} else {
 			Err(Error::new(ErrorKind::NotFound, "Task not found"))
@@ -735,10 +735,10 @@ mod test {
 				})
 				.await
 				.unwrap();
-			let task = 0;
+			let task = Uuid::nil();
 			let idx = 0;
 			let input = manager
-				.get_allocated_task_input(&job_id, &Uuid::nil(), idx)
+				.get_allocated_task_input(&job_id, &task, idx)
 				.await
 				.unwrap();
 			assert!(input.is_none())
