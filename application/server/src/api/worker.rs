@@ -48,6 +48,10 @@ pub(super) async fn get_task_input<S: AppState>(
 	Ok(Body::from_stream(stream))
 }
 
+pub(super) async fn post_task_output() -> StatusCode {
+	StatusCode::FORBIDDEN
+}
+
 #[cfg(test)]
 mod test_util {
 	use std::future::Future;
@@ -362,5 +366,21 @@ mod test_get_input {
 			.await
 			.unwrap();
 		assert_eq!(ret, expected)
+	}
+}
+
+#[cfg(test)]
+mod test_post_input {
+	use axum::http::StatusCode;
+	use uuid::Uuid;
+
+	use crate::api::test::test_server;
+
+	#[tokio::test]
+	async fn fail_without_auth() {
+		let server = test_server();
+		let path = format!("/job/{id}/task/{id}/output", id = Uuid::nil());
+		let code = server.post(&path).await.status_code();
+		assert_eq!(code, StatusCode::FORBIDDEN)
 	}
 }
