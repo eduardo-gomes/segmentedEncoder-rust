@@ -9,6 +9,6 @@
 	display: contents;
 }
 
-.job-div > input {
+button {
 	grid-column: 1 / 3;
 }

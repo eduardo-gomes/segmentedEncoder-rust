@@ -5,7 +5,7 @@ import { textChange } from "../../lib/utils";
 import { ApiContext } from "../../lib/apiProvider";
 
 function JobsTab() {
-	const { api } = useContext(ApiContext);
+	const { api, authenticated } = useContext(ApiContext);
 	const [videoCodec, setVideoCodec] = createSignal("libsvtav1");
 	const [videoArgs, setVideoArgs] = createSignal("-preset 4 -crf 27");
 	const [audioCodec, setAudioCodec] = createSignal("libopus");
@@ -65,7 +65,10 @@ function JobsTab() {
 					<span>audio args:</span>
 					<input type="text" value={audioArgs()} onChange={textChange(setAudioArgs)}/>
 				</label>
-				<input type="button" value="Add job" onClick={onCreate}/>
+				<button onClick={onCreate} disabled={!authenticated()}>
+					Add job
+					{!authenticated() ? " (missing authentication)" : undefined}
+				</button>
 				<Show when={status()}>
 					<label>
 						<span>Status:</span>
