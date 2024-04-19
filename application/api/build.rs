@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use futures_util::TryStreamExt;
 use tokio_util::io::StreamReader;
 
-const SIZE: u64 = 27011460;
+const SIZE: u64 = 29171782;
 
-const URL: &'static str = "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.2.0/openapi-generator-cli-7.2.0.jar";
+const URL: &str = "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.5.0/openapi-generator-cli-7.5.0.jar";
 
-const FILE_NAME: &'static str = "openapi-generator-cli.jar";
+const FILE_NAME: &str = "openapi-generator-cli-7.5.0.jar";
 
 async fn download_cli() -> PathBuf {
 	let jar = URL;
