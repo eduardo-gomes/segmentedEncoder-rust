@@ -3,12 +3,12 @@ import { textChange } from "../../lib/utils";
 import { ApiContext } from "../../lib/apiProvider";
 
 function ServerSelector() {
-	const { api, version, set_path, path } = useContext(ApiContext);
+	const { api, version, set_path, _path } = useContext(ApiContext);
 	const [value, setValue] = createSignal("")
 
 	return (
 		<>
-			<label>Selected server <output>{path().href}</output></label>
+			<label>Selected server <output>{_path().href}</output></label>
 			<br/>
 			<label>Version: <output>{version() ?? "Not connected"}</output></label>
 			<br/>

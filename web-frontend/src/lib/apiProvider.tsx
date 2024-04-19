@@ -3,10 +3,22 @@ import { createContext, createEffect, createSignal, onCleanup, untrack } from "s
 import { router_extract_server_url } from "./router_util";
 import { BASE_PATH, Configuration, DefaultApi } from "@api";
 
+interface Signal<T>{
+	get: Accessor<T>,
+	set: Setter<T>,
+}
+
 export type ApiContextType = {
 	api: Accessor<DefaultApi>
 	version: Accessor<string | undefined>
-	path: Accessor<URL>
+	path: Signal<URL>
+	/**
+	 * @deprecated
+	 * */
+	_path: Accessor<URL>
+	/**
+	 * @deprecated
+	 * */
 	set_path: Setter<URL>
 };
 
@@ -15,8 +27,9 @@ const fallback_url = new URL(BASE_PATH);
 export const ApiContext = createContext<ApiContextType>({
 	api: () => new DefaultApi(),
 	version: () => undefined,
-	path: () => fallback_url,
-	set_path: () => undefined
+	_path: () => fallback_url,
+	set_path: () => undefined,
+	path: {get: () => fallback_url, set: () => undefined}
 } as ApiContextType);
 
 
@@ -75,8 +88,9 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const api: ApiContextType = {
 		api: gen,
 		version,
-		path,
-		set_path: setPath
+		_path: path,
+		set_path: setPath,
+		path: {get: path, set: setPath}
 	};
 	return (
 		<ApiContext.Provider value={api}>
