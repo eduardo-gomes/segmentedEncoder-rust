@@ -16,6 +16,7 @@ export type ApiContextType = {
 	api: Accessor<DefaultApi>
 	version: Accessor<string | undefined>
 	path: Signal<URL>
+	authenticated: Accessor<boolean>
 };
 
 const fallback_url = new URL(BASE_PATH);
@@ -23,7 +24,8 @@ const fallback_url = new URL(BASE_PATH);
 export const ApiContext = createContext<ApiContextType>({
 	api: () => new DefaultApi(),
 	version: () => undefined,
-	path: { get: () => fallback_url, set: () => undefined }
+	path: { get: () => fallback_url, set: () => undefined },
+	authenticated: () => false
 } as ApiContextType);
 
 
@@ -88,7 +90,8 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const api: ApiContextType = {
 		api: gen,
 		version,
-		path
+		path,
+		authenticated: () => Boolean(key())
 	};
 	return (
 		<ApiContext.Provider value={api}>

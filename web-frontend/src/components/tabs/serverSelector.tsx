@@ -3,7 +3,7 @@ import { textChange } from "../../lib/utils";
 import { ApiContext } from "../../lib/apiProvider";
 
 function ServerSelector() {
-	const { api, version, path } = useContext(ApiContext);
+	const { authenticated, version, path } = useContext(ApiContext);
 	const [value, setValue] = createSignal("")
 
 	return (
@@ -12,7 +12,7 @@ function ServerSelector() {
 			<br/>
 			<label>Version: <output>{version() ?? "Not connected"}</output></label>
 			<br/>
-			<label>Authenticated: <output>{String(Boolean(api()))}</output></label>
+			<label>Authenticated: <output>{String(authenticated())}</output></label>
 			<br/>
 			Enter new server address to change server.
 			<br/>
