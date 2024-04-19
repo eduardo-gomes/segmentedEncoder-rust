@@ -7,9 +7,10 @@ interface Signal<T> {
 	get: Accessor<T>,
 	set: Setter<T>,
 }
-function createSignalObj<T>(val: T): Signal<T>{
+
+function createSignalObj<T>(val: T): Signal<T> {
 	const [get, set] = createSignal(val);
-	return {get, set}
+	return { get, set }
 }
 
 export type ApiContextType = {
@@ -71,6 +72,7 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const [key, setKey] = createSignal<string | undefined>();
 	const password = createSignalObj("password");
 	createEffect(() => {
+		setKey(undefined);
 		const api = new DefaultApi(new Configuration({ basePath: path.get().href }));
 		setWatcher(() => versionWatcher(api));
 	}, undefined, { name: "provider_update_api" });
@@ -84,14 +86,14 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	}, undefined, { name: "version_watcher" });
 	createEffect(() => {
 		const isConnectedToNewServer = Boolean(version());
-		if(isConnectedToNewServer)
+		if (isConnectedToNewServer)
 			untrack(gen).loginGet({ credentials: password.get() }).then(setKey)
 	});
 	const api: ApiContextType = {
 		api: gen,
 		version,
 		path,
-		authenticated: () => Boolean(key())
+		authenticated: () => Boolean(key()) && Boolean(version())
 	};
 	return (
 		<ApiContext.Provider value={api}>
