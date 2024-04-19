@@ -20,17 +20,13 @@ export const ApiContext = createContext<ApiContextType>({
 } as ApiContextType);
 
 
-function versionWatcher(api: Accessor<DefaultApi>): Accessor<string | undefined> {
+function versionWatcher(api: DefaultApi): Accessor<string | undefined> {
 	const [version, setVersion] = createSignal<string | undefined>(undefined);
 	const [sinceOk, setSinceOk] = createSignal(0, { equals: false });
 	const LONG_UPDATE = 30;
 	createEffect(() => {
-		api();
-		setSinceOk(0);
-	}, undefined, { name: "Track api changes" });
-	createEffect(() => {
 		if (sinceOk() % LONG_UPDATE) return;
-		api().versionGet().catch((err) => {
+		api.versionGet().catch((err) => {
 			console.warn("Failed to get version:", err);
 		}).then(setVersion);
 	});
@@ -61,11 +57,17 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 			setPath(url);
 	}, undefined, { name: "provider_extract_url" });
 	const [gen, setGen] = createSignal(new DefaultApi());
-	// eslint-disable-next-line solid/reactivity
-	const version: Accessor<string | undefined> = versionWatcher(gen);
+	const [watcher, setWatcher] = createSignal<Accessor<string | undefined>>();
+	const [version, setVersion] = createSignal(undefined as undefined | string);
 	createEffect(() => {
-		setGen(new DefaultApi(new Configuration({ basePath: path().href })));
+		const api = new DefaultApi(new Configuration({ basePath: path().href }));
+		setGen(api);
+		setWatcher(() => versionWatcher(api));
 	}, undefined, { name: "provider_update_api" });
+	createEffect(() => {
+		const got_watcher = watcher();
+		setVersion(got_watcher ? got_watcher() : undefined);
+	}, undefined, { name: "version_watcher" });
 	const api: ApiContextType = {
 		api: gen,
 		version,
