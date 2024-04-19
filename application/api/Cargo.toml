@@ -3,11 +3,19 @@ name = "api"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+client = ["reqwest", "serde_json", "url", "uuid"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 serde = "^1.0"
 serde_derive = "^1.0"
+
+reqwest = { version = "^0.11", features = ["json", "multipart"], optional = true }
+serde_json = { version = "^1.0", optional = true }
+url = { version = "^2.2", optional = true }
+uuid = { version = "^1.0", features = ["serde", "v4"], optional = true }
 
 [build-dependencies]
 futures-util = "0.3.30"
