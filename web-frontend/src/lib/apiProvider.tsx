@@ -81,8 +81,9 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 		setVersion(version);
 	}, undefined, { name: "version_watcher" });
 	createEffect(() => {
-		if(version())
-			gen().loginGet({ credentials: password.get() }).then(setKey)
+		const isConnectedToNewServer = Boolean(version());
+		if(isConnectedToNewServer)
+			untrack(gen).loginGet({ credentials: password.get() }).then(setKey)
 	});
 	const api: ApiContextType = {
 		api: gen,
