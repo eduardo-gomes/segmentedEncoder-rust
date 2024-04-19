@@ -109,7 +109,7 @@ paths:
         200:
           description: Server version
           content:
-            text/plain:
+            application/json:
               schema:
                 type: string
               example: v1.2.3

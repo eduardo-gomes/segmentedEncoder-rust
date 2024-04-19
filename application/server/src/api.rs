@@ -87,7 +87,10 @@ impl<S: AppState> FromRequestParts<Arc<S>> for AuthToken {
 
 pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 	Router::<Arc<S>>::new()
-		.route("/version", get(|| async { env!("CARGO_PKG_VERSION") }))
+		.route(
+			"/version",
+			get(|| async { concat!("\"", env!("CARGO_PKG_VERSION"), "\"") }),
+		)
 		.route("/login", get(login))
 		.route("/job", post(job_post))
 		.route(
@@ -239,6 +242,13 @@ mod test {
 			version.contains(expected),
 			"Got {version}, expected {expected}"
 		);
+	}
+
+	#[tokio::test]
+	async fn get_version_is_json_string() {
+		let server = test_server();
+		let version: String = server.get("/version").await.json();
+		assert!(!version.is_empty())
 	}
 
 	#[tokio::test]
