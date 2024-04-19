@@ -57,11 +57,11 @@ function versionWatcher(api: DefaultApi): Accessor<string | undefined> {
 
 export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const url = untrack(() => props.url) ?? fallback_url;
-	const [path, setPath] = createSignal(url);
+	const path = createSignalObj(url);
 	createEffect(() => {
 		const url = router_extract_server_url();
 		if (url)
-			setPath(url);
+			path.set(url);
 	}, undefined, { name: "provider_extract_url" });
 	const [gen, setGen] = createSignal(new DefaultApi());
 	const [watcher, setWatcher] = createSignal<Accessor<string | undefined>>();
@@ -69,11 +69,11 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const [key, setKey] = createSignal<string | undefined>();
 	const password = createSignalObj("password");
 	createEffect(() => {
-		const api = new DefaultApi(new Configuration({ basePath: path().href }));
+		const api = new DefaultApi(new Configuration({ basePath: path.get().href }));
 		setWatcher(() => versionWatcher(api));
 	}, undefined, { name: "provider_update_api" });
 	createEffect(() => {
-		setGen(new DefaultApi(new Configuration({ basePath: path().href, apiKey: key() })));
+		setGen(new DefaultApi(new Configuration({ basePath: path.get().href, apiKey: key() })));
 	});
 	createEffect(() => {
 		const got_watcher = watcher();
@@ -87,7 +87,7 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const api: ApiContextType = {
 		api: gen,
 		version,
-		path: { get: path, set: setPath }
+		path
 	};
 	return (
 		<ApiContext.Provider value={api}>
