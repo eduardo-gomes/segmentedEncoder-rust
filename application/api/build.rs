@@ -6,10 +6,14 @@ use tokio_util::io::StreamReader;
 
 const SIZE: u64 = 27011460;
 
+const URL: &'static str = "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.2.0/openapi-generator-cli-7.2.0.jar";
+
+const FILE_NAME: &'static str = "openapi-generator-cli.jar";
+
 async fn download_cli() -> PathBuf {
-	let jar = "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/7.2.0/openapi-generator-cli-7.2.0.jar";
+	let jar = URL;
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-	let out_file = out_dir.join("openapi-generator-cli.jar");
+	let out_file = out_dir.join(FILE_NAME);
 	let has_file = tokio::fs::metadata(&out_file)
 		.await
 		.map(|meta| meta.len() == SIZE)
