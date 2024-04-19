@@ -59,11 +59,15 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	const [gen, setGen] = createSignal(new DefaultApi());
 	const [watcher, setWatcher] = createSignal<Accessor<string | undefined>>();
 	const [version, setVersion] = createSignal(undefined as undefined | string);
+	const [key, setKey] = createSignal<string | undefined>();
 	createEffect(() => {
 		const api = new DefaultApi(new Configuration({ basePath: path().href }));
-		setGen(api);
 		setWatcher(() => versionWatcher(api));
+		api.loginGet({ credentials: "password" }).then(setKey)
 	}, undefined, { name: "provider_update_api" });
+	createEffect(() => {
+		setGen(new DefaultApi(new Configuration({ basePath: path().href, apiKey: key() })));
+	});
 	createEffect(() => {
 		const got_watcher = watcher();
 		setVersion(got_watcher ? got_watcher() : undefined);
