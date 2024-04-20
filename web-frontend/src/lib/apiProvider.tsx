@@ -79,8 +79,12 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 	}, undefined, { name: "version_watcher" });
 	createEffect(() => {
 		const isConnectedToNewServer = Boolean(version());
-		if (isConnectedToNewServer)
-			untrack(gen).loginGet({ credentials: password.get() }).then(setKey)
+		const credentials = password.get();
+		if (isConnectedToNewServer) {
+			const abort = new AbortController();
+			untrack(gen).loginGet({ credentials }).then(setKey);
+			onCleanup(() => abort.abort("Refreshed"));
+		}
 	});
 	const api: ApiContextType = {
 		api: gen,
