@@ -1,17 +1,8 @@
-import type { Accessor, ParentProps, Setter } from "solid-js";
+import type { Accessor, ParentProps } from "solid-js";
 import { createContext, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { router_extract_server_url } from "./router_util";
 import { BASE_PATH, Configuration, DefaultApi } from "@api";
-
-interface Signal<T> {
-	get: Accessor<T>,
-	set: Setter<T>,
-}
-
-function createSignalObj<T>(val: T): Signal<T> {
-	const [get, set] = createSignal(val);
-	return { get, set }
-}
+import { createSignalObj, type Signal } from "./utils";
 
 export type ApiContextType = {
 	api: Accessor<DefaultApi>
