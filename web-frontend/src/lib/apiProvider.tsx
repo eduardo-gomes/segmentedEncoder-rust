@@ -1,4 +1,4 @@
-import type { Accessor, ParentProps } from "solid-js";
+import type { Accessor, ParentProps, Setter } from "solid-js";
 import { createContext, createEffect, createSignal, onCleanup, untrack } from "solid-js";
 import { router_extract_server_url } from "./router_util";
 import { BASE_PATH, Configuration, DefaultApi } from "@api";
@@ -9,6 +9,7 @@ export type ApiContextType = {
 	version: Accessor<string | undefined>
 	path: Signal<URL>
 	authenticated: Accessor<boolean>
+	set_password: Setter<string>
 };
 
 const fallback_url = new URL(BASE_PATH);
@@ -17,7 +18,8 @@ export const ApiContext = createContext<ApiContextType>({
 	api: () => new DefaultApi(),
 	version: () => undefined,
 	path: { get: () => fallback_url, set: () => undefined },
-	authenticated: () => false
+	authenticated: () => false,
+	set_password: () => undefined
 } as ApiContextType);
 
 
@@ -84,7 +86,8 @@ export function ApiProvider(props: ParentProps<{ url?: URL }>) {
 		api: gen,
 		version,
 		path,
-		authenticated: () => Boolean(key()) && Boolean(version())
+		authenticated: () => Boolean(key()) && Boolean(version()),
+		set_password: password.set
 	};
 	return (
 		<ApiContext.Provider value={api}>
