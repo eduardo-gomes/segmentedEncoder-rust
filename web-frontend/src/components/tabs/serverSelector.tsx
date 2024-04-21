@@ -1,7 +1,7 @@
 import { createSignal, useContext } from "solid-js";
 import { createSignalObj, textChange } from "../../lib/utils";
 import { ApiContext } from "../../lib/apiProvider";
-import { Dialog } from "@kobalte/core";
+import { AlertDialog } from "@kobalte/core";
 
 import "../../styles/dialog.css";
 
@@ -51,18 +51,18 @@ function ServerSelector() {
 				</label>
 				<input type="submit" value="Set password"/>
 			</form>
-			<Dialog.Root open={Boolean(dialog())} onOpenChange={(open) => {if(!open) setDialog(undefined)}}>
-				<Dialog.Portal>
-					<Dialog.Overlay class="dialog_overlay"/>
-					<Dialog.Content class="dialog">
+			<AlertDialog.Root open={Boolean(dialog())} onOpenChange={(open) => {if(!open) setDialog(undefined)}}>
+				<AlertDialog.Portal>
+					<AlertDialog.Overlay class="dialog_overlay"/>
+					<AlertDialog.Content class="dialog">
 						<div class="top">
-							<Dialog.Title>Error</Dialog.Title>
-							<div class="close"><Dialog.CloseButton>X</Dialog.CloseButton></div>
+							<AlertDialog.Title>Error</AlertDialog.Title>
+							<div class="close"><AlertDialog.CloseButton>X</AlertDialog.CloseButton></div>
 						</div>
-						<Dialog.Description>{dialog()}</Dialog.Description>
-					</Dialog.Content>
-				</Dialog.Portal>
-			</Dialog.Root>
+						<AlertDialog.Description>{dialog()}</AlertDialog.Description>
+					</AlertDialog.Content>
+				</AlertDialog.Portal>
+			</AlertDialog.Root>
 		</>
 	)
 }
