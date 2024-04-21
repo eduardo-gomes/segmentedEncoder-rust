@@ -6,6 +6,9 @@ struct Args {
 	///Server api base url
 	#[arg(short, long, default_value = "http://localhost:8888/api")]
 	server: String,
+	///Password to register worker with server
+	#[arg(long, env = "CLIENT_PASSWORD")]
+	password: String,
 }
 
 #[tokio::main]
@@ -21,5 +24,9 @@ async fn main() {
 	};
 	let server_version = api::apis::default_api::version_get(&config).await.unwrap();
 	println!("Server: {}, version {:?}", base, server_version);
-	unimplemented!("Client is not implemented, only prints server version")
+	let token = api::apis::default_api::login_get(&config, &args.password)
+		.await
+		.unwrap();
+	println!("Login successful, token: {token}");
+	unimplemented!("Client is not implemented, only try to login")
 }
