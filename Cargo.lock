@@ -380,6 +380,7 @@ dependencies = [
  "reqwest 0.12.3",
  "task",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
