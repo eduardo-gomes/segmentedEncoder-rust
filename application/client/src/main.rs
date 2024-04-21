@@ -1,4 +1,10 @@
+use std::time::Duration;
+
 use clap::Parser;
+
+use api::apis::configuration::ApiKey;
+use api::apis::Error;
+use task::Instance;
 
 #[derive(Parser, Debug)]
 #[command()]
@@ -11,6 +17,39 @@ struct Args {
 	password: String,
 }
 
+async fn run_task(task: Instance) {
+	println!("Task: {:#?}", task);
+	unimplemented!("Client cant run task yet");
+}
+
+async fn work_loop(config: &api::apis::configuration::Configuration) -> bool {
+	println!("Requesting task...");
+	let api_task = api::apis::worker_api::allocate_task_get(config).await;
+	match api_task {
+		Err(Error::ResponseError(e)) => {
+			if 503 == e.status.as_u16() {
+				println!("No tasks available");
+				tokio::time::sleep(Duration::from_secs(5)).await;
+				true
+			} else {
+				eprintln!("Unexpected error: {:?}", e);
+				false
+			}
+		}
+		Ok(api_task) => {
+			match Instance::try_from(api_task) {
+				Ok(task) => run_task(task).await,
+				Err(e) => eprintln!("Failed to parse task: {e:?}"),
+			}
+			true
+		}
+		Err(e) => {
+			eprintln!("Could not finish request: {:?}", e);
+			false
+		}
+	}
+}
+
 #[tokio::main]
 async fn main() {
 	let args = Args::parse();
@@ -18,7 +57,7 @@ async fn main() {
 		.server
 		.parse::<reqwest::Url>()
 		.expect("Should be valid uri");
-	let config = api::apis::configuration::Configuration {
+	let mut config = api::apis::configuration::Configuration {
 		base_path: args.server,
 		..Default::default()
 	};
@@ -28,5 +67,9 @@ async fn main() {
 		.await
 		.unwrap();
 	println!("Login successful, token: {token}");
-	unimplemented!("Client is not implemented, only try to login")
+	config.api_key = Some(ApiKey {
+		key: token,
+		prefix: None,
+	});
+	while work_loop(&config).await {}
 }

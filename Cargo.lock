@@ -331,6 +331,7 @@ dependencies = [
  "api",
  "clap",
  "reqwest 0.12.3",
+ "task",
  "tokio",
 ]
 
