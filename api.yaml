@@ -127,7 +127,7 @@ paths:
         200:
           description: the authentication token for the created session
           content:
-            text/plain:
+            application/json:
               schema:
                 type: string
         403:

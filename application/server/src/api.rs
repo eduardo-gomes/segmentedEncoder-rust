@@ -8,7 +8,7 @@ use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post, put};
-use axum::Router;
+use axum::{Json, Router};
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
@@ -108,7 +108,7 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 async fn login<S: AppState>(
 	State(state): State<Arc<S>>,
 	header_map: HeaderMap,
-) -> Result<(StatusCode, String), StatusCode> {
+) -> Result<Json<String>, StatusCode> {
 	let credentials = header_map
 		.get(HeaderName::from_static("credentials"))
 		.map(|v| v.to_str())
@@ -117,7 +117,7 @@ async fn login<S: AppState>(
 	match credentials {
 		None => Err(StatusCode::BAD_REQUEST),
 		Some(provided) => match state.check_credential(provided) {
-			true => Ok((StatusCode::OK, state.auth_handler().new_token().await)),
+			true => Ok(Json(state.auth_handler().new_token().await)),
 			false => Err(StatusCode::FORBIDDEN),
 		},
 	}
@@ -301,6 +301,19 @@ mod test {
 	}
 
 	#[tokio::test]
+	async fn get_login_returns_json_string() {
+		let server = test_server();
+		let res = server
+			.get("/login")
+			.add_header(
+				HeaderName::from_static("credentials"),
+				HeaderValue::from_static(TEST_CRED),
+			)
+			.await;
+		assert!(!res.json::<String>().is_empty())
+	}
+
+	#[tokio::test]
 	async fn login_will_return_a_token_recognizable_by_auth_handler() {
 		let (server, state) = test_server_state();
 		let token = server
@@ -310,7 +323,7 @@ mod test {
 				HeaderValue::from_static(TEST_CRED),
 			)
 			.await
-			.text();
+			.json::<String>();
 		let valid = state
 			.auth_handler()
 			.is_valid(&token)
@@ -336,7 +349,7 @@ mod test {
 				HeaderValue::from_static(TEST_CRED),
 			)
 			.await
-			.text()
+			.json::<String>()
 			.parse()
 			.unwrap();
 		let status = server
