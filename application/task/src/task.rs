@@ -46,9 +46,9 @@ pub enum Status {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Input {
-	index: u32,
-	start: Option<f64>,
-	end: Option<f64>,
+	pub index: u32,
+	pub start: Option<f64>,
+	pub end: Option<f64>,
 }
 
 impl Input {

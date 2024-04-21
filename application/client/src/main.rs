@@ -4,6 +4,7 @@ use clap::Parser;
 
 use api::apis::configuration::ApiKey;
 use api::apis::Error;
+use client::TaskRunner;
 use task::Instance;
 
 #[derive(Parser, Debug)]
@@ -17,8 +18,9 @@ struct Args {
 	password: String,
 }
 
-async fn run_task(task: Instance) {
+async fn run_task(config: &api::apis::configuration::Configuration, task: Instance) {
 	println!("Task: {:#?}", task);
+	config.run(task).await;
 	unimplemented!("Client cant run task yet");
 }
 
@@ -38,7 +40,7 @@ async fn work_loop(config: &api::apis::configuration::Configuration) -> bool {
 		}
 		Ok(api_task) => {
 			match Instance::try_from(api_task) {
-				Ok(task) => run_task(task).await,
+				Ok(task) => run_task(config, task).await,
 				Err(e) => eprintln!("Failed to parse task: {e:?}"),
 			}
 			true
