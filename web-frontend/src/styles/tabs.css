@@ -1,0 +1,19 @@
+.tabs {
+	position: relative;
+	display: flex;
+	gap: 0.5em;
+}
+
+.tabs button {
+	margin-bottom: 0.15em;
+	padding-left: 1em;
+	padding-right: 1em;
+	font-size: 1.2em;
+}
+
+.tabs .indicator {
+	background-color: AccentColor;
+	height: 0.25em;
+	position: absolute;
+	bottom: 0;
+}

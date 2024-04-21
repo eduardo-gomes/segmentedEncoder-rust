@@ -1,7 +1,9 @@
-import { createEffect, createMemo, For, onCleanup, untrack } from "solid-js";
 import type { JSX } from "solid-js";
+import { createEffect, createMemo, For, onCleanup, untrack } from "solid-js";
 import { Tabs } from "@kobalte/core";
 import { createSignalObj } from "../lib/utils";
+
+import "../styles/tabs.css";
 
 type TabElement = {
 	title: string,
@@ -30,7 +32,7 @@ function TabBar(props: { children: NonEmptyArray<TabElement> }) {
 				<For each={c()}>{(tab) =>
 					<Tabs.Trigger value={tab.title}>{tab.title}</Tabs.Trigger>
 				}</For>
-				<Tabs.Indicator/>
+				<Tabs.Indicator class="indicator"/>
 			</Tabs.List>
 			<For each={c()}>{(tab) =>
 				<Tabs.Content value={tab.title}>{tab.component}</Tabs.Content>

@@ -1,14 +1,3 @@
 :root {
 	color-scheme: light dark;
 }
-
-.tabs {
-	display: flex;
-	gap: 0.5em;
-}
-
-.tabs button {
-	padding-left: 1em;
-	padding-right: 1em;
-	font-size: 1.2em;
-}
