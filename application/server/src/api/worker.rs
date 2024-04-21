@@ -24,7 +24,7 @@ pub(super) async fn allocate_task<S: AppState>(
 		.allocate_task()
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-		.ok_or(StatusCode::NOT_FOUND)?;
+		.ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
 	Ok(Json(allocate.into()))
 }
 
@@ -269,6 +269,17 @@ mod test_allocate_task {
 		assert!(res.status_code().is_success());
 		let got: Instance = res.json::<api::models::Task>().try_into().unwrap();
 		assert_eq!(got, instance);
+	}
+
+	#[tokio::test]
+	async fn without_task_available_returns_unavailable() {
+		let (server, _, auth) = test_server_state_auth().await;
+		let code = server
+			.get("/allocate_task")
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE);
 	}
 }
 
