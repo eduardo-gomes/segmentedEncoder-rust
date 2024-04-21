@@ -15,7 +15,8 @@ axum = "0.7.5"
 axum-server = "0.6.0"
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
 tower = "0.4.13"
-#tower-http = { version = "0.5.2", features = ["cors"] }
+tower-http = { version = "0.5.2", features = ["cors"] }
+clap = { version = "4.5.4", features = ["derive"] }
 task = { path = "../task" }
 api = { path = "../api" }
 auth_module = { path = "../auth_module" }
