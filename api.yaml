@@ -346,6 +346,14 @@ paths:
       parameters:
         - $ref: "#/components/parameters/job_id"
         - $ref: "#/components/parameters/task_id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                successfully_completed:
+                  type: boolean
       tags:
         - worker
       responses:
