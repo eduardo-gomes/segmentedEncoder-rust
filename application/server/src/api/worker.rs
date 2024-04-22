@@ -73,6 +73,10 @@ pub(super) async fn put_task_output<S: AppState>(
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
+pub(super) async fn task_status_post(_auth: AuthToken) -> StatusCode {
+	StatusCode::NOT_IMPLEMENTED
+}
+
 #[cfg(test)]
 mod test_util {
 	use std::future::Future;
@@ -521,5 +525,40 @@ mod test_post_input {
 			.await
 			.unwrap();
 		assert_eq!(content.as_slice(), SOURCE)
+	}
+
+	#[tokio::test]
+	async fn status_post_returns_forbidden_without_auth() {
+		use task::manager::Manager;
+		let (server, app, _auth) = super::test_util::app_with_job_and_analyse_task().await;
+		let instance = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("Should have task");
+		let path = format!("/job/{}/task/{}/status", instance.job_id, instance.task_id);
+		let code = server.post(&path).json("body").await.status_code();
+		assert_eq!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn status_post_with_auth_not_forbidden() {
+		use task::manager::Manager;
+		let (server, app, auth) = super::test_util::app_with_job_and_analyse_task().await;
+		let instance = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("Should have task");
+		let path = format!("/job/{}/task/{}/status", instance.job_id, instance.task_id);
+		let code = server
+			.post(&path)
+			.add_header(AUTHORIZATION, auth)
+			.json("body")
+			.await
+			.status_code();
+		assert_ne!(code, StatusCode::FORBIDDEN)
 	}
 }
