@@ -185,7 +185,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 				None => Ok(None),
 			}
 		} else {
-			Err(Error::new(ErrorKind::NotFound, "Task not found"))
+			Err(Error::new(ErrorKind::Other, "Not implemented"))
 		}
 	}
 

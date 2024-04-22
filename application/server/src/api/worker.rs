@@ -73,8 +73,21 @@ pub(super) async fn put_task_output<S: AppState>(
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
-pub(super) async fn task_status_post(_auth: AuthToken) -> StatusCode {
-	StatusCode::NOT_IMPLEMENTED
+pub(super) async fn task_status_post<S: AppState>(
+	State(state): State<Arc<S>>,
+	_auth: AuthToken,
+	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
+	Json(body): Json<api::models::TaskStatus>,
+) -> StatusCode {
+	let res = state
+		.manager()
+		.update_task_status(&job_id, &task_id, body.into())
+		.await;
+	match res {
+		Ok(Some(_)) => StatusCode::NO_CONTENT,
+		Ok(None) => StatusCode::NOT_FOUND,
+		Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+	}
 }
 
 #[cfg(test)]
@@ -408,17 +421,22 @@ mod test_get_input {
 
 #[cfg(test)]
 mod test_post_input {
+	use std::sync::Arc;
+
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::{HeaderValue, StatusCode};
 	use axum_test::TestServer;
 	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
-	use task::manager::Manager;
+	use auth_module::LocalAuthenticator;
+	use task::Status;
 
-	use crate::api::test::{test_server, test_server_auth};
+	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
+	use crate::api::worker::test_util::GenericApp;
+	use crate::api::worker::test_util::MockThisManager;
 	use crate::api::AppState;
-	use crate::storage::Storage;
+	use crate::storage::{MemStorage, Storage};
 	use crate::WEBM_SAMPLE;
 
 	#[tokio::test]
@@ -560,5 +578,43 @@ mod test_post_input {
 			.await
 			.status_code();
 		assert_ne!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn status_post_complete_once_success() {
+		let mut mock_manager = MockThisManager::new();
+		mock_manager
+			.expect_update_task_status()
+			.withf(|_job, _task, status| matches!(status, Status::Finished))
+			.times(1)
+			.returning(|_job, _task, _status| Box::pin(async { Ok(None) }));
+		let state = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let (server, _, auth) = test_server_state_auth_generic(Arc::new(state)).await;
+		let path = format!("/job/{}/task/{}/status", Uuid::nil(), Uuid::nil());
+		let code = server
+			.post(&path)
+			.add_header(AUTHORIZATION, auth)
+			.json(&Into::<api::models::TaskStatus>::into(Status::Finished))
+			.await
+			.status_code();
+		assert_ne!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn status_post_with_bad_task_not_found() {
+		let (server, _, auth) = super::test_util::app_with_job_and_analyse_task().await;
+		let path = format!("/job/{}/task/{}/status", Uuid::nil(), Uuid::nil());
+		let code = server
+			.post(&path)
+			.add_header(AUTHORIZATION, auth)
+			.json(&Into::<api::models::TaskStatus>::into(Status::Finished))
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::NOT_FOUND)
 	}
 }
