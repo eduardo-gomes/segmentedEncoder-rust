@@ -21,7 +21,6 @@ struct Args {
 async fn run_task(config: &api::apis::configuration::Configuration, task: Instance) {
 	println!("Task: {:#?}", task);
 	config.run(task).await;
-	unimplemented!("Client cant run task yet");
 }
 
 async fn work_loop(config: &api::apis::configuration::Configuration) -> bool {
