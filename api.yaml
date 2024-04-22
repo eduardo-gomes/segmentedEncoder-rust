@@ -90,6 +90,11 @@ components:
       minProperties: 1
       maxProperties: 1
       additionalProperties: false
+    task_status:
+      type: object
+      properties:
+        successfully_completed:
+          type: boolean
   securitySchemes:
     auth_token:
       name: Authorization
@@ -350,10 +355,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                successfully_completed:
-                  type: boolean
+              $ref: "#/components/schemas/task_status"
       tags:
         - worker
       responses:

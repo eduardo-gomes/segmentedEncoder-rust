@@ -124,3 +124,25 @@ impl From<Instance> for api::models::Task {
 		}
 	}
 }
+
+impl From<api::models::TaskStatus> for Status {
+	fn from(value: api::models::TaskStatus) -> Self {
+		match value.successfully_completed {
+			Some(true) => Status::Finished,
+			_ => Status::Running,
+		}
+	}
+}
+
+impl From<Status> for api::models::TaskStatus {
+	fn from(value: Status) -> Self {
+		use api::models::TaskStatus;
+		let finished = match value {
+			Status::Finished => Some(true),
+			Status::Running => None,
+		};
+		TaskStatus {
+			successfully_completed: finished,
+		}
+	}
+}
