@@ -1,4 +1,4 @@
-use api::models::AnalysisTask;
+use api::models::{AnalysisTask, TaskRequestRecipe};
 
 use super::*;
 
@@ -88,6 +88,15 @@ impl From<Options> for api::models::TranscodeTask {
 	}
 }
 
+impl From<api::models::TranscodeTask> for Options {
+	fn from(value: api::models::TranscodeTask) -> Self {
+		Options {
+			codec: value.options.codec.unwrap_or_else(|| "copy".to_string()),
+			params: value.options.params.unwrap_or_default(),
+		}
+	}
+}
+
 impl From<Recipe> for api::models::Recipe {
 	fn from(value: Recipe) -> Self {
 		match value {
@@ -150,5 +159,25 @@ impl From<Status> for api::models::TaskStatus {
 		TaskStatus {
 			successfully_completed: finished,
 		}
+	}
+}
+
+impl TryFrom<api::models::TaskRequest> for TaskSource {
+	type Error = ();
+	fn try_from(value: api::models::TaskRequest) -> Result<Self, Self::Error> {
+		let recipe: Recipe = match value.recipe.as_ref() {
+			TaskRequestRecipe::TranscodeTask(task) => {
+				Recipe::Transcode(Options::from(Box::as_ref(task).clone()))
+			}
+			TaskRequestRecipe::MergeTask(task) => Recipe::Merge(
+				task.iter()
+					.map(|v| (*v).try_into().unwrap_or(u32::MAX))
+					.collect(),
+			),
+		};
+		let inputs: Result<Vec<Input>, _> =
+			value.inputs.into_iter().map(|v| v.try_into()).collect();
+		let inputs = inputs?;
+		Ok(TaskSource { inputs, recipe })
 	}
 }
