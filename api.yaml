@@ -76,8 +76,10 @@ components:
           type: number
           format: double
     merge_task:
-      type: string
       description: How to merge the inputs
+      type: array
+      items:
+        type: integer
     recipe:
       type: object
       properties:
@@ -90,6 +92,16 @@ components:
       minProperties: 1
       maxProperties: 1
       additionalProperties: false
+    task_request:
+      type: object
+      required: [ inputs, recipe ]
+      properties:
+        inputs:
+          $ref: "#/components/schemas/task_input"
+        recipe:
+          oneOf:
+            - $ref: "#/components/schemas/transcode_task"
+            - $ref: "#/components/schemas/merge_task"
     task_status:
       type: object
       properties:
@@ -285,6 +297,11 @@ paths:
       description: Append task to job
       parameters:
         - $ref: "#/components/parameters/job_id"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/task_request"
       tags:
         - worker
       responses:
