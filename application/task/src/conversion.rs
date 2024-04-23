@@ -31,6 +31,16 @@ impl TryFrom<api::models::TaskInputInner> for Input {
 	}
 }
 
+impl From<Input> for api::models::TaskInputInner {
+	fn from(value: Input) -> Self {
+		Self {
+			input: value.index.try_into().unwrap_or(i32::MAX),
+			start: value.start,
+			end: value.end,
+		}
+	}
+}
+
 impl TryFrom<api::models::Task> for Instance {
 	type Error = ();
 
@@ -108,11 +118,7 @@ impl From<Instance> for api::models::Task {
 			value
 				.inputs
 				.into_iter()
-				.map(|input| api::models::TaskInputInner {
-					input: input.index as i32,
-					start: input.start,
-					end: input.end,
-				})
+				.map(api::models::TaskInputInner::from)
 				.collect(),
 		);
 		let recipe = Some(Box::new(value.recipe.into()));
