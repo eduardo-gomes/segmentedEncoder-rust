@@ -7,11 +7,15 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+use axum_extra::headers::Range;
+use axum_extra::TypedHeader;
 use uuid::Uuid;
 
 use task::manager::Manager;
 
+use crate::api::worker::ranged::from_reader;
 use crate::api::{AppState, AuthToken};
 use crate::storage::Storage;
 
@@ -31,8 +35,9 @@ pub(super) async fn allocate_task<S: AppState>(
 pub(super) async fn get_task_input<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
+	range: Option<TypedHeader<Range>>,
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
-) -> Result<Body, StatusCode> {
+) -> Result<Response, StatusCode> {
 	let file = state
 		.manager()
 		.get_allocated_task_input(&job_id, &task_id, 0)
@@ -44,8 +49,10 @@ pub(super) async fn get_task_input<S: AppState>(
 		.read_file(&file)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	let stream = tokio_util::io::ReaderStream::new(Box::new(read));
-	Ok(Body::from_stream(stream))
+	let ranged = from_reader(read, range.map(|TypedHeader(r)| r))
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	Ok(ranged.into_response())
 }
 
 pub(super) async fn put_task_output<S: AppState>(
@@ -302,8 +309,8 @@ mod test_allocate_task {
 
 #[cfg(test)]
 mod test_get_input {
-	use axum::http::header::AUTHORIZATION;
-	use axum::http::StatusCode;
+	use axum::http::header::{AUTHORIZATION, RANGE};
+	use axum::http::{HeaderValue, StatusCode};
 	use tokio::io::AsyncReadExt;
 	use uuid::Uuid;
 
@@ -416,6 +423,70 @@ mod test_get_input {
 			.await
 			.unwrap();
 		assert_eq!(ret, expected)
+	}
+
+	#[tokio::test]
+	async fn range_returns_partial_content() {
+		let (server, app, auth) = app_with_job_and_analyse_task().await;
+		let task = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("There should be a task");
+		assert!(!task.inputs.is_empty(), "This task should have a input");
+		let input_id = app
+			.manager()
+			.get_job(&task.job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.input_id;
+		let path = format!("/job/{}/task/{}/input/0", task.job_id, task.task_id);
+		let response = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.add_header(RANGE, HeaderValue::from_static("bytes=0-10"))
+			.await;
+		let code = response.status_code();
+		assert_eq!(code, StatusCode::PARTIAL_CONTENT);
+	}
+
+	#[tokio::test]
+	async fn range_returns_partial_content_with_selected_range() {
+		let (server, app, auth) = app_with_job_and_analyse_task().await;
+		let task = app
+			.manager()
+			.allocate_task()
+			.await
+			.unwrap()
+			.expect("There should be a task");
+		assert!(!task.inputs.is_empty(), "This task should have a input");
+		let input_id = app
+			.manager()
+			.get_job(&task.job_id)
+			.await
+			.unwrap()
+			.unwrap()
+			.input_id;
+		let path = format!("/job/{}/task/{}/input/0", task.job_id, task.task_id);
+		let range = 0..10 + 1;
+		let ret = server
+			.get(&path)
+			.add_header(AUTHORIZATION, auth)
+			.add_header(RANGE, HeaderValue::from_static("bytes=0-10"))
+			.await
+			.into_bytes()
+			.to_vec();
+		let mut expected = Vec::new();
+		app.storage()
+			.read_file(&input_id)
+			.await
+			.unwrap()
+			.read_to_end(&mut expected)
+			.await
+			.unwrap();
+		assert_eq!(ret, &expected[range])
 	}
 }
 
@@ -616,5 +687,68 @@ mod test_post_input {
 			.await
 			.status_code();
 		assert_eq!(code, StatusCode::NOT_FOUND)
+	}
+}
+
+mod ranged {
+	use axum::response::{IntoResponse, Response};
+	use axum_extra::headers::Range;
+	use axum_range::{KnownSize, Ranged};
+	use tokio::io::{AsyncRead, AsyncSeek};
+
+	pub(crate) async fn from_reader<T: AsyncRead + AsyncSeek + Send + Unpin + 'static>(
+		read: T,
+		range: Option<Range>,
+	) -> std::io::Result<Result<Response, Response>> {
+		let known_size = KnownSize::seek(read).await?;
+		Ok(Ranged::new(range, known_size)
+			.try_respond()
+			.map(|res| res.into_response())
+			.map_err(|res| res.into_response()))
+	}
+
+	#[cfg(test)]
+	mod test {
+		use std::io::Cursor;
+
+		use axum::body::to_bytes;
+		use axum_extra::headers::Range;
+
+		use crate::api::worker::ranged::from_reader;
+		use crate::WEBM_SAMPLE;
+
+		#[tokio::test]
+		async fn with_no_option_returns_entire_content() {
+			let content = Cursor::new(WEBM_SAMPLE);
+			let body = from_reader(content, None)
+				.await
+				.unwrap()
+				.unwrap()
+				.into_body();
+			let bytes = to_bytes(body, WEBM_SAMPLE.len() + 10).await.unwrap();
+			assert_eq!(bytes, WEBM_SAMPLE.as_slice())
+		}
+
+		#[tokio::test]
+		async fn with_range_return_the_selected_range() {
+			let content = Cursor::new(WEBM_SAMPLE);
+			let body = from_reader(content, Some(Range::bytes(0..10).unwrap()))
+				.await
+				.unwrap()
+				.unwrap()
+				.into_body();
+			let bytes = to_bytes(body, WEBM_SAMPLE.len() + 10).await.unwrap();
+			assert_eq!(bytes.as_ref(), &WEBM_SAMPLE[0..10])
+		}
+
+		#[tokio::test]
+		async fn with_bad_range_ok_error() {
+			let content = Cursor::new(WEBM_SAMPLE);
+			let len = WEBM_SAMPLE.len();
+			let res = from_reader(content, Some(Range::bytes(len as u64..).unwrap()))
+				.await
+				.unwrap();
+			assert!(res.is_err())
+		}
 	}
 }
