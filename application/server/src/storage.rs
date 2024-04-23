@@ -12,7 +12,7 @@ pub trait Storage: Sync {
 	type WriteFile: AsyncWrite + Send + Unpin;
 	fn read_file(
 		&self,
-		uuid: &Uuid,
+		uuid: Uuid,
 	) -> impl Future<Output = std::io::Result<impl AsyncRead + AsyncSeek + Send + Unpin + 'static>> + Send;
 	///Create a writer for a new file, the content may only be stored after a call to store
 	fn create_file(&self) -> impl Future<Output = std::io::Result<Self::WriteFile>> + Send;
@@ -94,9 +94,9 @@ mod mem {
 	impl Storage for MemStorage {
 		type WriteFile = Vec<u8>;
 
-		async fn read_file(&self, uuid: &Uuid) -> std::io::Result<Cursor<MemReadFile>> {
+		async fn read_file(&self, uuid: Uuid) -> std::io::Result<Cursor<MemReadFile>> {
 			self.read()
-				.get(uuid)
+				.get(&uuid)
 				.cloned()
 				.map(Cursor::new)
 				.ok_or(Error::new(ErrorKind::NotFound, "Not found"))
@@ -127,7 +127,7 @@ mod mem {
 		#[tokio::test]
 		async fn read_nonexistent_file_not_found() {
 			let storage = MemStorage::default();
-			let read = storage.read_file(&Uuid::nil()).await;
+			let read = storage.read_file(Uuid::nil()).await;
 			assert!(read.is_err());
 			assert_eq!(read.unwrap_err().kind(), ErrorKind::NotFound);
 		}
@@ -163,7 +163,7 @@ mod mem {
 			let storage = MemStorage::default();
 			let write = storage.create_file().await.unwrap();
 			let id = storage.store_file(write).await.unwrap();
-			let read = storage.read_file(&id).await;
+			let read = storage.read_file(id).await;
 			assert!(read.is_ok())
 		}
 
@@ -174,7 +174,7 @@ mod mem {
 			let input = &MKV_SAMPLE;
 			AsyncWriteExt::write_all(&mut write, input).await.unwrap();
 			let id = storage.store_file(write).await.unwrap();
-			let mut read = storage.read_file(&id).await.unwrap();
+			let mut read = storage.read_file(id).await.unwrap();
 			let mut out = Vec::new();
 			AsyncReadExt::read_to_end(&mut read, &mut out)
 				.await

@@ -547,7 +547,7 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.input_id;
-		let mut read = state.storage().read_file(&input).await.unwrap();
+		let mut read = state.storage().read_file(input).await.unwrap();
 		let mut readed = Vec::new();
 		AsyncReadExt::read_to_end(&mut read, &mut readed)
 			.await

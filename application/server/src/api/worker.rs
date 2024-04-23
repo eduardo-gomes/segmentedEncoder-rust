@@ -55,7 +55,7 @@ pub(super) async fn get_task_input<S: AppState>(
 		.ok_or(StatusCode::NOT_FOUND)?;
 	let read = state
 		.storage()
-		.read_file(&file)
+		.read_file(file)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	let ranged = from_reader(read, range.map(|TypedHeader(r)| r))
@@ -425,7 +425,7 @@ mod test_get_input {
 			.to_vec();
 		let mut expected = Vec::new();
 		app.storage()
-			.read_file(&input_id)
+			.read_file(input_id)
 			.await
 			.unwrap()
 			.read_to_end(&mut expected)
@@ -489,7 +489,7 @@ mod test_get_input {
 			.to_vec();
 		let mut expected = Vec::new();
 		app.storage()
-			.read_file(&input_id)
+			.read_file(input_id)
 			.await
 			.unwrap()
 			.read_to_end(&mut expected)
@@ -616,7 +616,7 @@ mod test_post_input {
 			.unwrap();
 		let mut content = Vec::new();
 		app.storage()
-			.read_file(&task_output)
+			.read_file(task_output)
 			.await
 			.unwrap()
 			.read_to_end(&mut content)
