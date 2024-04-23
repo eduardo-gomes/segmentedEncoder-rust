@@ -19,17 +19,26 @@ use crate::api::worker::ranged::from_reader;
 use crate::api::{AppState, AuthToken};
 use crate::storage::Storage;
 
+trait WorkerApi {
+	async fn allocate_task(&self) -> Result<Json<api::models::Task>, impl IntoResponse>;
+}
+
+impl<T: AppState> WorkerApi for T {
+	async fn allocate_task(&self) -> Result<Json<api::models::Task>, StatusCode> {
+		self.manager()
+			.allocate_task()
+			.await
+			.map(|opt| opt.map(|val| Json(val.into())))
+			.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+			.ok_or(StatusCode::SERVICE_UNAVAILABLE)
+	}
+}
+
 pub(super) async fn allocate_task<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
 ) -> Result<Json<api::models::Task>, StatusCode> {
-	let allocate = state
-		.manager()
-		.allocate_task()
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-		.ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
-	Ok(Json(allocate.into()))
+	state.allocate_task().await
 }
 
 pub(super) async fn get_task_input<S: AppState>(
