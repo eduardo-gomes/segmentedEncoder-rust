@@ -11,6 +11,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use axum_extra::headers::Range;
 use axum_extra::TypedHeader;
+use tokio::io::{AsyncRead, AsyncSeek};
 use uuid::Uuid;
 
 use task::manager::Manager;
@@ -21,6 +22,12 @@ use crate::storage::Storage;
 
 trait WorkerApi {
 	async fn allocate_task(&self) -> Result<Json<api::models::Task>, impl IntoResponse>;
+	async fn get_task_input_file(
+		&self,
+		job_id: Uuid,
+		task_id: Uuid,
+		input_idx: u32,
+	) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin + 'static, StatusCode>;
 }
 
 impl<T: AppState> WorkerApi for T {
@@ -31,6 +38,24 @@ impl<T: AppState> WorkerApi for T {
 			.map(|opt| opt.map(|val| Json(val.into())))
 			.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
 			.ok_or(StatusCode::SERVICE_UNAVAILABLE)
+	}
+
+	async fn get_task_input_file(
+		&self,
+		job_id: Uuid,
+		task_id: Uuid,
+		input_idx: u32,
+	) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin + 'static, StatusCode> {
+		let file = self
+			.manager()
+			.get_allocated_task_input(&job_id, &task_id, input_idx)
+			.await
+			.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
+			.ok_or(StatusCode::NOT_FOUND)?;
+		self.storage()
+			.read_file(file)
+			.await
+			.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
 	}
 }
 
@@ -47,17 +72,7 @@ pub(super) async fn get_task_input<S: AppState>(
 	range: Option<TypedHeader<Range>>,
 	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Response, StatusCode> {
-	let file = state
-		.manager()
-		.get_allocated_task_input(&job_id, &task_id, 0)
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?
-		.ok_or(StatusCode::NOT_FOUND)?;
-	let read = state
-		.storage()
-		.read_file(file)
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	let read = state.get_task_input_file(job_id, task_id, 0).await?;
 	let ranged = from_reader(read, range.map(|TypedHeader(r)| r))
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
