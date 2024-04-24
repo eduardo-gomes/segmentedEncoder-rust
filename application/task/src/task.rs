@@ -10,8 +10,7 @@ pub struct JobSource {
 	pub video_options: Options,
 }
 
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TaskSource {
 	///Here, the input should be the task id, or 0 for the job source
 	pub inputs: Vec<Input>,
