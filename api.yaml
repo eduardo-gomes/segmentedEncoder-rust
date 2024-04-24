@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SegmentedEncoder rest api
-  version: 0.0.1
+  version: 0.0.2
 servers:
   - description: Local
     url: http://localhost:8888/api
@@ -54,11 +54,14 @@ components:
         params: [ -crf, 30 ]
     task:
       type: object
+      required: [ job_id, task_id, job_options, input, recipe ]
       properties:
         job_id:
           type: string
         task_id:
           type: string
+        job_options:
+          $ref: "#/components/schemas/job_options"
         input:
           $ref: "#/components/schemas/task_input"
         recipe:
@@ -67,8 +70,10 @@ components:
       type: object
       properties:
         options:
-          $ref: "#/components/schemas/codec_params"
-      required: [ options ]
+          description: Additional options
+          type: array
+          items:
+            type: string
     analysis_task:
       type: object
       properties:
@@ -107,6 +112,21 @@ components:
       properties:
         successfully_completed:
           type: boolean
+    job_options:
+      type: object
+      required: [ video ]
+      properties:
+        video:
+          $ref: "#/components/schemas/codec_params"
+          required: [ codec ]
+        audio:
+          $ref: "#/components/schemas/codec_params"
+      example:
+        video:
+          codec: "libsvtav1"
+          params: [ "-crf", "30" ]
+        audio:
+          codec: "libopus"
   securitySchemes:
     auth_token:
       name: Authorization
