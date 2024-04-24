@@ -147,11 +147,19 @@ pub(super) async fn task_status_post<S: AppState>(
 	}
 }
 
-pub(super) async fn task_post(
+pub(super) async fn task_post<S: AppState>(
+	State(state): State<Arc<S>>,
 	_auth: AuthToken,
+	Path(job_id): Path<Uuid>,
 	_request: Json<api::models::TaskRequest>,
-) -> StatusCode {
-	StatusCode::NOT_FOUND
+) -> Result<StatusCode, StatusCode> {
+	let job = state
+		.manager()
+		.get_job(&job_id)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
+	job.ok_or(StatusCode::NOT_FOUND)
+		.and(Ok(StatusCode::CREATED))
 }
 
 #[cfg(test)]
@@ -822,7 +830,9 @@ mod test_task_post {
 	use task::manager::Manager;
 	use task::{Input, JobSource, Options, TaskSource};
 
-	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
+	use crate::api::test::{
+		test_server, test_server_auth, test_server_state_auth, test_server_state_auth_generic,
+	};
 	use crate::api::worker::test_util::{GenericApp, MockThisManager};
 	use crate::api::worker::WorkerApi;
 	use crate::api::AppState;
@@ -979,5 +989,48 @@ mod test_task_post {
 			.await
 			.status_code();
 		assert_eq!(res, StatusCode::NOT_FOUND)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_invalid_uuid_is_bad_request() {
+		let (server, auth) = test_server_auth().await;
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+		};
+		let res = server
+			.post("/job/BAD_ID/task")
+			.add_header(AUTHORIZATION, auth)
+			.json(&task)
+			.await
+			.status_code();
+		assert_eq!(res, StatusCode::BAD_REQUEST)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_good_body_valid_job_created() {
+		let (server, app, auth) = test_server_state_auth().await;
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+		};
+		let job_id = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let res = server
+			.post(&format!("/job/{}/task", job_id))
+			.add_header(AUTHORIZATION, auth)
+			.json(&task)
+			.await
+			.status_code();
+		assert_eq!(res, StatusCode::CREATED)
 	}
 }
