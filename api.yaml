@@ -176,6 +176,19 @@ paths:
               example: Bad credentials
 
   /job:
+    get:
+      description: List jobs
+      security:
+        - auth_token: [ ]
+      responses:
+        200:
+          description: Array with job ids
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
     post:
       description: Create new job
       security:
