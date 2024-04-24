@@ -147,6 +147,10 @@ pub(super) async fn task_status_post<S: AppState>(
 	}
 }
 
+pub(super) async fn task_post(_auth: AuthToken) -> StatusCode {
+	StatusCode::NOT_IMPLEMENTED
+}
+
 #[cfg(test)]
 mod test_util {
 	use std::future::Future;
@@ -805,6 +809,7 @@ mod ranged {
 
 #[cfg(test)]
 mod test_task_post {
+	use axum::http::header::AUTHORIZATION;
 	use axum::http::StatusCode;
 	use uuid::Uuid;
 
@@ -812,6 +817,7 @@ mod test_task_post {
 	use task::manager::Manager;
 	use task::{Input, JobSource, Options, TaskSource};
 
+	use crate::api::test::{test_server, test_server_auth};
 	use crate::api::worker::test_util::{GenericApp, MockThisManager};
 	use crate::api::worker::WorkerApi;
 	use crate::api::AppState;
@@ -918,5 +924,26 @@ mod test_task_post {
 		};
 		let id = app.append_task_to_job(Uuid::nil(), task).await.unwrap();
 		assert_eq!(id, NUM);
+	}
+
+	#[tokio::test]
+	async fn endpoint_without_auth_forbidden() {
+		let server = test_server();
+		let res = server
+			.post(&format!("/job/{}/task", Uuid::nil()))
+			.await
+			.status_code();
+		assert_eq!(res, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_auth_not_forbidden() {
+		let (server, auth) = test_server_auth().await;
+		let res = server
+			.post(&format!("/job/{}/task", Uuid::nil()))
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_ne!(res, StatusCode::FORBIDDEN)
 	}
 }
