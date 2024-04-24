@@ -2,6 +2,7 @@
 //!
 //! Define the routes used by the workers to execute tasks
 
+use std::io::ErrorKind;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -15,6 +16,7 @@ use tokio::io::{AsyncRead, AsyncSeek};
 use uuid::Uuid;
 
 use task::manager::Manager;
+use task::TaskSource;
 
 use crate::api::worker::ranged::from_reader;
 use crate::api::{AppState, AuthToken};
@@ -28,6 +30,12 @@ trait WorkerApi {
 		task_id: Uuid,
 		input_idx: u32,
 	) -> Result<impl AsyncRead + AsyncSeek + Send + Unpin + 'static, StatusCode>;
+	///Append task to job and returns the task number
+	async fn append_task_to_job(
+		&self,
+		job_id: Uuid,
+		source: api::models::TaskRequest,
+	) -> Result<u32, StatusCode>;
 }
 
 impl<T: AppState> WorkerApi for T {
@@ -56,6 +64,24 @@ impl<T: AppState> WorkerApi for T {
 			.read_file(file)
 			.await
 			.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
+	}
+
+	async fn append_task_to_job(
+		&self,
+		job_id: Uuid,
+		source: api::models::TaskRequest,
+	) -> Result<u32, StatusCode> {
+		let task: TaskSource = source.try_into().or(Err(StatusCode::BAD_REQUEST))?;
+		self.manager()
+			.add_task_to_job(&job_id, task)
+			.await
+			.map(Some)
+			.or_else(|err| match err.kind() {
+				ErrorKind::NotFound => Ok(None),
+				ErrorKind::InvalidInput => Err(StatusCode::BAD_REQUEST),
+				_ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+			})
+			.and_then(|v| v.ok_or(StatusCode::NOT_FOUND))
 	}
 }
 
@@ -774,5 +800,123 @@ mod ranged {
 				.unwrap();
 			assert!(res.is_err())
 		}
+	}
+}
+
+#[cfg(test)]
+mod test_task_post {
+	use axum::http::StatusCode;
+	use uuid::Uuid;
+
+	use auth_module::LocalAuthenticator;
+	use task::manager::Manager;
+	use task::{Input, JobSource, Options, TaskSource};
+
+	use crate::api::worker::test_util::{GenericApp, MockThisManager};
+	use crate::api::worker::WorkerApi;
+	use crate::api::AppState;
+	use crate::storage::MemStorage;
+	use crate::AppStateLocal;
+
+	#[tokio::test]
+	async fn append_task_to_non_existent_err() {
+		let app = AppStateLocal::default();
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let err = app.append_task_to_job(Uuid::nil(), task).await;
+		assert_eq!(err.unwrap_err(), StatusCode::NOT_FOUND);
+	}
+
+	#[tokio::test]
+	async fn append_task_to_existent_job() {
+		let app = AppStateLocal::default();
+		let job = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let res = app.append_task_to_job(job, task).await;
+		assert!(res.is_ok());
+	}
+
+	#[tokio::test]
+	async fn append_multiple_task_returns_different_idx() {
+		let app = AppStateLocal::default();
+		let job = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				video_options: Options {
+					codec: "".to_string(),
+					params: vec![],
+				},
+			})
+			.await
+			.unwrap();
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let id_1 = app.append_task_to_job(job, task.clone()).await.unwrap();
+		let id_2 = app.append_task_to_job(job, task).await.unwrap();
+		assert_ne!(id_1, id_2);
+	}
+
+	#[tokio::test]
+	async fn append_returns_idx_returned_by_manager() {
+		static NUM: u32 = 12345;
+		let mut mock_manager = MockThisManager::new();
+		mock_manager
+			.expect_add_task_to_job()
+			.times(1)
+			.returning(|_job, _task| Box::pin(async { Ok(NUM) }));
+		let app = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let id = app.append_task_to_job(Uuid::nil(), task).await.unwrap();
+		assert_eq!(id, NUM);
+	}
+
+	#[tokio::test]
+	async fn send_parsed_task_to_manager() {
+		static NUM: u32 = 12345;
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let parsed: TaskSource = task.clone().try_into().unwrap();
+		let mut mock_manager = MockThisManager::new();
+		mock_manager
+			.expect_add_task_to_job()
+			.withf(move |_, task_parsed| parsed == *task_parsed)
+			.times(1)
+			.returning(|_job, _task| Box::pin(async { Ok(NUM) }));
+		let app = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let id = app.append_task_to_job(Uuid::nil(), task).await.unwrap();
+		assert_eq!(id, NUM);
 	}
 }
