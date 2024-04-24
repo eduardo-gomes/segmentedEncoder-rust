@@ -7,7 +7,13 @@ use uuid::Uuid;
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct JobSource {
 	pub input_id: Uuid,
-	pub video_options: Options,
+	pub options: JobOptions,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct JobOptions {
+	pub video: Options,
+	pub audio: Option<Options>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,7 +25,7 @@ pub struct TaskSource {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Options {
-	pub codec: String,
+	pub codec: Option<String>,
 	pub params: Vec<String>,
 }
 
@@ -27,7 +33,8 @@ pub struct Options {
 pub enum Recipe {
 	///Determines how long the tasks segments should be
 	Analysis(Option<f64>),
-	Transcode(Options),
+	///Extra options for transcoding
+	Transcode(Vec<String>),
 	Merge(Vec<u32>),
 }
 
@@ -61,6 +68,7 @@ pub struct Instance {
 	pub task_id: Uuid,
 	pub inputs: Vec<Input>,
 	pub recipe: Recipe,
+	pub job_options: JobOptions,
 }
 
 mod conversion;

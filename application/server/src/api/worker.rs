@@ -176,7 +176,7 @@ mod test_util {
 
 	use auth_module::AuthenticationHandler;
 	use task::manager::Manager;
-	use task::{Input, Instance, JobSource, Options, Recipe, Status, TaskSource};
+	use task::{Input, Instance, JobOptions, JobSource, Options, Recipe, Status, TaskSource};
 
 	use crate::api::AppState;
 	use crate::storage::Storage;
@@ -249,13 +249,7 @@ mod test_util {
 		let app = AppStateLocal::default();
 		let data = axum::body::Body::from(WEBM_SAMPLE.as_slice());
 		let input = app._storage.body_to_new_file(data).await.unwrap();
-		let job = JobSource {
-			input_id: input,
-			video_options: Options {
-				codec: "libx264".to_string(),
-				params: vec![],
-			},
-		};
+		let job = create_job_source(input);
 		let job_id = app._manager.create_job(job).await.unwrap();
 		app._manager
 			.add_task_to_job(
@@ -268,6 +262,23 @@ mod test_util {
 			.await
 			.unwrap();
 		test_server_state_auth_generic(Arc::new(app)).await
+	}
+
+	pub(crate) fn create_job_options() -> JobOptions {
+		JobOptions {
+			video: Options {
+				codec: Some("libx264".to_string()),
+				params: vec![],
+			},
+			audio: None,
+		}
+	}
+
+	pub(crate) fn create_job_source(input_id: Uuid) -> JobSource {
+		JobSource {
+			input_id,
+			options: create_job_options(),
+		}
 	}
 }
 
@@ -337,6 +348,7 @@ mod test_allocate_task {
 			task_id: Uuid::from_u64_pair(1, 3),
 			inputs: vec![Input::source()],
 			recipe: Recipe::Analysis(None),
+			job_options: create_job_options(),
 		};
 		let _result = instance.clone();
 		mock_manager
@@ -830,12 +842,12 @@ mod test_task_post {
 
 	use auth_module::LocalAuthenticator;
 	use task::manager::Manager;
-	use task::{Input, JobSource, Options, TaskSource};
+	use task::{Input, JobSource, TaskSource};
 
 	use crate::api::test::{
 		test_server, test_server_auth, test_server_state_auth, test_server_state_auth_generic,
 	};
-	use crate::api::worker::test_util::{GenericApp, MockThisManager};
+	use crate::api::worker::test_util::{create_job_options, GenericApp, MockThisManager};
 	use crate::api::worker::WorkerApi;
 	use crate::api::AppState;
 	use crate::storage::MemStorage;
@@ -859,10 +871,7 @@ mod test_task_post {
 			.manager()
 			.create_job(JobSource {
 				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
+				options: create_job_options(),
 			})
 			.await
 			.unwrap();
@@ -881,10 +890,7 @@ mod test_task_post {
 			.manager()
 			.create_job(JobSource {
 				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
+				options: create_job_options(),
 			})
 			.await
 			.unwrap();
@@ -1020,10 +1026,7 @@ mod test_task_post {
 			.manager()
 			.create_job(JobSource {
 				input_id: Default::default(),
-				video_options: Options {
-					codec: "".to_string(),
-					params: vec![],
-				},
+				options: create_job_options(),
 			})
 			.await
 			.unwrap();

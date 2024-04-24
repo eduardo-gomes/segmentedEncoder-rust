@@ -32,6 +32,13 @@ use std::future::Future;
 
 use uuid::Uuid;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Allocated<JOB: Sync, TASK: Sync> {
+	pub task: TASK,
+	pub job: JOB,
+	pub idx: u32,
+}
+
 #[cfg_attr(test, mockall::automock)]
 pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 	fn get_job(
@@ -64,7 +71,7 @@ pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 		&self,
 		job_id: &Uuid,
 		task_id: &Uuid,
-	) -> impl Future<Output = Result<Option<(TASK, u32)>, std::io::Error>> + Send;
+	) -> impl Future<Output = Result<Option<Allocated<JOB, TASK>>, std::io::Error>> + Send;
 
 	fn allocate_task(
 		&self,
@@ -95,7 +102,7 @@ pub(crate) mod local {
 
 	use uuid::Uuid;
 
-	use super::JobDb;
+	use super::{Allocated, JobDb};
 
 	struct Entry<TASK, STATUS> {
 		task: TASK,
@@ -178,7 +185,7 @@ pub(crate) mod local {
 			&self,
 			job_id: &Uuid,
 			task_id: &Uuid,
-		) -> Result<Option<(TASK, u32)>, Error> {
+		) -> Result<Option<Allocated<JOB, TASK>>, Error> {
 			let guard = self.lock();
 			let job = match guard.get(job_id) {
 				None => {
@@ -191,7 +198,11 @@ pub(crate) mod local {
 				.iter()
 				.enumerate()
 				.find(|(_, entry)| entry.run_id.as_ref() == Some(task_id))
-				.map(|(i, entry)| (entry.task.clone(), i as u32));
+				.map(|(i, entry)| Allocated {
+					task: entry.task.clone(),
+					job: job.0.clone(),
+					idx: i as u32,
+				});
 			Ok(task)
 		}
 
@@ -538,7 +549,7 @@ pub(crate) mod local {
 			let (job_id, task_id) = manager.allocate_task().await.unwrap().unwrap();
 			let task = manager.get_allocated_task(&job_id, &task_id).await.unwrap();
 			assert!(task.is_some());
-			assert_eq!(task.unwrap().0, task_src);
+			assert_eq!(task.unwrap().task, task_src);
 		}
 
 		#[tokio::test]
@@ -552,12 +563,12 @@ pub(crate) mod local {
 				.await
 				.unwrap();
 			let (job_id, task_id) = manager.allocate_task().await.unwrap().unwrap();
-			let (_task, idx) = manager
+			let allocated = manager
 				.get_allocated_task(&job_id, &task_id)
 				.await
 				.unwrap()
 				.unwrap();
-			assert_eq!(idx, task_idx);
+			assert_eq!(allocated.idx, task_idx);
 		}
 
 		#[tokio::test]

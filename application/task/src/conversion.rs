@@ -1,4 +1,4 @@
-use api::models::{AnalysisTask, TaskRequestRecipe};
+use api::models::{AnalysisTask, CodecParams, TaskRequestRecipe, TranscodeTask};
 
 use super::*;
 
@@ -9,10 +9,7 @@ impl TryFrom<&api::models::Recipe> for Recipe {
 		let transcode = value.transcode.as_ref().map(|e| &e.options);
 		match (&value.analysis, transcode, &value.merge) {
 			(Some(s), None, None) => Ok(Recipe::Analysis(s.duration)),
-			(None, Some(opt), None) => Ok(Recipe::Transcode(Options {
-				codec: opt.codec.clone().unwrap_or_default(),
-				params: opt.params.clone().unwrap_or_default(),
-			})),
+			(None, Some(opt), None) => Ok(Recipe::Transcode(opt.clone().unwrap_or_default())),
 			(None, None, Some(_)) => Ok(Recipe::Merge(vec![])),
 			(_, _, _) => Err(()),
 		}
@@ -45,54 +42,54 @@ impl TryFrom<api::models::Task> for Instance {
 	type Error = ();
 
 	fn try_from(value: api::models::Task) -> Result<Self, Self::Error> {
-		let job_id = value
-			.job_id
-			.as_deref()
-			.map(Uuid::parse_str)
-			.transpose()
-			.unwrap_or_default()
-			.ok_or(())?;
-		let task_id = value
-			.task_id
-			.as_deref()
-			.map(Uuid::parse_str)
-			.transpose()
-			.unwrap_or_default()
-			.ok_or(())?;
-		let from_recipe = value.recipe.ok_or(())?;
-		let inputs: Result<Vec<Input>, ()> = value
-			.input
-			.ok_or(())?
-			.into_iter()
-			.map(Input::try_from)
-			.collect();
+		let job_id = Uuid::parse_str(&value.job_id).or(Err(()))?;
+		let task_id = Uuid::parse_str(&value.task_id).or(Err(()))?;
+		let inputs: Result<Vec<Input>, ()> = value.input.into_iter().map(Input::try_from).collect();
 		let inputs = inputs?;
-		let recipe = Recipe::try_from(from_recipe.as_ref())?;
+		let recipe = Recipe::try_from(value.recipe.as_ref())?;
+		let job_options = value.job_options.as_ref().clone().into();
 		Ok(Instance {
 			job_id,
 			task_id,
 			inputs,
 			recipe,
+			job_options,
 		})
 	}
 }
 
-impl From<Options> for api::models::TranscodeTask {
-	fn from(value: Options) -> Self {
-		Self {
-			options: Box::new(api::models::CodecParams {
-				codec: Some(value.codec),
-				params: Some(value.params),
-			}),
+impl From<api::models::JobOptions> for JobOptions {
+	fn from(value: api::models::JobOptions) -> Self {
+		JobOptions {
+			video: value.video.as_ref().clone().into(),
+			audio: value.audio.map(|v| v.as_ref().clone().into()),
 		}
 	}
 }
 
-impl From<api::models::TranscodeTask> for Options {
-	fn from(value: api::models::TranscodeTask) -> Self {
-		Options {
-			codec: value.options.codec.unwrap_or_else(|| "copy".to_string()),
-			params: value.options.params.unwrap_or_default(),
+impl From<JobOptions> for api::models::JobOptions {
+	fn from(value: JobOptions) -> Self {
+		Self {
+			video: Box::new(value.video.into()),
+			audio: value.audio.map(|v| Box::new(v.clone().into())),
+		}
+	}
+}
+
+impl From<CodecParams> for Options {
+	fn from(value: CodecParams) -> Self {
+		Self {
+			codec: value.codec,
+			params: value.params.unwrap_or_default(),
+		}
+	}
+}
+
+impl From<Options> for CodecParams {
+	fn from(value: Options) -> Self {
+		Self {
+			codec: value.codec,
+			params: value.params.into(),
 		}
 	}
 }
@@ -107,7 +104,7 @@ impl From<Recipe> for api::models::Recipe {
 			},
 			Recipe::Transcode(opt) => api::models::Recipe {
 				analysis: None,
-				transcode: Some(Box::new(opt.into())),
+				transcode: Some(Box::new(TranscodeTask { options: Some(opt) })),
 				merge: None,
 			},
 			Recipe::Merge(_) => api::models::Recipe {
@@ -121,21 +118,21 @@ impl From<Recipe> for api::models::Recipe {
 
 impl From<Instance> for api::models::Task {
 	fn from(value: Instance) -> api::models::Task {
-		let job_id = Some(value.job_id.to_string());
-		let task_id = Some(value.task_id.to_string());
-		let input = Some(
-			value
-				.inputs
-				.into_iter()
-				.map(api::models::TaskInputInner::from)
-				.collect(),
-		);
-		let recipe = Some(Box::new(value.recipe.into()));
+		let job_id = value.job_id.to_string();
+		let task_id = value.task_id.to_string();
+		let input = value
+			.inputs
+			.into_iter()
+			.map(api::models::TaskInputInner::from)
+			.collect();
+		let recipe = Box::new(value.recipe.into());
+		let job_options = Box::new(value.job_options.into());
 		api::models::Task {
 			job_id,
 			task_id,
 			input,
 			recipe,
+			job_options,
 		}
 	}
 }
@@ -165,9 +162,9 @@ impl From<Status> for api::models::TaskStatus {
 impl TryFrom<api::models::TaskRequest> for TaskSource {
 	type Error = ();
 	fn try_from(value: api::models::TaskRequest) -> Result<Self, Self::Error> {
-		let recipe: Recipe = match value.recipe.as_ref() {
+		let recipe: Recipe = match *value.recipe {
 			TaskRequestRecipe::TranscodeTask(task) => {
-				Recipe::Transcode(Options::from(Box::as_ref(task).clone()))
+				Recipe::Transcode(task.options.unwrap_or_default())
 			}
 			TaskRequestRecipe::MergeTask(task) => Recipe::Merge(
 				task.iter()

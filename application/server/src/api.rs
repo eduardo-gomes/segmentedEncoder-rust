@@ -12,7 +12,7 @@ use axum::{Json, Router};
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
-use task::{Input, JobSource, Options, Recipe, TaskSource};
+use task::{Input, JobOptions, JobSource, Options, Recipe, TaskSource};
 
 use crate::storage::{MemStorage, Storage};
 
@@ -156,9 +156,12 @@ async fn job_post<S: AppState>(
 		.manager()
 		.create_job(JobSource {
 			input_id,
-			video_options: Options {
-				codec: video_codec.to_string(),
-				params: video_param,
+			options: JobOptions {
+				video: Options {
+					codec: Some(video_codec.to_string()),
+					params: video_param,
+				},
+				audio: None,
 			},
 		})
 		.await
@@ -408,7 +411,14 @@ mod test {
 			.add_header(AUTHORIZATION, token)
 			.add_header(
 				HeaderName::from_static("video_codec"),
-				HeaderValue::from_str(&options.codec).unwrap(),
+				HeaderValue::from_str(
+					options
+						.codec
+						.as_ref()
+						.map(String::as_str)
+						.unwrap_or("libx264"),
+				)
+				.unwrap(),
 			)
 			.bytes(body);
 		let params = options
@@ -427,7 +437,7 @@ mod test {
 	async fn job_post_creates_job_on_task_manager() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec![],
 		};
 		let job_id: Uuid =
@@ -444,7 +454,7 @@ mod test {
 	async fn job_post_creates_job_with_same_codec() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec![],
 		};
 		let job_id: Uuid = make_post_job_request(
@@ -463,15 +473,15 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.video_options;
-		assert_eq!(job.codec, job_options.codec)
+			.options;
+		assert_eq!(job.video.codec, job_options.codec)
 	}
 
 	#[tokio::test]
 	async fn job_post_creates_job_with_same_first_params() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec!["opt".to_string()],
 		};
 		let job_id: Uuid = make_post_job_request(
@@ -490,15 +500,15 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.video_options;
-		assert_eq!(job.params[0], job_options.params[0])
+			.options;
+		assert_eq!(job.video.params[0], job_options.params[0])
 	}
 
 	#[tokio::test]
 	async fn job_post_creates_job_with_multiple_params() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec!["opt1", "opt2", "opt3", "opt4"]
 				.into_iter()
 				.map(String::from)
@@ -520,15 +530,15 @@ mod test {
 			.await
 			.unwrap()
 			.unwrap()
-			.video_options;
-		assert_eq!(job.params, job_options.params)
+			.options;
+		assert_eq!(job.video.params, job_options.params)
 	}
 
 	#[tokio::test]
 	async fn job_post_body_will_be_saved_on_storage() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec![],
 		};
 		let job_id: Uuid = make_post_job_request(
@@ -560,7 +570,7 @@ mod test {
 	async fn job_post_will_schedule_a_task() {
 		let (server, state, token) = test_server_state_auth().await;
 		let job_options = task::Options {
-			codec: "libx264".to_string(),
+			codec: Some("libx264".to_string()),
 			params: vec![],
 		};
 		let job_id: Uuid = make_post_job_request(

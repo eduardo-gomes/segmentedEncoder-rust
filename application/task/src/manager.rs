@@ -132,8 +132,9 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 				Some(task) => Ok(Some(Instance {
 					job_id,
 					task_id,
-					inputs: task.0.inputs,
-					recipe: task.0.recipe,
+					inputs: task.task.inputs,
+					recipe: task.task.recipe,
+					job_options: task.job.options,
 				})),
 			},
 			None => Ok(None),
@@ -159,11 +160,12 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 			.get_allocated_task(job_id, task_id)
 			.await
 			.map(|opt| {
-				opt.map(|(task, _)| Instance {
+				opt.map(|allocated| Instance {
 					job_id: *job_id,
 					task_id: *task_id,
-					inputs: task.inputs,
-					recipe: task.recipe,
+					inputs: allocated.task.inputs,
+					recipe: allocated.task.recipe,
+					job_options: allocated.job.options,
 				})
 			})
 	}
@@ -179,7 +181,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 				.db
 				.get_allocated_task(job_id, task_id)
 				.await?
-				.map(|(_, idx)| idx)
+				.map(|allocated| allocated.idx)
 			{
 				Some(idx) => self.db.fulfill(job_id, idx).await.map(|_| Some(())),
 				None => Ok(None),
@@ -199,7 +201,7 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 			.db
 			.get_allocated_task(job_id, task_id)
 			.await?
-			.map(|(_, idx)| idx)
+			.map(|a| a.idx)
 			.unwrap_or(u32::MAX /*NOT FOUND*/);
 		self.db
 			.set_task_status(
@@ -229,7 +231,10 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 		let task = self.db.get_allocated_task(&job_id, &task_id).await?;
 		Ok(match task {
 			None => None,
-			Some((_, task_idx)) => self.get_task_input(&job_id, task_idx, input_idx).await?,
+			Some(allocated) => {
+				self.get_task_input(&job_id, allocated.idx, input_idx)
+					.await?
+			}
 		})
 	}
 
@@ -246,20 +251,31 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 mod test {
 	use uuid::Uuid;
 
-	use crate::manager::db::{JobDb, MockJobDb};
+	use crate::manager::db::{Allocated, JobDb, MockJobDb};
 	use crate::manager::{JobManager, Manager};
 	use crate::Recipe::{Analysis, Merge};
-	use crate::{Input, Instance, JobSource, Options, TaskSource};
+	use crate::{Input, Instance, JobOptions, JobSource, Options, TaskSource};
+
+	fn default_job_options() -> JobOptions {
+		JobOptions {
+			video: Options {
+				codec: Some("libx264".to_string()),
+				params: vec![],
+			},
+			audio: None,
+		}
+	}
+
+	fn create_job_source(input_id: Uuid) -> JobSource {
+		JobSource {
+			input_id,
+			options: default_job_options(),
+		}
+	}
 
 	#[tokio::test]
 	async fn create_job_uses_db_and_returns_uuid() {
-		let source = JobSource {
-			input_id: Uuid::from_u64_pair(1, 1),
-			video_options: Options {
-				codec: "libx264".to_string(),
-				params: vec![],
-			},
-		};
+		let source = create_job_source(Uuid::from_u64_pair(1, 1));
 		let mut mock = MockJobDb::new();
 		const TARGET_ID: Uuid = Uuid::from_u64_pair(123, 123);
 		mock.expect_create_job()
@@ -308,11 +324,13 @@ mod test {
 			inputs: vec![INPUT],
 			recipe: Analysis(None),
 		};
+		let job = create_job_source(Uuid::nil());
 		let target_instance = Instance {
 			job_id: JOB_ID,
 			task_id: TASK_ID,
 			inputs: task.inputs.clone(),
 			recipe: task.recipe.clone(),
+			job_options: job.options.clone(),
 		};
 		let mut mock = MockJobDb::new();
 
@@ -322,15 +340,16 @@ mod test {
 		mock.expect_get_allocated_task()
 			.withf(|a, b| *a == JOB_ID && *b == TASK_ID)
 			.times(1)
-			.returning(|_job_id, _task_id| {
+			.returning(move |_job_id, _task_id| {
 				Box::pin(async {
-					Ok(Some((
-						TaskSource {
+					Ok(Some(Allocated {
+						task: TaskSource {
 							inputs: vec![INPUT],
 							recipe: Analysis(None),
 						},
-						0,
-					)))
+						idx: 0,
+						job: create_job_source(Uuid::nil()),
+					}))
 				})
 			});
 		let manager = JobManager { db: mock };
@@ -429,13 +448,7 @@ mod test {
 
 		let db = super::db::local::LocalJobDb::default();
 		let job_id = db
-			.create_job(JobSource {
-				input_id: Uuid::from_u64_pair(1, 1),
-				video_options: Options {
-					codec: "libx264".to_string(),
-					params: vec![],
-				},
-			})
+			.create_job(create_job_source(Uuid::from_u64_pair(1, 1)))
 			.await
 			.unwrap();
 		db.append_task(&job_id, task, &[]).await.unwrap();
@@ -455,10 +468,7 @@ mod test {
 		let job_id = db
 			.create_job(JobSource {
 				input_id: Uuid::from_u64_pair(1, 1),
-				video_options: Options {
-					codec: "libx264".to_string(),
-					params: vec![],
-				},
+				options: default_job_options(),
 			})
 			.await
 			.unwrap();
@@ -490,10 +500,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -507,10 +514,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -551,10 +555,7 @@ mod test {
 			let job_id = db
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -569,10 +570,7 @@ mod test {
 			let job_id = db
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -598,10 +596,7 @@ mod test {
 			let job_id = db
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -635,8 +630,9 @@ mod test {
 	mod task_input {
 		use uuid::Uuid;
 
+		use crate::manager::test::default_job_options;
 		use crate::manager::{LocalJobManager, Manager};
-		use crate::{Input, JobSource, Options, Recipe, TaskSource};
+		use crate::{Input, JobSource, Recipe, TaskSource};
 
 		#[tokio::test]
 		async fn with_invalid_job_none() {
@@ -654,10 +650,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -673,10 +666,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -701,10 +691,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: job_input,
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -728,10 +715,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Default::default(),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
@@ -750,10 +734,7 @@ mod test {
 			let job_id = manager
 				.create_job(JobSource {
 					input_id: Uuid::from_u64_pair(1, 2),
-					video_options: Options {
-						codec: "".to_string(),
-						params: vec![],
-					},
+					options: default_job_options(),
 				})
 				.await
 				.unwrap();
