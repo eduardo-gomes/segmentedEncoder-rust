@@ -151,15 +151,17 @@ pub(super) async fn task_post<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
 	Path(job_id): Path<Uuid>,
-	_request: Json<api::models::TaskRequest>,
+	Json(request): Json<api::models::TaskRequest>,
 ) -> Result<StatusCode, StatusCode> {
-	let job = state
-		.manager()
-		.get_job(&job_id)
-		.await
-		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
-	job.ok_or(StatusCode::NOT_FOUND)
-		.and(Ok(StatusCode::CREATED))
+	let task: TaskSource = request
+		.try_into()
+		.or(Err(StatusCode::UNPROCESSABLE_ENTITY))?;
+	let result = state.manager().add_task_to_job(&job_id, task).await;
+	let _idx = result.map_err(|e| match e.kind() {
+		ErrorKind::NotFound => StatusCode::NOT_FOUND,
+		_ => StatusCode::INTERNAL_SERVER_ERROR,
+	})?;
+	Ok(StatusCode::CREATED)
 }
 
 #[cfg(test)]
@@ -1032,5 +1034,39 @@ mod test_task_post {
 			.await
 			.status_code();
 		assert_eq!(res, StatusCode::CREATED)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_send_parsed_task_source_to_manager() {
+		static NUM: u32 = 1;
+		let job_id = Uuid::from_u64_pair(123, 456);
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+		};
+		let parsed: TaskSource = task.clone().try_into().unwrap();
+		let mut mock_manager = MockThisManager::new();
+		mock_manager
+			.expect_add_task_to_job()
+			.with(
+				mockall::predicate::eq(job_id),
+				mockall::predicate::eq(parsed),
+			)
+			.times(1)
+			.returning(|_job, _task| Box::pin(async { Ok(NUM) }));
+		let app = GenericApp {
+			credential: "".to_string(),
+			_auth_handler: LocalAuthenticator::default(),
+			_manager: mock_manager,
+			_storage: MemStorage::default(),
+		};
+		let (server, _, auth) = test_server_state_auth_generic(Arc::new(app)).await;
+		let res = server
+			.post(&format!("/job/{}/task", job_id))
+			.add_header(AUTHORIZATION, auth)
+			.json(&task)
+			.await
+			.status_code();
+		assert!(res.is_success())
 	}
 }
