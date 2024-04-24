@@ -3,7 +3,7 @@ use std::process::Command;
 use uuid::Uuid;
 
 use api::apis::configuration::Configuration;
-use task::{Input, Instance, Options, Recipe, Status, TaskSource};
+use task::{Input, Instance, Recipe, Status, TaskSource};
 
 #[allow(async_fn_in_trait)]
 pub trait TaskRunner {
@@ -17,20 +17,14 @@ pub trait TaskRunner {
 
 	async fn add_task_to_job(&self, job: Uuid, task: TaskSource) -> Result<(), ()>;
 
-	async fn run_analysis(&self, task: Instance, option: Option<f64>) -> Result<(), ()> {
+	async fn run_analysis(&self, task: Instance, _option: Option<f64>) -> Result<(), ()> {
 		let source = TaskSource {
 			inputs: vec![Input::source()],
-			recipe: Recipe::Transcode(Options {
-				codec: "libx264".to_string(),
-				params: ["-preset", "ultrafast", "-crf", "30"]
-					.into_iter()
-					.map(String::from)
-					.collect(),
-			}),
+			recipe: Recipe::Transcode(Default::default()),
 		};
 		self.add_task_to_job(task.job_id, source).await
 	}
-	async fn run_transcode(&self, task: Instance, recipe: Options) -> Result<(), ()> {
+	async fn run_transcode(&self, task: Instance, _extra_options: Vec<String>) -> Result<(), ()> {
 		let inputs = task
 			.inputs
 			.into_iter()
@@ -54,10 +48,14 @@ pub trait TaskRunner {
 				args
 			})
 			.collect::<Vec<_>>();
-		let codec = ["-c:v", recipe.codec.as_str()]
-			.into_iter()
-			.map(String::from);
-		let params = recipe.params.into_iter();
+		let codec = [
+			"-c:v".to_string(),
+			task.job_options
+				.video
+				.codec
+				.expect("Should have a video codec"),
+		];
+		let params = task.job_options.video.params.into_iter();
 		let output = [
 			"-f".to_string(),
 			"matroska".to_string(),
@@ -88,7 +86,7 @@ pub trait TaskRunner {
 	async fn run(&self, task: Instance) {
 		let _ = match task.recipe.clone() {
 			Recipe::Analysis(analysis) => self.run_analysis(task, analysis).await,
-			Recipe::Transcode(transcode) => self.run_transcode(task, transcode).await,
+			Recipe::Transcode(extra_options) => self.run_transcode(task, extra_options).await,
 			Recipe::Merge(_) => unimplemented!("Merge task is not implemented"),
 		};
 	}
@@ -130,7 +128,9 @@ impl TaskRunner for Configuration {
 		let parsed = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
 			recipe: Box::new(api::models::TaskRequestRecipe::TranscodeTask(Box::new(
-				recipe.into(),
+				api::models::TranscodeTask {
+					options: recipe.into(),
+				},
 			))),
 		};
 		api::apis::worker_api::job_job_id_task_post(self, &job.to_string(), Some(parsed))
