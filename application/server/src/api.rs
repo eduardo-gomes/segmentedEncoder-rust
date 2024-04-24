@@ -149,7 +149,11 @@ async fn job_post<S: AppState>(
 		.map(HeaderValue::to_str)
 		.map(|v| v.map(String::from))
 		.collect::<Result<Vec<_>, _>>()
-		.or(Err(StatusCode::BAD_REQUEST))?;
+		.or(Err(StatusCode::BAD_REQUEST))? //TODO: how to pass ','?
+		.join(",")
+		.split(',')
+		.map(String::from)
+		.collect();
 	let input_id = state
 		.storage()
 		.body_to_new_file(body)
