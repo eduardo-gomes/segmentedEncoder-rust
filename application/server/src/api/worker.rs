@@ -147,8 +147,11 @@ pub(super) async fn task_status_post<S: AppState>(
 	}
 }
 
-pub(super) async fn task_post(_auth: AuthToken) -> StatusCode {
-	StatusCode::NOT_IMPLEMENTED
+pub(super) async fn task_post(
+	_auth: AuthToken,
+	_request: Json<api::models::TaskRequest>,
+) -> StatusCode {
+	StatusCode::NOT_FOUND
 }
 
 #[cfg(test)]
@@ -809,6 +812,8 @@ mod ranged {
 
 #[cfg(test)]
 mod test_task_post {
+	use std::sync::Arc;
+
 	use axum::http::header::AUTHORIZATION;
 	use axum::http::StatusCode;
 	use uuid::Uuid;
@@ -817,7 +822,7 @@ mod test_task_post {
 	use task::manager::Manager;
 	use task::{Input, JobSource, Options, TaskSource};
 
-	use crate::api::test::{test_server, test_server_auth};
+	use crate::api::test::{test_server, test_server_auth, test_server_state_auth_generic};
 	use crate::api::worker::test_util::{GenericApp, MockThisManager};
 	use crate::api::worker::WorkerApi;
 	use crate::api::AppState;
@@ -945,5 +950,34 @@ mod test_task_post {
 			.await
 			.status_code();
 		assert_ne!(res, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_bad_body_is_client_error_other_than_not_found() {
+		let (server, auth) = test_server_auth().await;
+		let res = server
+			.post(&format!("/job/{}/task", Uuid::nil()))
+			.add_header(AUTHORIZATION, auth)
+			.json("BAD BODY")
+			.await
+			.status_code();
+		assert!(res.is_client_error());
+		assert_ne!(res, StatusCode::NOT_FOUND)
+	}
+
+	#[tokio::test]
+	async fn endpoint_with_good_body_invalid_job_error() {
+		let (server, auth) = test_server_auth().await;
+		let task = api::models::TaskRequest {
+			inputs: vec![Input::source().into()],
+			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+		};
+		let res = server
+			.post(&format!("/job/{}/task", Uuid::nil()))
+			.add_header(AUTHORIZATION, auth)
+			.json(&task)
+			.await
+			.status_code();
+		assert_eq!(res, StatusCode::NOT_FOUND)
 	}
 }
