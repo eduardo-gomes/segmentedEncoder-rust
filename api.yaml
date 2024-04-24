@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SegmentedEncoder rest api
-  version: 0.0.2
+  version: 0.0.3
 servers:
   - description: Local
     url: http://localhost:8888/api
@@ -82,9 +82,13 @@ components:
           format: double
     merge_task:
       description: How to merge the inputs
-      type: array
-      items:
-        type: integer
+      type: object
+      required: [ concatenate ]
+      properties:
+        concatenate:
+          type: array
+          items:
+            type: integer
     recipe:
       type: object
       properties:
