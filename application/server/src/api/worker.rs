@@ -280,6 +280,17 @@ mod test_util {
 			options: create_job_options(),
 		}
 	}
+
+	pub struct MergeRecipe(pub Vec<i32>);
+
+	impl From<MergeRecipe> for api::models::TaskRequestRecipe {
+		fn from(value: MergeRecipe) -> Self {
+			let concatenate = value.0;
+			api::models::TaskRequestRecipe::MergeTask(Box::new(api::models::MergeTask {
+				concatenate,
+			}))
+		}
+	}
 }
 
 #[cfg(test)]
@@ -847,7 +858,9 @@ mod test_task_post {
 	use crate::api::test::{
 		test_server, test_server_auth, test_server_state_auth, test_server_state_auth_generic,
 	};
-	use crate::api::worker::test_util::{create_job_options, GenericApp, MockThisManager};
+	use crate::api::worker::test_util::{
+		create_job_options, GenericApp, MergeRecipe, MockThisManager,
+	};
 	use crate::api::worker::WorkerApi;
 	use crate::api::AppState;
 	use crate::storage::MemStorage;
@@ -858,7 +871,7 @@ mod test_task_post {
 		let app = AppStateLocal::default();
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let err = app.append_task_to_job(Uuid::nil(), task).await;
 		assert_eq!(err.unwrap_err(), StatusCode::NOT_FOUND);
@@ -877,7 +890,7 @@ mod test_task_post {
 			.unwrap();
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let res = app.append_task_to_job(job, task).await;
 		assert!(res.is_ok());
@@ -896,7 +909,7 @@ mod test_task_post {
 			.unwrap();
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let id_1 = app.append_task_to_job(job, task.clone()).await.unwrap();
 		let id_2 = app.append_task_to_job(job, task).await.unwrap();
@@ -919,7 +932,7 @@ mod test_task_post {
 		};
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let id = app.append_task_to_job(Uuid::nil(), task).await.unwrap();
 		assert_eq!(id, NUM);
@@ -930,7 +943,7 @@ mod test_task_post {
 		static NUM: u32 = 12345;
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let parsed: TaskSource = task.clone().try_into().unwrap();
 		let mut mock_manager = MockThisManager::new();
@@ -988,7 +1001,7 @@ mod test_task_post {
 		let (server, auth) = test_server_auth().await;
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+			recipe: Box::new(MergeRecipe(vec![0, 1, 2]).into()),
 		};
 		let res = server
 			.post(&format!("/job/{}/task", Uuid::nil()))
@@ -1004,7 +1017,7 @@ mod test_task_post {
 		let (server, auth) = test_server_auth().await;
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+			recipe: Box::new(MergeRecipe(vec![0, 1, 2]).into()),
 		};
 		let res = server
 			.post("/job/BAD_ID/task")
@@ -1020,7 +1033,7 @@ mod test_task_post {
 		let (server, app, auth) = test_server_state_auth().await;
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: Box::new(api::models::TaskRequestRecipe::MergeTask(vec![0, 1, 2])),
+			recipe: Box::new(MergeRecipe(vec![0, 1, 2]).into()),
 		};
 		let job_id = app
 			.manager()
@@ -1045,9 +1058,9 @@ mod test_task_post {
 		let job_id = Uuid::from_u64_pair(123, 456);
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
-		let parsed: TaskSource = task.clone().try_into().unwrap();
+		let parsed: TaskSource = dbg!(task.clone().try_into().unwrap());
 		let mut mock_manager = MockThisManager::new();
 		mock_manager
 			.expect_add_task_to_job()
@@ -1079,7 +1092,7 @@ mod test_task_post {
 		let job_id = Uuid::from_u64_pair(123, 456);
 		let task = api::models::TaskRequest {
 			inputs: vec![Input::source().into()],
-			recipe: api::models::TaskRequestRecipe::MergeTask(vec![0]).into(),
+			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
 		let parsed: TaskSource = task.clone().try_into().unwrap();
 		let mut mock_manager = MockThisManager::new();

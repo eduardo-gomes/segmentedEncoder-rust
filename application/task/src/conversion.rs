@@ -107,10 +107,18 @@ impl From<Recipe> for api::models::Recipe {
 				transcode: Some(Box::new(TranscodeTask { options: Some(opt) })),
 				merge: None,
 			},
-			Recipe::Merge(_) => api::models::Recipe {
+			Recipe::Merge(val) => api::models::Recipe {
 				analysis: None,
 				transcode: None,
-				merge: Some(Default::default()),
+				merge: Some(
+					api::models::MergeTask {
+						concatenate: val
+							.into_iter()
+							.map(|v| TryInto::<i32>::try_into(v).unwrap_or(i32::MAX))
+							.collect(),
+					}
+					.into(),
+				),
 			},
 		}
 	}
@@ -167,7 +175,8 @@ impl TryFrom<api::models::TaskRequest> for TaskSource {
 				Recipe::Transcode(task.options.unwrap_or_default())
 			}
 			TaskRequestRecipe::MergeTask(task) => Recipe::Merge(
-				task.iter()
+				task.concatenate
+					.iter()
 					.map(|v| (*v).try_into().unwrap_or(u32::MAX))
 					.collect(),
 			),
