@@ -4,6 +4,8 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum_extra::headers::Range;
+use axum_extra::TypedHeader;
 use uuid::Uuid;
 
 use task::manager::Manager;
@@ -40,6 +42,27 @@ trait ClientApi: AppState {
 }
 
 impl<T: AppState> ClientApi for T {}
+
+pub(super) async fn job_output_get<S: AppState>(
+	State(state): State<Arc<S>>,
+	range: Option<TypedHeader<Range>>,
+	Path(job_id): Path<Uuid>,
+) -> Result<Response, Response> {
+	let read = state
+		.get_job_output(job_id)
+		.await
+		.map_err(|e| e.into_response())?;
+	use crate::storage::Storage;
+	let read = state
+		.storage()
+		.read_file(read)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?;
+	let ranged = crate::api::utils::ranged::from_reader(read, range.map(|TypedHeader(r)| r))
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?;
+	Ok(ranged.into_response())
+}
 
 pub(crate) async fn task_output_get<S: AppState>(
 	State(state): State<Arc<S>>,

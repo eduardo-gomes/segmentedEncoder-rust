@@ -108,6 +108,7 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 			post(worker::task_status_post),
 		)
 		.route("/job/:job_id/task", post(worker::task_post))
+		.route("/job/:job_id/output", get(client::job_output_get))
 		.route("/allocate_task", get(worker::allocate_task))
 		.with_state(state)
 }
