@@ -16,6 +16,7 @@ use task::{Input, JobOptions, JobSource, Options, Recipe, TaskSource};
 
 use crate::storage::{MemStorage, Storage};
 
+mod client;
 mod worker;
 
 pub trait AppState: Sync + Send {

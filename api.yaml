@@ -263,8 +263,8 @@ paths:
       parameters:
         - $ref: "#/components/parameters/job_id"
       responses:
-        308:
-          description: Redirect to the task output that is the output of the job
+        200:
+          description: The job output
         503:
           description: The job is not finished yet
   /job/{job_id}:

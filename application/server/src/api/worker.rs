@@ -165,7 +165,7 @@ pub(super) async fn task_post<S: AppState>(
 }
 
 #[cfg(test)]
-mod test_util {
+pub(crate) mod test_util {
 	use std::future::Future;
 	use std::io::Error;
 	use std::sync::Arc;
