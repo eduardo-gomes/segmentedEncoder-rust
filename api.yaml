@@ -264,7 +264,7 @@ paths:
       responses:
         308:
           description: Redirect to the task output that is the output of the job
-        404:
+        503:
           description: The job is not finished yet
   /job/{job_id}:
     delete:
