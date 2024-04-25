@@ -68,6 +68,7 @@ components:
           $ref: "#/components/schemas/recipe"
     transcode_task:
       type: object
+      required: [ options ]
       properties:
         options:
           description: Additional options

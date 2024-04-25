@@ -9,7 +9,7 @@ impl TryFrom<&api::models::Recipe> for Recipe {
 		let transcode = value.transcode.as_ref().map(|e| &e.options);
 		match (&value.analysis, transcode, &value.merge) {
 			(Some(s), None, None) => Ok(Recipe::Analysis(s.duration)),
-			(None, Some(opt), None) => Ok(Recipe::Transcode(opt.clone().unwrap_or_default())),
+			(None, Some(opt), None) => Ok(Recipe::Transcode(opt.clone())),
 			(None, None, Some(_)) => Ok(Recipe::Merge(vec![])),
 			(_, _, _) => Err(()),
 		}
@@ -102,9 +102,9 @@ impl From<Recipe> for api::models::Recipe {
 				transcode: None,
 				merge: None,
 			},
-			Recipe::Transcode(opt) => api::models::Recipe {
+			Recipe::Transcode(options) => api::models::Recipe {
 				analysis: None,
-				transcode: Some(Box::new(TranscodeTask { options: Some(opt) })),
+				transcode: Some(Box::new(TranscodeTask { options })),
 				merge: None,
 			},
 			Recipe::Merge(val) => api::models::Recipe {
@@ -171,9 +171,7 @@ impl TryFrom<api::models::TaskRequest> for TaskSource {
 	type Error = ();
 	fn try_from(value: api::models::TaskRequest) -> Result<Self, Self::Error> {
 		let recipe: Recipe = match *value.recipe {
-			TaskRequestRecipe::TranscodeTask(task) => {
-				Recipe::Transcode(task.options.unwrap_or_default())
-			}
+			TaskRequestRecipe::TranscodeTask(task) => Recipe::Transcode(task.options),
 			TaskRequestRecipe::MergeTask(task) => Recipe::Merge(
 				task.concatenate
 					.iter()
