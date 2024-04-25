@@ -84,6 +84,11 @@ pub trait Manager: Sync {
 		task_id: &Uuid,
 		input_idx: u32,
 	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
+	///Get the uuid of the stored output
+	fn get_job_output(
+		&self,
+		job_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
 	///Cancel this task execution, will be available for allocation
 	fn cancel_task(
 		&self,
@@ -236,6 +241,22 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 					.await?
 			}
 		})
+	}
+
+	async fn get_job_output(&self, job_id: &Uuid) -> Result<Option<Uuid>, Error> {
+		let last: u32 = self
+			.db
+			.get_tasks(job_id)
+			.await?
+			.ok_or(Error::new(ErrorKind::NotFound, "Job not found"))?
+			.len()
+			.try_into()
+			.or(Err(Error::new(ErrorKind::Other, "index out of range")))?;
+		let last_idx = match last.checked_sub(1) {
+			Some(i) => i,
+			None => return Ok(None),
+		};
+		self.get_task_output(job_id, last_idx).await
 	}
 
 	async fn cancel_task(&self, job_id: &Uuid, task_id: &Uuid) -> Result<Option<()>, Error> {
@@ -757,6 +778,126 @@ mod test {
 				.unwrap();
 			let input_by_idx = manager.get_task_input(&job_id, task, idx).await.unwrap();
 			assert_eq!(input, input_by_idx.unwrap())
+		}
+	}
+
+	mod job_output {
+		use std::io::ErrorKind;
+
+		use crate::manager::LocalJobDb;
+		use crate::Recipe::Transcode;
+
+		use super::*;
+
+		#[tokio::test]
+		async fn get_output_invalid_job_is_not_found_err() {
+			let db = LocalJobDb::default();
+			let manager = JobManager { db };
+			let err = manager.get_job_output(&Uuid::nil()).await.unwrap_err();
+			assert_eq!(err.kind(), ErrorKind::NotFound)
+		}
+
+		#[tokio::test]
+		async fn get_output_job_not_task_returns_none() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			let res = manager.get_job_output(&job_id).await.unwrap();
+			assert!(res.is_none())
+		}
+
+		#[tokio::test]
+		async fn get_output_job_task_not_finished() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			manager
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![Input::source()],
+						recipe: Transcode(Vec::new()),
+					},
+				)
+				.await
+				.unwrap();
+			let allocated = manager
+				.allocate_task()
+				.await
+				.unwrap()
+				.expect("Should allocate");
+			let res = manager.get_job_output(&job_id).await.unwrap();
+			assert!(res.is_none())
+		}
+
+		#[tokio::test]
+		async fn get_output_job_with_last_task_finished_returns_task_uuid() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			manager
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![Input::source()],
+						recipe: Transcode(Vec::new()),
+					},
+				)
+				.await
+				.unwrap();
+			let allocated = manager
+				.allocate_task()
+				.await
+				.unwrap()
+				.expect("Should allocate");
+			let output = Uuid::from_u64_pair(156, 895554);
+			manager
+				.set_task_output(&allocated.job_id, &allocated.task_id, output)
+				.await
+				.unwrap()
+				.expect("Should set");
+			let res = manager
+				.get_job_output(&job_id)
+				.await
+				.unwrap()
+				.expect("Should get the output");
+			assert_eq!(res, output)
 		}
 	}
 }
