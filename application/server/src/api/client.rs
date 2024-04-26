@@ -1,11 +1,15 @@
 use std::io::ErrorKind;
+use std::sync::Arc;
 
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use uuid::Uuid;
 
 use task::manager::Manager;
 
-use crate::api::AppState;
+use crate::api::{AppState, AuthToken};
+use crate::storage::Storage;
 
 trait ClientApi: AppState {
 	async fn get_job_output(&self, job_id: Uuid) -> Result<Uuid, (StatusCode, &'static str)> {
@@ -36,6 +40,25 @@ trait ClientApi: AppState {
 }
 
 impl<T: AppState> ClientApi for T {}
+
+pub(crate) async fn task_output_get<S: AppState>(
+	State(state): State<Arc<S>>,
+	_auth: AuthToken,
+	Path((job_id, task_id)): Path<(Uuid, Uuid)>,
+) -> Result<Response, Response> {
+	let stored = state
+		.get_task_output(job_id, task_id)
+		.await
+		.map_err(|s| s.into_response())?;
+	let read = state.storage().read_file(stored).await.or(Err((
+		StatusCode::INTERNAL_SERVER_ERROR,
+		"Invalid file",
+	)
+		.into_response()))?;
+	crate::api::worker::ranged::from_reader(read, None)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?
+}
 
 #[cfg(test)]
 mod test {
@@ -255,5 +278,145 @@ mod test {
 			.await
 			.expect("Task has output");
 		assert_eq!(file_id, file)
+	}
+}
+
+#[cfg(test)]
+mod test_handle {
+	use axum::http::header::AUTHORIZATION;
+	use axum::http::StatusCode;
+	use uuid::Uuid;
+
+	use task::{JobOptions, JobSource, Options, Recipe, TaskSource};
+
+	use crate::api::AppState;
+	use crate::WEBM_SAMPLE;
+
+	use super::super::worker::test_util::*;
+
+	#[tokio::test]
+	async fn get_task_output_without_auth_forbidden() {
+		let server = test_server();
+		let code = server
+			.get(&format!("/job/{}/task/{}/output", Uuid::nil(), Uuid::nil()))
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn get_task_output_with_auth_bad_task_not_found() {
+		let (server, auth) = test_server_auth().await;
+		let code = server
+			.get(&format!("/job/{}/task/{}/output", Uuid::nil(), Uuid::nil()))
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::NOT_FOUND)
+	}
+
+	#[tokio::test]
+	async fn get_task_output_with_auth_invalid_task_bad_request() {
+		let (server, auth) = test_server_auth().await;
+		let code = server
+			.get("/job/BAD/task/BAD/output")
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::BAD_REQUEST)
+	}
+
+	#[tokio::test]
+	async fn get_task_output_unfinished_unavailable() {
+		let (server, app, auth) = test_server_state_auth().await;
+		use task::manager::Manager;
+		let job_id = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				options: JobOptions {
+					video: Options {
+						codec: None,
+						params: vec![],
+					},
+					audio: None,
+				},
+			})
+			.await
+			.unwrap();
+		app.manager()
+			.add_task_to_job(
+				&job_id,
+				TaskSource {
+					inputs: vec![],
+					recipe: Recipe::Transcode(Vec::new()),
+				},
+			)
+			.await
+			.unwrap();
+		let instance = app.manager().allocate_task().await.unwrap().unwrap();
+		let code = server
+			.get(&format!(
+				"/job/{}/task/{}/output",
+				instance.job_id, instance.task_id
+			))
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.status_code();
+		assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE)
+	}
+
+	#[tokio::test]
+	async fn get_task_output_returns_task_output() {
+		let (server, app, auth) = test_server_state_auth().await;
+		use task::manager::Manager;
+		let job_id = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				options: JobOptions {
+					video: Options {
+						codec: None,
+						params: vec![],
+					},
+					audio: None,
+				},
+			})
+			.await
+			.unwrap();
+		app.manager()
+			.add_task_to_job(
+				&job_id,
+				TaskSource {
+					inputs: vec![],
+					recipe: Recipe::Transcode(Vec::new()),
+				},
+			)
+			.await
+			.unwrap();
+		let instance = app.manager().allocate_task().await.unwrap().unwrap();
+		let content: Vec<u8> = WEBM_SAMPLE.iter().cloned().chain(32..98).collect();
+		let output = {
+			use crate::storage::Storage;
+			let mut file = app.storage().create_file().await.unwrap();
+			use tokio::io::AsyncWriteExt;
+			file.write_all(content.as_slice()).await.unwrap();
+			app.storage().store_file(file).await.unwrap()
+		};
+		app.manager()
+			.set_task_output(&job_id, &instance.task_id, output)
+			.await
+			.unwrap()
+			.unwrap();
+		let res = server
+			.get(&format!(
+				"/job/{}/task/{}/output",
+				instance.job_id, instance.task_id
+			))
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.into_bytes()
+			.to_vec();
+		assert_eq!(res, content)
 	}
 }

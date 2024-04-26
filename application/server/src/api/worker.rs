@@ -784,7 +784,7 @@ mod test_post_input {
 	}
 }
 
-mod ranged {
+pub(crate) mod ranged {
 	use axum::response::{IntoResponse, Response};
 	use axum_extra::headers::Range;
 	use axum_range::{KnownSize, Ranged};
