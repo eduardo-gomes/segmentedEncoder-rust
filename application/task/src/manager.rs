@@ -52,6 +52,11 @@ pub trait Manager: Sync {
 		job_id: &Uuid,
 		task_idx: u32,
 	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
+	fn get_allocated_task_output(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+	) -> impl std::future::Future<Output = Result<Option<Uuid>, Error>> + Send;
 	fn get_task_input(
 		&self,
 		job_id: &Uuid,
@@ -225,6 +230,20 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 			.get_task_status(job_id, task_idx)
 			.await?
 			.and_then(|status| status.output))
+	}
+
+	async fn get_allocated_task_output(
+		&self,
+		job_id: &Uuid,
+		task_id: &Uuid,
+	) -> Result<Option<Uuid>, Error> {
+		let idx = self
+			.db
+			.get_allocated_task(job_id, task_id)
+			.await?
+			.map(|a| a.idx)
+			.unwrap_or(u32::MAX /*NOT FOUND*/);
+		self.get_task_output(job_id, idx).await
 	}
 
 	async fn get_allocated_task_input(
@@ -641,6 +660,99 @@ mod test {
 				.unwrap();
 			let got = manager
 				.get_task_output(&job_id, idx)
+				.await
+				.unwrap()
+				.expect("Should get the output");
+			assert_eq!(got, output);
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_output_bad_job_err() {
+			let db = LocalJobDb::default();
+			let manager = JobManager { db };
+			let res = manager
+				.get_allocated_task_output(&Uuid::nil(), &Uuid::nil())
+				.await;
+			assert!(res.is_err())
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_output_bad_task_err() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: default_job_options(),
+				})
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			let res = manager
+				.get_allocated_task_output(&job_id, &Uuid::nil())
+				.await;
+			assert!(res.is_err())
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_output_before_set() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: default_job_options(),
+				})
+				.await
+				.unwrap();
+			let idx = db
+				.append_task(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Analysis(None),
+					},
+					&[],
+				)
+				.await
+				.unwrap();
+			let manager = JobManager { db };
+			let task_id = manager.allocate_task().await.unwrap().unwrap().task_id;
+			let output = manager
+				.get_allocated_task_output(&job_id, &task_id)
+				.await
+				.unwrap();
+			assert!(output.is_none())
+		}
+
+		#[tokio::test]
+		async fn get_allocated_task_output_after_set_equals() {
+			let db = LocalJobDb::default();
+			let job_id = db
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: default_job_options(),
+				})
+				.await
+				.unwrap();
+			let idx = db
+				.append_task(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Analysis(None),
+					},
+					&[],
+				)
+				.await
+				.unwrap();
+			let (job_id, task_id) = db.allocate_task().await.unwrap().unwrap();
+			let manager = JobManager { db };
+			let output = Uuid::from_u64_pair(1, 3);
+			manager
+				.set_task_output(&job_id, &task_id, output)
+				.await
+				.unwrap();
+			let got = manager
+				.get_allocated_task_output(&job_id, &task_id)
 				.await
 				.unwrap()
 				.expect("Should get the output");

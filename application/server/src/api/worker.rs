@@ -205,6 +205,8 @@ pub(crate) mod test_util {
 
 			fn get_task_output(&self, job_id: &Uuid, task_idx: u32) -> impl Future<Output=Result<Option<Uuid>, Error>> + Send;
 
+			fn get_allocated_task_output(&self, job_id: &Uuid, task_id: &Uuid) -> impl Future<Output=Result<Option<Uuid>, Error>> + Send;
+
 			fn get_allocated_task_input(&self, job_id: &Uuid, task_id: &Uuid, input_idx: u32) -> impl Future<Output = Result<Option<Uuid>, Error>> + Send;
 
 			fn get_job_output(&self, job_id: &Uuid) -> impl Future<Output=Result<Option<Uuid>, Error>> + Send;
