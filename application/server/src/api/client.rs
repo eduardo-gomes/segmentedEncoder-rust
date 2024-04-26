@@ -198,7 +198,7 @@ mod test {
 			)
 			.await
 			.unwrap();
-		let allocated = dbg!(state.manager().allocate_task().await.unwrap().unwrap());
+		let allocated = state.manager().allocate_task().await.unwrap().unwrap();
 		let (code, _) = state
 			.get_task_output(allocated.job_id, allocated.task_id)
 			.await
