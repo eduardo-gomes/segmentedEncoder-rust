@@ -1064,7 +1064,7 @@ mod test_task_post {
 			inputs: vec![Input::source().into()],
 			recipe: Box::new(MergeRecipe(vec![0]).into()),
 		};
-		let parsed: TaskSource = dbg!(task.clone().try_into().unwrap());
+		let parsed: TaskSource = task.clone().try_into().unwrap();
 		let mut mock_manager = MockThisManager::new();
 		mock_manager
 			.expect_add_task_to_job()
