@@ -7,7 +7,7 @@ use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{get, post, put};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use auth_module::AuthenticationHandler;
@@ -17,6 +17,7 @@ use task::{Input, JobOptions, JobSource, Options, Recipe, TaskSource};
 use crate::storage::{MemStorage, Storage};
 
 mod client;
+mod utils;
 mod worker;
 
 pub trait AppState: Sync + Send {

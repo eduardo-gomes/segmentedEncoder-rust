@@ -55,7 +55,7 @@ pub(crate) async fn task_output_get<S: AppState>(
 		"Invalid file",
 	)
 		.into_response()))?;
-	crate::api::worker::ranged::from_reader(read, None)
+	crate::api::utils::ranged::from_reader(read, None)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?
 }
