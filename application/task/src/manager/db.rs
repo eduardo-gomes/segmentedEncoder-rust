@@ -46,6 +46,7 @@ pub trait JobDb<JOB: Sync, TASK: Sync, STATUS: Sync>: Sync {
 		id: &Uuid,
 	) -> impl Future<Output = Result<Option<JOB>, std::io::Error>> + Send;
 	fn create_job(&self, job: JOB) -> impl Future<Output = Result<Uuid, std::io::Error>> + Send;
+	fn list_job_ids(&self) -> impl Future<Output = Result<Vec<Uuid>, std::io::Error>> + Send;
 	/// Append task to job and return the task index
 	fn append_task(
 		&self,
@@ -153,6 +154,10 @@ pub(crate) mod local {
 			let key = Uuid::new_v4();
 			self.lock().insert(key, (job, Default::default()));
 			Ok(key)
+		}
+
+		async fn list_job_ids(&self) -> Result<Vec<Uuid>, Error> {
+			Ok(self.lock().keys().cloned().collect())
 		}
 
 		async fn append_task(&self, job_id: &Uuid, task: TASK, dep: &[u32]) -> Result<u32, Error> {
@@ -665,6 +670,29 @@ pub(crate) mod local {
 				.unwrap()
 				.unwrap();
 			assert_eq!(got, status);
+		}
+
+		#[tokio::test]
+		async fn list_jobs_on_empty_returns_empty_list() {
+			let manager = LocalJobDb::<String, String, String>::default();
+			let ids = manager.list_job_ids().await.unwrap();
+			assert!(ids.is_empty())
+		}
+
+		#[tokio::test]
+		async fn list_jobs_on_non_empty_is_not_empty() {
+			let manager = LocalJobDb::<String, String, String>::default();
+			manager.create_job("JOB".to_string()).await.unwrap();
+			let ids = manager.list_job_ids().await.unwrap();
+			assert!(!ids.is_empty())
+		}
+
+		#[tokio::test]
+		async fn list_jobs_has_the_right_id() {
+			let manager = LocalJobDb::<String, String, String>::default();
+			let id = manager.create_job("JOB".to_string()).await.unwrap();
+			let ids = manager.list_job_ids().await.unwrap();
+			assert!(ids.contains(&id))
 		}
 	}
 }
