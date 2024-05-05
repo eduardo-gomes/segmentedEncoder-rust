@@ -17,6 +17,7 @@ pub trait Manager: Sync {
 		&self,
 		job_id: &Uuid,
 	) -> impl std::future::Future<Output = Result<Option<JobSource>, Error>> + Send;
+	fn get_job_list(&self) -> impl std::future::Future<Output = Result<Vec<Uuid>, Error>> + Send;
 	fn allocate_task(
 		&self,
 	) -> impl std::future::Future<Output = Result<Option<Instance>, Error>> + Send;
@@ -133,6 +134,10 @@ impl<DB: db::JobDb<JobSource, TaskSource, TaskState> + Sync> Manager for JobMana
 
 	async fn get_job(&self, job_id: &Uuid) -> Result<Option<JobSource>, Error> {
 		self.db.get_job(job_id).await
+	}
+
+	async fn get_job_list(&self) -> Result<Vec<Uuid>, Error> {
+		self.db.list_job_ids().await
 	}
 
 	async fn allocate_task(&self) -> Result<Option<Instance>, Error> {
@@ -1010,6 +1015,39 @@ mod test {
 				.unwrap()
 				.expect("Should get the output");
 			assert_eq!(res, output)
+		}
+	}
+
+	mod list_job {
+		use crate::manager::LocalJobManager;
+
+		use super::*;
+
+		#[tokio::test]
+		async fn list_jobs_empty() {
+			let manager = LocalJobManager::default();
+			let res = manager.get_job_list().await.unwrap();
+			assert!(res.is_empty())
+		}
+
+		#[tokio::test]
+		async fn list_jobs_contains_created_job_id() {
+			let manager = LocalJobManager::default();
+			let id = manager
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			let res = manager.get_job_list().await.unwrap();
+			assert!(res.contains(&id))
 		}
 	}
 }

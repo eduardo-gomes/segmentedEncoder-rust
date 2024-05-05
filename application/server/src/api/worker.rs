@@ -191,6 +191,8 @@ pub(crate) mod test_util {
 
 			fn get_job(&self, job_id: &Uuid) -> impl Future<Output=Result<Option<JobSource>, Error>> + Send;
 
+			fn get_job_list(&self) -> impl Future<Output=Result<Vec<Uuid>, Error>> + Send;
+
 			fn allocate_task(&self) -> impl Future<Output=Result<Option<Instance>, Error>> + Send;
 
 			fn add_task_to_job(&self, job_id: &Uuid, task: TaskSource) -> impl Future<Output=Result<u32, Error>> + Send;
