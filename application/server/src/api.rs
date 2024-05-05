@@ -94,7 +94,7 @@ pub fn make_router<S: AppState + 'static>(state: Arc<S>) -> Router {
 			get(|| async { concat!("\"", env!("CARGO_PKG_VERSION"), "\"") }),
 		)
 		.route("/login", get(login))
-		.route("/job", post(job_post))
+		.route("/job", get(client::get_job_list).post(job_post))
 		.route(
 			"/job/:job_id/task/:task_id/input/0",
 			get(worker::get_task_input),

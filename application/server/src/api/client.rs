@@ -4,6 +4,7 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use uuid::Uuid;
 
 use task::manager::Manager;
@@ -58,6 +59,18 @@ pub(crate) async fn task_output_get<S: AppState>(
 	crate::api::utils::ranged::from_reader(read, None)
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?
+}
+
+pub(crate) async fn get_job_list<S: AppState>(
+	State(state): State<Arc<S>>,
+	_auth: AuthToken,
+) -> Result<Json<Vec<Uuid>>, StatusCode> {
+	state
+		.manager()
+		.get_job_list()
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))
+		.map(Json)
 }
 
 #[cfg(test)]
@@ -418,5 +431,55 @@ mod test_handle {
 			.into_bytes()
 			.to_vec();
 		assert_eq!(res, content)
+	}
+
+	#[tokio::test]
+	async fn list_jobs_requires_auth() {
+		let server = test_server();
+		let res = server.get("/job").await;
+		assert_eq!(res.status_code(), StatusCode::FORBIDDEN)
+	}
+
+	#[tokio::test]
+	async fn list_jobs_success_with_auth() {
+		let (server, auth) = test_server_auth().await;
+		let res = server.get("/job").add_header(AUTHORIZATION, auth).await;
+		assert!(res.status_code().is_success())
+	}
+
+	#[tokio::test]
+	async fn list_jobs_returns_json_array() {
+		let (server, auth) = test_server_auth().await;
+		let _array = server
+			.get("/job")
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.json::<Vec<Uuid>>();
+	}
+
+	#[tokio::test]
+	async fn list_jobs_returns_json_array_with_the_created_job_id() {
+		let (server, app, auth) = test_server_state_auth().await;
+		use task::manager::Manager;
+		let id = app
+			.manager()
+			.create_job(JobSource {
+				input_id: Default::default(),
+				options: JobOptions {
+					video: Options {
+						codec: None,
+						params: vec![],
+					},
+					audio: None,
+				},
+			})
+			.await
+			.unwrap();
+		let array = server
+			.get("/job")
+			.add_header(AUTHORIZATION, auth)
+			.await
+			.json::<Vec<Uuid>>();
+		assert!(array.contains(&id))
 	}
 }
