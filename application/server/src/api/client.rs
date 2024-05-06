@@ -61,6 +61,27 @@ pub(crate) async fn task_output_get<S: AppState>(
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?
 }
 
+pub(super) async fn job_output_get<S: AppState>(
+	State(state): State<Arc<S>>,
+	_auth: AuthToken,
+	Path(job_id): Path<Uuid>,
+) -> Result<Response, Response> {
+	let read = state
+		.get_job_output(job_id)
+		.await
+		.map_err(|e| e.into_response())?;
+	use crate::storage::Storage;
+	let read = state
+		.storage()
+		.read_file(read)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?;
+	let ranged = crate::api::utils::ranged::from_reader(read, None)
+		.await
+		.or(Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()))?;
+	Ok(ranged.into_response())
+}
+
 pub(crate) async fn get_job_list<S: AppState>(
 	State(state): State<Arc<S>>,
 	_auth: AuthToken,
@@ -481,5 +502,129 @@ mod test_handle {
 			.await
 			.json::<Vec<Uuid>>();
 		assert!(array.contains(&id))
+	}
+
+	mod job_output {
+		use super::*;
+
+		#[tokio::test]
+		async fn get_without_auth_forbidden() {
+			let server = test_server();
+			let code = server
+				.get(&format!("/job/{}/output", Uuid::nil()))
+				.await
+				.status_code();
+			assert_eq!(code, StatusCode::FORBIDDEN)
+		}
+
+		#[tokio::test]
+		async fn get_with_auth_bad_job_not_found() {
+			let (server, auth) = test_server_auth().await;
+			let code = server
+				.get(&format!("/job/{}/output", Uuid::nil()))
+				.add_header(AUTHORIZATION, auth)
+				.await
+				.status_code();
+			assert_eq!(code, StatusCode::NOT_FOUND)
+		}
+
+		#[tokio::test]
+		async fn get_with_auth_invalid_job_bad_request() {
+			let (server, auth) = test_server_auth().await;
+			let code = server
+				.get("/job/BAD/output")
+				.add_header(AUTHORIZATION, auth)
+				.await
+				.status_code();
+			assert_eq!(code, StatusCode::BAD_REQUEST)
+		}
+
+		#[tokio::test]
+		async fn get_unfinished_unavailable() {
+			let (server, app, auth) = test_server_state_auth().await;
+			use task::manager::Manager;
+			let job_id = app
+				.manager()
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			app.manager()
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Recipe::Transcode(Vec::new()),
+					},
+				)
+				.await
+				.unwrap();
+			let instance = app.manager().allocate_task().await.unwrap().unwrap();
+			let code = server
+				.get(&format!("/job/{}/output", instance.job_id))
+				.add_header(AUTHORIZATION, auth)
+				.await
+				.status_code();
+			assert_eq!(code, StatusCode::SERVICE_UNAVAILABLE)
+		}
+
+		#[tokio::test]
+		async fn get_returns_task_output() {
+			let (server, app, auth) = test_server_state_auth().await;
+			use task::manager::Manager;
+			let job_id = app
+				.manager()
+				.create_job(JobSource {
+					input_id: Default::default(),
+					options: JobOptions {
+						video: Options {
+							codec: None,
+							params: vec![],
+						},
+						audio: None,
+					},
+				})
+				.await
+				.unwrap();
+			app.manager()
+				.add_task_to_job(
+					&job_id,
+					TaskSource {
+						inputs: vec![],
+						recipe: Recipe::Transcode(Vec::new()),
+					},
+				)
+				.await
+				.unwrap();
+			let instance = app.manager().allocate_task().await.unwrap().unwrap();
+			let content: Vec<u8> = WEBM_SAMPLE.iter().cloned().chain(32..98).collect();
+			let output = {
+				use crate::storage::Storage;
+				let mut file = app.storage().create_file().await.unwrap();
+				use tokio::io::AsyncWriteExt;
+				file.write_all(content.as_slice()).await.unwrap();
+				app.storage().store_file(file).await.unwrap()
+			};
+			app.manager()
+				.set_task_output(&job_id, &instance.task_id, output)
+				.await
+				.unwrap()
+				.unwrap();
+			let res = server
+				.get(&format!("/job/{}/output", instance.job_id))
+				.add_header(AUTHORIZATION, auth)
+				.await
+				.into_bytes()
+				.to_vec();
+			assert_eq!(res, content)
+		}
 	}
 }
