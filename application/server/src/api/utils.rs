@@ -62,27 +62,42 @@ pub(crate) mod ranged {
 }
 
 pub(crate) mod parse {
-	use axum::http::HeaderValue;
+	use axum::http::header::ToStrError;
+	use axum::http::{HeaderMap, HeaderValue};
 
-	pub fn split_multiple_headers_into_strings<'a, I>(iter: I) -> Result<Vec<String>, ()>
+	use task::{JobOptions, Options};
+
+	pub fn parse_job_options(headers: &HeaderMap) -> Result<JobOptions, ToStrError> {
+		let video_codec = headers
+			.get("video_codec")
+			.map(|val| val.to_str())
+			.transpose()?
+			.map(String::from);
+		let video_params = split_multiple_headers_into_strings(headers.get_all("video_param"))?;
+		Ok(JobOptions {
+			video: Options {
+				codec: video_codec,
+				params: video_params,
+			},
+			audio: None,
+		})
+	}
+
+	pub fn split_multiple_headers_into_strings<'a, I>(iter: I) -> Result<Vec<String>, ToStrError>
 	where
 		I: IntoIterator<Item = &'a HeaderValue>,
 	{
 		iter.into_iter()
-			.map(|val| {
-				val.to_str()
-					.map(|str| str.split(',').map(String::from))
-					.map_err(|_| ())
-			})
+			.map(|val| val.to_str().map(|str| str.split(',').map(String::from)))
 			.collect::<Result<Vec<_>, _>>()
 			.map(|vec| vec.into_iter().flatten().collect())
 	}
 
 	#[cfg(test)]
 	mod test {
-		use axum::http::HeaderValue;
+		use axum::http::{HeaderMap, HeaderValue};
 
-		use crate::api::utils::parse::split_multiple_headers_into_strings;
+		use crate::api::utils::parse::{parse_job_options, split_multiple_headers_into_strings};
 
 		#[test]
 		fn with_empty_iterator_return_empty_vec() {
@@ -117,6 +132,28 @@ pub(crate) mod parse {
 			let res = split_multiple_headers_into_strings([&values]).unwrap();
 			assert_eq!(res[0].as_str(), src[0]);
 			assert_eq!(res[1].as_str(), src[1]);
+		}
+
+		#[test]
+		fn parse_video_codec_job_options() {
+			let codec = "libx264";
+			let mut headers = HeaderMap::new();
+			headers.insert("video_codec", HeaderValue::from_static(codec));
+			let options = parse_job_options(&headers).unwrap();
+			assert_eq!(options.video.codec.unwrap().as_str(), codec)
+		}
+
+		#[test]
+		fn parse_video_args_job_options() {
+			let args = ["-preset", "ultrafast"];
+			let mut headers = HeaderMap::new();
+			headers.append("video_param", HeaderValue::from_static(args[0]));
+			headers.append("video_param", HeaderValue::from_static(args[1]));
+			let params = parse_job_options(&headers).unwrap().video.params;
+			assert_eq!(
+				params,
+				args.into_iter().map(String::from).collect::<Vec<_>>()
+			);
 		}
 	}
 }
