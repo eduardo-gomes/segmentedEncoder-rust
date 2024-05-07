@@ -15,7 +15,30 @@ mod ffmpeg_runner {
 	use std::future::Future;
 	use std::process::{ExitStatus, Stdio};
 
+	use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 	use tokio::process::{ChildStdout, Command};
+	use tokio::sync::mpsc::{channel, Receiver};
+
+	fn status_adapter(stream: impl AsyncRead + Unpin + Send + 'static) -> Receiver<String> {
+		let mut stream = BufReader::new(stream);
+		let (sender, receiver) = channel(32);
+		tokio::spawn(async move {
+			let mut status = String::new();
+			loop {
+				if stream.read_line(&mut status).await.is_err() {
+					break;
+				}
+				let is_complete = status.rfind("progress=").is_some();
+				if is_complete {
+					if sender.send(status).await.is_err() {
+						break;
+					}
+					status = String::new()
+				}
+			}
+		});
+		receiver
+	}
 
 	pub(crate) fn run_to_stream<I, S>(
 		args: I,
@@ -32,13 +55,28 @@ mod ffmpeg_runner {
 		ffmpeg.args(["-progress", "pipe:2", "-nostats", "-v", "quiet"]);
 		ffmpeg.args(["-f", "matroska", "-"]);
 		ffmpeg
-			.stderr(Stdio::inherit())
+			.stderr(Stdio::piped())
 			.stdout(Stdio::piped())
 			.stdin(Stdio::null());
 		println!("ffmpeg command: {:?}", ffmpeg);
 		let mut child = ffmpeg.spawn().unwrap();
 		let output = child.stdout.take().unwrap();
+		let progress = child.stderr.take().unwrap();
 		let status = async move { child.wait().await };
+		let parsed_progress = status_adapter(progress);
+		tokio::spawn(async move {
+			let mut stream = parsed_progress;
+			loop {
+				let status = match stream.recv().await {
+					None => return,
+					Some(status) => status,
+				};
+				status
+					.lines()
+					.filter(|line| line.starts_with("out_time="))
+					.for_each(|val| println!("Time: {val}"));
+			}
+		});
 		(output, status)
 	}
 }
