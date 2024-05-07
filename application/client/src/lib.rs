@@ -1,9 +1,47 @@
-use std::process::Command;
+use std::io;
+use std::io::ErrorKind;
 
+use reqwest::header::AUTHORIZATION;
+use reqwest::{Body, StatusCode};
+use tokio::process::ChildStdout;
+use tokio_util::codec::{BytesCodec, FramedRead};
 use uuid::Uuid;
 
 use api::apis::configuration::Configuration;
 use task::{Input, Instance, Recipe, Status, TaskSource};
+
+mod ffmpeg_runner {
+	use std::ffi::OsStr;
+	use std::future::Future;
+	use std::process::{ExitStatus, Stdio};
+
+	use tokio::process::{ChildStdout, Command};
+
+	pub(crate) fn run_to_stream<I, S>(
+		args: I,
+	) -> (
+		ChildStdout,
+		impl Future<Output = std::io::Result<ExitStatus>>,
+	)
+	where
+		I: IntoIterator<Item = S>,
+		S: AsRef<OsStr>,
+	{
+		let mut ffmpeg = Command::new("ffmpeg");
+		ffmpeg.args(args);
+		ffmpeg.args(["-progress", "pipe:2", "-nostats", "-v", "quiet"]);
+		ffmpeg.args(["-f", "matroska", "-"]);
+		ffmpeg
+			.stderr(Stdio::inherit())
+			.stdout(Stdio::piped())
+			.stdin(Stdio::null());
+		println!("ffmpeg command: {:?}", ffmpeg);
+		let mut child = ffmpeg.spawn().unwrap();
+		let output = child.stdout.take().unwrap();
+		let status = async move { child.wait().await };
+		(output, status)
+	}
+}
 
 #[allow(async_fn_in_trait)]
 pub trait TaskRunner {
@@ -13,6 +51,7 @@ pub trait TaskRunner {
 	fn get_output_creds(&self) -> String {
 		self.get_input_creds()
 	}
+	async fn upload_stdout(&self, stdout: ChildStdout, id: (Uuid, Uuid)) -> io::Result<StatusCode>;
 	async fn mark_task_complete(&self, job: Uuid, task: Uuid) -> Result<(), ()>;
 
 	async fn add_task_to_job(&self, job: Uuid, task: TaskSource) -> Result<(), ()>;
@@ -56,27 +95,11 @@ pub trait TaskRunner {
 				.expect("Should have a video codec"),
 		];
 		let params = task.job_options.video.params.into_iter();
-		let output = [
-			"-f".to_string(),
-			"matroska".to_string(),
-			"-method".to_string(),
-			"PUT".to_string(),
-			"-headers".to_string(),
-			format!("Authorization: {}", self.get_output_creds()),
-			self.get_output_url(task.job_id, task.task_id),
-		];
-		let mut ffmpeg = Command::new("ffmpeg");
-		ffmpeg
-			.args(inputs.into_iter())
-			.args(codec)
-			.args(params)
-			.args(output.into_iter());
-		println!("Command: {:?}", ffmpeg);
-		let status = ffmpeg
-			.status()
-			.expect("Failed to run ffmpeg")
-			.code()
-			.unwrap();
+		let args = inputs.into_iter().chain(codec).chain(params);
+		let (pipe, out) = ffmpeg_runner::run_to_stream(args);
+		let upload_res = self.upload_stdout(pipe, (task.job_id, task.task_id)).await;
+		let status = out.await.expect("Failed to run ffmpeg").code().unwrap();
+		upload_res.unwrap();
 		println!("ffmpeg returned: {status}");
 		let res = self.mark_task_complete(task.job_id, task.task_id).await;
 		println!("Mark task complete: {:?}", res);
@@ -106,6 +129,19 @@ impl TaskRunner for Configuration {
 			.as_ref()
 			.map(|k| k.key.to_string())
 			.unwrap_or_default()
+	}
+
+	async fn upload_stdout(&self, stdout: ChildStdout, id: (Uuid, Uuid)) -> io::Result<StatusCode> {
+		let stream = FramedRead::new(stdout, BytesCodec::new());
+		let body = Body::wrap_stream(stream);
+		self.client
+			.put(self.get_output_url(id.0, id.1))
+			.header(AUTHORIZATION.as_str(), self.get_output_creds())
+			.body(body)
+			.send()
+			.await
+			.map(|res| res.status())
+			.map_err(|e| io::Error::new(ErrorKind::Other, e))
 	}
 
 	async fn mark_task_complete(&self, job: Uuid, task: Uuid) -> Result<(), ()> {
