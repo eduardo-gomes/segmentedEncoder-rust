@@ -5,15 +5,16 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
-use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
 use auth_module::AuthenticationHandler;
 use task::manager::Manager;
-use task::{Input, JobOptions, JobSource, Options, Recipe, TaskSource};
+use task::{Input, JobSource, Recipe, TaskSource};
 
+use crate::api::utils::parse::parse_job_options;
 use crate::storage::{MemStorage, Storage};
 
 mod client;
@@ -137,19 +138,12 @@ async fn job_post<S: AppState>(
 	headers: HeaderMap,
 	body: Body,
 ) -> Result<impl IntoResponse, StatusCode> {
-	let video_codec = headers
-		.get(HeaderName::from_static("video_codec"))
-		.map(HeaderValue::to_str)
-		.transpose()
+	let options = parse_job_options(&headers)
+		.map(|opt| opt.video.codec.is_some().then_some(opt))
+		.ok()
 		.unwrap_or_default()
 		.ok_or(StatusCode::BAD_REQUEST)?;
-	let video_param: Vec<String> = headers
-		.get_all(HeaderName::from_static("video_param"))
-		.iter()
-		.map(HeaderValue::to_str)
-		.map(|v| v.map(String::from))
-		.collect::<Result<Vec<_>, _>>()
-		.or(Err(StatusCode::BAD_REQUEST))?;
+
 	let input_id = state
 		.storage()
 		.body_to_new_file(body)
@@ -157,16 +151,7 @@ async fn job_post<S: AppState>(
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	let job_id = state
 		.manager()
-		.create_job(JobSource {
-			input_id,
-			options: JobOptions {
-				video: Options {
-					codec: Some(video_codec.to_string()),
-					params: video_param,
-				},
-				audio: None,
-			},
-		})
+		.create_job(JobSource { input_id, options })
 		.await
 		.or(Err(StatusCode::INTERNAL_SERVER_ERROR))?;
 	state
@@ -414,14 +399,7 @@ mod test {
 			.add_header(AUTHORIZATION, token)
 			.add_header(
 				HeaderName::from_static("video_codec"),
-				HeaderValue::from_str(
-					options
-						.codec
-						.as_ref()
-						.map(String::as_str)
-						.unwrap_or("libx264"),
-				)
-				.unwrap(),
+				HeaderValue::from_str(options.codec.as_deref().unwrap_or("libx264")).unwrap(),
 			)
 			.bytes(body);
 		let params = options
