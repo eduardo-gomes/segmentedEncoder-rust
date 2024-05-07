@@ -60,3 +60,63 @@ pub(crate) mod ranged {
 		}
 	}
 }
+
+pub(crate) mod parse {
+	use axum::http::HeaderValue;
+
+	pub fn split_multiple_headers_into_strings<'a, I>(iter: I) -> Result<Vec<String>, ()>
+	where
+		I: IntoIterator<Item = &'a HeaderValue>,
+	{
+		iter.into_iter()
+			.map(|val| {
+				val.to_str()
+					.map(|str| str.split(',').map(String::from))
+					.map_err(|_| ())
+			})
+			.collect::<Result<Vec<_>, _>>()
+			.map(|vec| vec.into_iter().flatten().collect())
+	}
+
+	#[cfg(test)]
+	mod test {
+		use axum::http::HeaderValue;
+
+		use crate::api::utils::parse::split_multiple_headers_into_strings;
+
+		#[test]
+		fn with_empty_iterator_return_empty_vec() {
+			let res = split_multiple_headers_into_strings(vec![]).unwrap();
+			assert!(res.is_empty())
+		}
+
+		#[test]
+		fn with_single_simple_value_returns_the_value() {
+			let src = "simple";
+			let value = HeaderValue::from_static(src);
+			let res = split_multiple_headers_into_strings(vec![&value]).unwrap();
+			assert_eq!(res.first().unwrap().as_str(), src)
+		}
+
+		#[test]
+		fn with_two_simple_values_returns_the_two_values() {
+			let src = ["first", "second"];
+			let values = [
+				HeaderValue::from_static(src[0]),
+				HeaderValue::from_static(src[1]),
+			];
+			let res = split_multiple_headers_into_strings(values.as_ref()).unwrap();
+			assert_eq!(res[0].as_str(), src[0]);
+			assert_eq!(res[1].as_str(), src[1]);
+		}
+
+		#[test]
+		fn with_two_comma_separated_values_returns_the_two_values() {
+			let src = ["first", "second"];
+			let values = HeaderValue::from_str(src.join(",").as_str()).unwrap();
+			let res = split_multiple_headers_into_strings([&values]).unwrap();
+			assert_eq!(res[0].as_str(), src[0]);
+			assert_eq!(res[1].as_str(), src[1]);
+		}
+	}
+}
