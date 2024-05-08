@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::future::Future;
 use std::process::{ExitStatus, Stdio};
@@ -6,21 +7,27 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{ChildStdout, Command};
 use tokio::sync::mpsc::{channel, Receiver};
 
-fn status_adapter(stream: impl AsyncRead + Unpin + Send + 'static) -> Receiver<String> {
+struct Status(pub BTreeMap<String, String>);
+
+fn status_adapter(stream: impl AsyncRead + Unpin + Send + 'static) -> Receiver<Status> {
 	let mut stream = BufReader::new(stream);
 	let (sender, receiver) = channel(32);
 	tokio::spawn(async move {
-		let mut status = String::new();
+		let mut status = BTreeMap::new();
 		loop {
-			if stream.read_line(&mut status).await.is_err() {
+			let mut line = String::new();
+			if stream.read_line(&mut line).await.is_err() {
 				break;
 			}
-			let is_complete = status.rfind("progress=").is_some();
+			if let Some((name, value)) = line.split_once('=') {
+				status.insert(name.into(), value.trim_end().into());
+			}
+			let is_complete = line.starts_with("progress=");
 			if is_complete {
-				if sender.send(status).await.is_err() {
+				if sender.send(Status(status)).await.is_err() {
 					break;
 				}
-				status = String::new()
+				status = BTreeMap::new();
 			}
 		}
 	});
@@ -59,9 +66,13 @@ where
 				Some(status) => status,
 			};
 			status
-				.lines()
-				.filter(|line| line.starts_with("out_time="))
-				.for_each(|val| println!("Time: {val}"));
+				.0
+				.iter()
+				.filter(|(key, val)| {
+					key.as_str().eq("out_time")
+						|| (key.as_str(), val.as_str()) == ("progress", "end")
+				})
+				.for_each(|(_, val)| println!("Time: {val}"));
 		}
 	});
 	(output, status)
